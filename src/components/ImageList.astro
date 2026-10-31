@@ -1,0 +1,24 @@
+---
+import { getHarborSource } from '../settings.ts';
+import { listImages } from '../sources/harbor.ts';
+
+interface Props {
+	source: string;
+	project: string;
+}
+
+const { source, project } = Astro.props;
+const images = await listImages(getHarborSource(source), project);
+---
+
+{
+	images.length > 0 ? (
+		<ul>
+			{images.map((image) => (
+				<li>{image.name}</li>
+			))}
+		</ul>
+	) : (
+		<p>No Images found.</p>
+	)
+}

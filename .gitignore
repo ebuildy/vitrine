@@ -17,8 +17,16 @@ pnpm-debug.log*
 .env
 .env.production
 
+# installation Settings hold real hostnames, this repo is public
+/settings.yaml
+
 # macOS-specific files
 .DS_Store
 
 # jetbrains setting folder
 .idea/
+
+# test output
+test-results/
+.test-build/
+playwright-report/

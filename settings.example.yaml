@@ -1,0 +1,18 @@
+# Copy this file to settings.yaml, then replace the values with your own.
+# settings.yaml is ignored by git: never commit real hostnames.
+
+sources:
+  - name: main-harbor
+    type: harbor
+    url: https://harbor.example.com
+    # Leave out username and passwordEnv for a Harbor project with anonymous read access.
+    username: robot$vitrine
+    # The name of the environment variable holding the password, never the password itself.
+    passwordEnv: HARBOR_PASSWORD
+
+routes:
+  - url: /images
+    controller: harbor-images
+    params:
+      source: main-harbor
+      project: library
