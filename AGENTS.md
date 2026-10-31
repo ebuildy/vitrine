@@ -8,6 +8,8 @@ astro dev --background
 
 Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
 
+Commit with `git commit -s`, amends included: the sign-off respects the DCO.
+
 ## Documentation
 
 Full documentation: https://docs.astro.build
