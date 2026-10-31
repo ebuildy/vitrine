@@ -7,14 +7,16 @@ export interface FakeHarborOptions {
 	projects: Record<string, string[]>;
 	/** Harbor's own artifact JSON per repository, e.g. { 'platform/api': [{ size: 1, tags: [] }] } */
 	artifacts?: Record<string, FakeArtifact[]>;
+	/** Harbor's own JSON per project, where summary is left out when Harbor refuses it to this reader. */
+	projectDetails?: Record<string, { creation_time: string; repo_count: number; summary?: Record<string, unknown> }>;
 	/** When set, requests must carry these credentials. */
 	credentials?: { username: string; password: string };
 }
 
 export type FakeArtifact = Record<string, unknown>;
 
-/** up answers at once, slow after a short wait, down with a 503, and hanging never. down-after-repositories only fails artifact requests. */
-export type FakeHarborBehaviour = 'up' | 'slow' | 'down' | 'down-after-repositories' | 'hanging';
+/** up answers at once, slow after a short wait, down with a 503, and hanging never. down-after-repositories only fails artifact requests, and down-after-projects only summary requests. */
+export type FakeHarborBehaviour = 'up' | 'slow' | 'down' | 'down-after-repositories' | 'down-after-projects' | 'hanging';
 
 export interface FakeHarbor {
 	url: string;
@@ -28,20 +30,40 @@ export interface FakeHarbor {
 }
 
 /** Answers the parts of Harbor's v2 API that Vitrine reads. */
-export async function startFakeHarbor({ projects, artifacts = {}, credentials }: FakeHarborOptions): Promise<FakeHarbor> {
+export async function startFakeHarbor({ projects, artifacts = {}, projectDetails = {}, credentials }: FakeHarborOptions): Promise<FakeHarbor> {
 	const requests: string[] = [];
 	let behaviour: FakeHarborBehaviour = 'up';
 	const handle = async (request: IncomingMessage, response: ServerResponse) => {
 		const url = new URL(request.url ?? '/', 'http://fake-harbor');
 		requests.push(`${url.pathname}${url.search}`);
 		if (behaviour === 'hanging') return;
-		if (behaviour === 'down' || (behaviour === 'down-after-repositories' && url.pathname.endsWith('/artifacts'))) {
+		if (
+			behaviour === 'down' ||
+			(behaviour === 'down-after-repositories' && url.pathname.endsWith('/artifacts')) ||
+			(behaviour === 'down-after-projects' && url.pathname.endsWith('/summary'))
+		) {
 			response.writeHead(503).end();
 			return;
 		}
 		if (behaviour === 'slow') await new Promise((resolve) => setTimeout(resolve, 200));
 		if (credentials && request.headers.authorization !== basicAuth(credentials)) {
 			response.writeHead(401).end();
+			return;
+		}
+		const names = Object.keys(projects);
+		if (url.pathname === '/api/v2.0/projects') {
+			const items = names.map((name, index) => {
+				const { summary, ...details } = projectDetails[name] ?? { creation_time: '2025-01-01T00:00:00.000Z', repo_count: 0 };
+				return { project_id: index + 1, name, ...details };
+			});
+			respondWithPage(response, url, items);
+			return;
+		}
+		const summaryMatch = url.pathname.match(/^\/api\/v2\.0\/projects\/(\d+)\/summary$/);
+		if (summaryMatch) {
+			const summary = projectDetails[names[Number(summaryMatch[1]) - 1]]?.summary;
+			if (summary) response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(summary));
+			else response.writeHead(403).end();
 			return;
 		}
 		const repositoriesMatch = url.pathname.match(/^\/api\/v2\.0\/projects\/([^/]+)\/repositories$/);

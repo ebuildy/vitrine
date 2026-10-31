@@ -5,13 +5,18 @@ import { getSettings } from '../settings.ts';
 
 interface Props {
 	source?: string;
+	project?: string;
 }
 
-const { source } = Astro.props;
+const { source, project } = Astro.props;
 const sources = getSettings().sources.filter(({ name }) => source === undefined || name === source);
 ---
 
 <Layout title="Images">
 	<h1>Images</h1>
-	{sources.map(({ name, projects }) => projects.map((project) => <ImageList source={name} project={project} />))}
+	{
+		sources.map(({ name, projects }) =>
+			(project ? [project] : projects).map((selected) => <ImageList source={name} project={selected} />),
+		)
+	}
 </Layout>

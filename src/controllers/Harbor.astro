@@ -1,0 +1,15 @@
+---
+import HarborProjectList from '../components/HarborProjectList.astro';
+import Layout from '../layouts/Layout.astro';
+
+interface Props {
+	source: string;
+}
+
+const { source } = Astro.props;
+---
+
+<Layout title={source}>
+	<h1>{source}</h1>
+	<HarborProjectList source={source} />
+</Layout>

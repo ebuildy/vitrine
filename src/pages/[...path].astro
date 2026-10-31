@@ -1,18 +1,20 @@
 ---
 import type { AstroComponentFactory } from 'astro/runtime/server/index.js';
+import Harbor from '../controllers/Harbor.astro';
 import HarborImages from '../controllers/HarborImages.astro';
-import { getSettings } from '../settings.ts';
+import { matchRoute } from '../settings.ts';
 import type { ControllerName } from '../settings.ts';
 
 const controllers: Record<ControllerName, AstroComponentFactory> = {
+	harbor: Harbor,
 	'harbor-images': HarborImages,
 };
 
 const url = `/${Astro.params.path ?? ''}`;
-const route = getSettings().routes.find((candidate) => candidate.url === url);
-if (!route) return new Response(null, { status: 404 });
+const match = matchRoute(url);
+if (!match) return new Response(null, { status: 404 });
 
-const Controller = controllers[route.controller];
+const Controller = controllers[match.route.controller];
 ---
 
-<Controller {...route.params} />
+<Controller {...match.params} />

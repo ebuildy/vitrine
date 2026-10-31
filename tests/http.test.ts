@@ -132,6 +132,85 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 		});
 	});
 
+	describe('a Route to the harbor Controller', () => {
+		let harbor: FakeHarbor;
+		let vitrine: RunningVitrine;
+
+		beforeAll(async () => {
+			harbor = await startFakeHarbor({
+				projects: { platform: ['platform/api'], data: ['data/etl'] },
+				artifacts: { 'platform/api': [artifact], 'data/etl': [artifact] },
+				projectDetails: {
+					platform: { creation_time: '2025-03-14T08:00:00.000Z', repo_count: 1, summary: { quota: { used: { storage: 1_073_741_824 } } } },
+					data: { creation_time: '2024-01-02T08:00:00.000Z', repo_count: 1 },
+				},
+			});
+			vitrine = await startVitrine({
+				sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: ['platform'] }],
+				routes: [
+					{ url: '/harbor/:source', controller: 'harbor' },
+					{ url: '/harbor/:source/:project', controller: 'harbor-images' },
+					{ url: '/:source/overview', controller: 'harbor' },
+					{ url: '/about/overview', controller: 'harbor-images' },
+				],
+				cacheStore: await empty(),
+			});
+		});
+
+		afterAll(async () => {
+			await vitrine?.stop();
+			await harbor?.stop();
+		});
+
+		test('lists every Harbor project the Source reports, selected in Settings or not', async () => {
+			const response = await fetch(`${vitrine.url}/harbor/main-harbor`);
+
+			expect(response.status).toBe(200);
+			const html = await response.text();
+			expect(html).toContain('href="/harbor/main-harbor/platform"');
+			expect(html).toContain('href="/harbor/main-harbor/data"');
+		});
+
+		test('serves the list from the cache without calling the Source again', async () => {
+			await (await fetch(`${vitrine.url}/harbor/main-harbor`)).text();
+			const before = harbor.requests.length;
+
+			await (await fetch(`${vitrine.url}/harbor/main-harbor`)).text();
+
+			expect(harbor.requests).toHaveLength(before);
+		});
+
+		test.each([
+			['selected in Settings', 'platform', 'platform/api', 'data/etl'],
+			['not selected in Settings', 'data', 'data/etl', 'platform/api'],
+		])('opens the Images of a Harbor project %s', async (_, project, shown, left) => {
+			const html = await (await fetch(`${vitrine.url}/harbor/main-harbor/${project}`)).text();
+
+			expect(html).toContain(shown);
+			expect(html).not.toContain(left);
+		});
+
+		test('moves on to the next Route when a URL names no Source', async () => {
+			const response = await fetch(`${vitrine.url}/about/overview`);
+
+			expect(response.status).toBe(200);
+			expect(await response.text()).toContain('<h1>Images</h1>');
+		});
+
+		test.each([
+			['an unknown Source', '/harbor/nope'],
+			['a Harbor project under an unknown Source', '/harbor/nope/platform'],
+		])('returns a not-found page for %s', async (_, url) => {
+			const before = harbor.requests.length;
+
+			const response = await fetch(`${vitrine.url}${url}`);
+
+			expect(response.status).toBe(404);
+			await response.text();
+			expect(harbor.requests).toHaveLength(before);
+		});
+	});
+
 	describe('one Harbor Source down among several', () => {
 		test('limits the error to the Harbor project of that Source', async () => {
 			const up = await startFakeHarbor({ projects: { platform: ['platform/api'] } });
@@ -468,6 +547,10 @@ describe('invalid Settings stop startup', () => {
 		['an empty file', '', 'the file is empty, see settings.example.yaml'],
 		['an unknown Controller', { sources: [source], routes: [{ ...route, controller: 'nope' }] }, 'controller'],
 		['a Route to an unknown Source', { sources: [], routes: [route] }, 'unknown Source "main-harbor"'],
+		['a harbor Route with no Route to Images', { sources: [source], routes: [{ url: '/harbor/:source', controller: 'harbor' }] }, 'needs a harbor-images Route'],
+		['a harbor Route with no Source', { sources: [source], routes: [{ url: '/harbor', controller: 'harbor' }, { url: '/h/:source/:project', controller: 'harbor-images' }] }, 'source'],
+		['a project param with no Source', { sources: [source], routes: [{ url: '/images/:project', controller: 'harbor-images' }] }, 'project needs a source'],
+		['an unknown URL parameter', { sources: [source], routes: [{ url: '/images/:nope', controller: 'harbor-images' }] }, 'nope'],
 		['a Source with no Harbor projects', { sources: [{ ...source, projects: [] }], routes: [route] }, 'projects'],
 		['a Source without a projects key', { sources: [{ name: 'main-harbor', type: 'harbor', url: 'http://harbor.test' }], routes: [route] }, 'projects'],
 		['the same Harbor project twice', { sources: [{ ...source, projects: ['platform', 'platform'] }], routes: [route] }, 'Source "main-harbor" selects Harbor project "platform" twice'],
