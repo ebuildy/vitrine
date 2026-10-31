@@ -19,7 +19,8 @@ cacheStore:
   # files keeps content across a restart when the directory is on a persistent volume:
   # type: files
   # directory: /var/cache/vitrine
-  # redis keeps content across a restart, and is the only store replicas can share:
+  # redis keeps content across a restart of Vitrine, and is the only store replicas can share.
+  # Stale content survives only if the server persists its data and never evicts keys:
   # type: redis
   # The name of the environment variable holding the connection URL, never the URL itself.
   # urlEnv: REDIS_URL

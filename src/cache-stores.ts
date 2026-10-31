@@ -56,7 +56,7 @@ function filesStore(directory: string): CacheStore {
 		},
 		set: async (key, entry) => {
 			await mkdir(directory, { recursive: true });
-			// Renaming into place means a crash or a replica never sees a half-written file.
+			// Renaming into place means a crash never leaves a half-written file.
 			const temporaryPath = `${pathOf(key)}.${randomUUID()}.tmp`;
 			await writeFile(temporaryPath, JSON.stringify(entry));
 			await rename(temporaryPath, pathOf(key));
@@ -65,7 +65,7 @@ function filesStore(directory: string): CacheStore {
 }
 
 function redisStore(url: string): CacheStore {
-	const redis = new Redis(url, { maxRetriesPerRequest: 1 });
+	const redis = new Redis(url, { maxRetriesPerRequest: 1, commandTimeout: 1_000 });
 	// The content cache logs every read and write that fails, which says more than the connection errors do.
 	redis.on('error', () => {});
 	return {
