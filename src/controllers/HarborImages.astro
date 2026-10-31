@@ -1,0 +1,16 @@
+---
+import ImageList from '../components/ImageList.astro';
+import Layout from '../layouts/Layout.astro';
+
+interface Props {
+	source: string;
+	project: string;
+}
+
+const { source, project } = Astro.props;
+---
+
+<Layout title="Images">
+	<h1>Images</h1>
+	<ImageList source={source} project={project} />
+</Layout>
