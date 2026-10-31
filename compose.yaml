@@ -1,0 +1,15 @@
+# Services for local development: `docker compose up -d` or `podman compose up -d`.
+name: vitrine
+
+services:
+  valkey:
+    image: docker.io/valkey/valkey:9-alpine
+    # A disposable cache: nothing is written to disk, and the oldest keys go when memory runs out.
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
