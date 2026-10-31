@@ -22,6 +22,19 @@ sources:
     projects:
       - tools
 
+# Where content read from Sources is kept. Defaults to memory.
+cacheStore:
+  # memory loses everything on restart.
+  type: memory
+  # files keeps content across a restart when the directory is on a persistent volume:
+  # type: files
+  # directory: /var/cache/vitrine
+  # redis keeps content across a restart of Vitrine, and is the only store replicas can share.
+  # Stale content survives only if the server persists its data and never evicts keys:
+  # type: redis
+  # The name of the environment variable holding the connection URL, never the URL itself.
+  # urlEnv: REDIS_URL
+
 routes:
   # Shows the Images of every selected Harbor project of every Source.
   - url: /images
