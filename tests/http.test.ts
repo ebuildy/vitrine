@@ -109,11 +109,15 @@ describe('reading a Source through the cache', () => {
 		cleanups.push(vitrine.stop, harbor.stop);
 		const images = async () => {
 			const response = await fetch(`${vitrine.url}/images`);
-			return { status: response.status, html: await response.text() };
+			const page = { status: response.status, html: await response.text() };
+			// Lets an allowed age of ONE_MILLISECOND run out before the next request.
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			return page;
 		};
 		return { harbor, images };
 	}
 
+	const ONE_MILLISECOND = 1 / 60_000;
 	const cleanups: (() => Promise<void>)[] = [];
 
 	afterEach(async () => {
@@ -132,7 +136,7 @@ describe('reading a Source through the cache', () => {
 
 	test('loads data older than its allowed age and replaces the cached data', async () => {
 		const projects = { platform: ['platform/old'] };
-		const { images } = await start({ allowedAgeMinutes: 0 }, projects);
+		const { images } = await start({ allowedAgeMinutes: ONE_MILLISECOND }, projects);
 
 		await images();
 		projects.platform = ['platform/new'];
@@ -143,7 +147,7 @@ describe('reading a Source through the cache', () => {
 	});
 
 	test('serves Stale data with a warning while the Source is down', async () => {
-		const { harbor, images } = await start({ allowedAgeMinutes: 0 });
+		const { harbor, images } = await start({ allowedAgeMinutes: ONE_MILLISECOND });
 
 		expect((await images()).html).not.toContain('This list is Stale');
 		harbor.behave('down');
@@ -154,7 +158,7 @@ describe('reading a Source through the cache', () => {
 	});
 
 	test('drops the warning once the Source is back', async () => {
-		const { harbor, images } = await start({ allowedAgeMinutes: 0 });
+		const { harbor, images } = await start({ allowedAgeMinutes: ONE_MILLISECOND });
 
 		await images();
 		harbor.behave('down');
@@ -175,8 +179,11 @@ describe('reading a Source through the cache', () => {
 		expect(html).toContain('Images could not be loaded');
 	});
 
-	test('counts a Source that takes over 10 seconds as down', async () => {
-		const { harbor, images } = await start();
+	test.each([
+		['with the cache', {}],
+		['with the cache disabled', { allowedAgeMinutes: 0 }],
+	])('counts a Source that takes over 10 seconds as down %s', async (_, source) => {
+		const { harbor, images } = await start(source);
 
 		harbor.behave('hanging');
 		const startedAt = Date.now();
@@ -189,7 +196,7 @@ describe('reading a Source through the cache', () => {
 	});
 
 	test('serves Stale data with a warning when the Source takes over 10 seconds', async () => {
-		const { harbor, images } = await start({ allowedAgeMinutes: 0 });
+		const { harbor, images } = await start({ allowedAgeMinutes: ONE_MILLISECOND });
 
 		await images();
 		harbor.behave('hanging');
@@ -197,6 +204,28 @@ describe('reading a Source through the cache', () => {
 
 		expect(html).toContain('platform/api');
 		expect(html).toContain('This list is Stale');
+	});
+
+	test('calls the Source on every request when the allowed age is 0', async () => {
+		const { harbor, images } = await start({ allowedAgeMinutes: 0 });
+
+		await images();
+		await images();
+
+		expect(harbor.requests).toHaveLength(2);
+	});
+
+	test('never serves Stale data when the allowed age is 0', async () => {
+		const { harbor, images } = await start({ allowedAgeMinutes: 0 });
+
+		await images();
+		harbor.behave('down');
+		const { status, html } = await images();
+
+		expect(status).toBe(200);
+		expect(html).toContain('<h1>Images</h1>');
+		expect(html).toContain('Images could not be loaded');
+		expect(html).not.toContain('platform/api');
 	});
 
 	test('shares one Source call between simultaneous requests', async () => {
@@ -210,7 +239,7 @@ describe('reading a Source through the cache', () => {
 	});
 
 	test('shares one Source call when simultaneous requests refresh data older than its allowed age', async () => {
-		const { harbor, images } = await start({ allowedAgeMinutes: 0 });
+		const { harbor, images } = await start({ allowedAgeMinutes: ONE_MILLISECOND });
 
 		await images();
 		harbor.behave('slow');

@@ -25,17 +25,24 @@ export async function readThrough<T>(key: string, allowedAgeMs: number, loader: 
 	return load as Promise<CachedContent<T>>;
 }
 
-async function refresh<T>(key: string, loader: Loader<T>): Promise<CachedContent<T>> {
+/** Reads a Source with the cache left out, so it never stores or falls back on anything. */
+export async function readUncached<T>(key: string, loader: Loader<T>): Promise<CachedContent<T>> {
 	try {
-		const data = await withTimeout(loader);
-		entries.set(key, { data, loadedAt: Date.now() });
-		return { data, stale: false };
+		return { data: await withTimeout(loader), stale: false };
 	} catch (error) {
 		console.error(`Could not load "${key}":`, error);
-		const entry = entries.get(key);
-		if (entry) return { data: entry.data as T, stale: true };
 		return { error: error instanceof Error ? error : new Error(String(error)) };
 	}
+}
+
+async function refresh<T>(key: string, loader: Loader<T>): Promise<CachedContent<T>> {
+	const result = await readUncached(key, loader);
+	if (result.error) {
+		const entry = entries.get(key);
+		return entry ? { data: entry.data as T, stale: true } : result;
+	}
+	entries.set(key, { data: result.data, loadedAt: Date.now() });
+	return result;
 }
 
 function withTimeout<T>(loader: Loader<T>): Promise<T> {
