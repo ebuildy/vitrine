@@ -8,11 +8,14 @@ interface Props {
 }
 
 const { source, project } = Astro.props;
-const images = await listImages(getHarborSource(source), project);
+const { data: images, stale } = await listImages(getHarborSource(source), project);
 ---
 
+{stale && <p role="status">This list is Stale because {source} is down.</p>}
 {
-	images.length > 0 ? (
+	!images ? (
+		<p role="alert">Images could not be loaded because {source} is down.</p>
+	) : images.length > 0 ? (
 		<ul>
 			{images.map((image) => (
 				<li>{image.name}</li>

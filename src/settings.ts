@@ -9,6 +9,7 @@ const harborSourceSchema = z
 		url: z.url(),
 		username: z.string().optional(),
 		passwordEnv: z.string().optional(),
+		allowedAgeMinutes: z.number().nonnegative().default(15),
 	})
 	.refine(({ username, passwordEnv }) => Boolean(username) === Boolean(passwordEnv), {
 		message: 'username and passwordEnv must be set together',
