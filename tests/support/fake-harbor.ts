@@ -5,31 +5,37 @@ import type { AddressInfo } from 'node:net';
 export interface FakeHarborOptions {
 	/** Repository names per Harbor project, e.g. { platform: ['platform/api'] } */
 	projects: Record<string, string[]>;
+	/** Harbor's own artifact JSON per repository, e.g. { 'platform/api': [{ size: 1, tags: [] }] } */
+	artifacts?: Record<string, FakeArtifact[]>;
 	/** When set, requests must carry these credentials. */
 	credentials?: { username: string; password: string };
 }
 
-/** up answers at once, slow after a short wait, down with a 503, and hanging never. */
-export type FakeHarborBehaviour = 'up' | 'slow' | 'down' | 'hanging';
+export type FakeArtifact = Record<string, unknown>;
+
+/** up answers at once, slow after a short wait, down with a 503, and hanging never. down-after-repositories only fails artifact requests. */
+export type FakeHarborBehaviour = 'up' | 'slow' | 'down' | 'down-after-repositories' | 'hanging';
 
 export interface FakeHarbor {
 	url: string;
 	/** Every request received, as path and query. */
 	requests: string[];
+	/** The requests that list a project's repositories, of which a load of one project makes one per page. */
+	repositoryListRequests: () => string[];
 	/** Changes how the following requests are answered. */
 	behave: (behaviour: FakeHarborBehaviour) => void;
 	stop: () => Promise<void>;
 }
 
 /** Answers the parts of Harbor's v2 API that Vitrine reads. */
-export async function startFakeHarbor({ projects, credentials }: FakeHarborOptions): Promise<FakeHarbor> {
+export async function startFakeHarbor({ projects, artifacts = {}, credentials }: FakeHarborOptions): Promise<FakeHarbor> {
 	const requests: string[] = [];
 	let behaviour: FakeHarborBehaviour = 'up';
 	const handle = async (request: IncomingMessage, response: ServerResponse) => {
 		const url = new URL(request.url ?? '/', 'http://fake-harbor');
 		requests.push(`${url.pathname}${url.search}`);
 		if (behaviour === 'hanging') return;
-		if (behaviour === 'down') {
+		if (behaviour === 'down' || (behaviour === 'down-after-repositories' && url.pathname.endsWith('/artifacts'))) {
 			response.writeHead(503).end();
 			return;
 		}
@@ -38,16 +44,23 @@ export async function startFakeHarbor({ projects, credentials }: FakeHarborOptio
 			response.writeHead(401).end();
 			return;
 		}
-		const match = url.pathname.match(/^\/api\/v2\.0\/projects\/([^/]+)\/repositories$/);
-		const repositories = match && projects[match[1]];
-		if (!repositories) {
-			response.writeHead(404).end();
+		const repositoriesMatch = url.pathname.match(/^\/api\/v2\.0\/projects\/([^/]+)\/repositories$/);
+		const repositories = repositoriesMatch && projects[repositoriesMatch[1]];
+		if (repositories) {
+			respondWithPage(response, url, repositories.map((name) => ({ name })));
 			return;
 		}
-		const page = Number(url.searchParams.get('page') ?? 1);
-		const pageSize = Number(url.searchParams.get('page_size') ?? 10);
-		const items = repositories.slice((page - 1) * pageSize, page * pageSize).map((name) => ({ name }));
-		response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(items));
+		const artifactsMatch = url.pathname.match(/^\/api\/v2\.0\/projects\/([^/]+)\/repositories\/([^/]+)\/artifacts$/);
+		const repository = artifactsMatch && repositoryName(artifactsMatch[1], artifactsMatch[2]);
+		if (repository && projects[artifactsMatch[1]]?.includes(repository)) {
+			const withScanOverview = url.searchParams.get('with_scan_overview') === 'true';
+			const items = (artifacts[repository] ?? []).map(({ scan_overview, ...artifact }) =>
+				withScanOverview ? { ...artifact, scan_overview } : artifact,
+			);
+			respondWithPage(response, url, items);
+			return;
+		}
+		response.writeHead(404).end();
 	};
 
 	const server = createServer(handle);
@@ -56,6 +69,7 @@ export async function startFakeHarbor({ projects, credentials }: FakeHarborOptio
 	return {
 		url: `http://127.0.0.1:${port}`,
 		requests,
+		repositoryListRequests: () => requests.filter((request) => /\/repositories\?/.test(request)),
 		behave: (next) => {
 			behaviour = next;
 		},
@@ -65,6 +79,19 @@ export async function startFakeHarbor({ projects, credentials }: FakeHarborOptio
 				server.closeAllConnections();
 			}),
 	};
+}
+
+function respondWithPage(response: ServerResponse, url: URL, items: unknown[]) {
+	const page = Number(url.searchParams.get('page') ?? 1);
+	const pageSize = Number(url.searchParams.get('page_size') ?? 10);
+	response
+		.writeHead(200, { 'content-type': 'application/json' })
+		.end(JSON.stringify(items.slice((page - 1) * pageSize, page * pageSize)));
+}
+
+/** Harbor wants the slashes of a repository name encoded twice, and answers 404 to a single encoding. */
+function repositoryName(project: string, encoded: string) {
+	return /%2f/i.test(encoded) ? undefined : `${project}/${decodeURIComponent(decodeURIComponent(encoded))}`;
 }
 
 function basicAuth({ username, password }: { username: string; password: string }) {

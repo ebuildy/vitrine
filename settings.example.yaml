@@ -5,16 +5,29 @@ sources:
   - name: main-harbor
     type: harbor
     url: https://harbor.example.com
+    # The Harbor projects whose Images appear in Vitrine.
+    projects:
+      - library
+      - platform
     # Leave out username and passwordEnv for a Harbor project with anonymous read access.
     username: robot$vitrine
     # The name of the environment variable holding the password, never the password itself.
     passwordEnv: HARBOR_PASSWORD
     # How long content from this Source is served without asking it again. Defaults to 15, and 0 disables the cache.
     allowedAgeMinutes: 15
+  # Declare as many Sources as you run.
+  - name: tools-harbor
+    type: harbor
+    url: https://tools-harbor.example.com
+    projects:
+      - tools
 
 routes:
+  # Shows the Images of every selected Harbor project of every Source.
   - url: /images
     controller: harbor-images
+  # The source parameter limits a Route to one Source.
+  - url: /images/tools
+    controller: harbor-images
     params:
-      source: main-harbor
-      project: library
+      source: tools-harbor

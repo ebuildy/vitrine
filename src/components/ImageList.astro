@@ -9,6 +9,21 @@ interface Props {
 
 const { source, project } = Astro.props;
 const { data: images, stale } = await listImages(getHarborSource(source), project);
+
+function formatSize(bytes: number) {
+	const units = ['B', 'KiB', 'MiB', 'GiB'];
+	let size = bytes;
+	let unit = 0;
+	while (size >= 1024 && unit < units.length - 1) {
+		size /= 1024;
+		unit++;
+	}
+	return `${Number(size.toFixed(1))} ${units[unit]}`;
+}
+
+function formatDate(date: string) {
+	return date.slice(0, 10);
+}
 ---
 
 {stale && <p role="status">This list is Stale because {source} is down.</p>}
@@ -18,10 +33,70 @@ const { data: images, stale } = await listImages(getHarborSource(source), projec
 	) : images.length > 0 ? (
 		<ul>
 			{images.map((image) => (
-				<li>{image.name}</li>
+				<li>
+					<h2>{image.name}</h2>
+					{image.tags.length > 0 ? (
+						<table>
+							<thead>
+								<tr>
+									<th scope="col">Tag</th>
+									<th scope="col">Size</th>
+									<th scope="col">Pushed</th>
+									<th scope="col">Critical</th>
+									<th scope="col">High</th>
+									<th scope="col">Medium</th>
+									<th scope="col">Low</th>
+									<th scope="col">Scanned</th>
+									<th scope="col">Pull</th>
+								</tr>
+							</thead>
+							<tbody>
+								{image.tags.map((tag) => (
+									<tr>
+										<th scope="row">{tag.name}</th>
+										<td>{formatSize(tag.size)}</td>
+										<td>{formatDate(tag.pushedAt)}</td>
+										{tag.scan ? (
+											<>
+												<td>{tag.scan.critical}</td>
+												<td>{tag.scan.high}</td>
+												<td>{tag.scan.medium}</td>
+												<td>{tag.scan.low}</td>
+												<td>{formatDate(tag.scan.scannedAt)}</td>
+											</>
+										) : (
+											<td colspan="5">Not scanned</td>
+										)}
+										<td>
+											<code>docker pull {tag.pullReference}</code>
+											<button type="button" data-pull-command={`docker pull ${tag.pullReference}`} hidden>
+												Copy
+											</button>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					) : (
+						<p>No tags.</p>
+					)}
+				</li>
 			))}
 		</ul>
 	) : (
 		<p>No Images found.</p>
 	)
 }
+
+<script>
+	// Browsers only offer the clipboard on HTTPS and localhost, and the command stays selectable everywhere else.
+	if (navigator.clipboard) {
+		for (const button of document.querySelectorAll<HTMLButtonElement>('[data-pull-command]')) {
+			button.hidden = false;
+			button.addEventListener('click', async () => {
+				await navigator.clipboard.writeText(button.dataset.pullCommand ?? '');
+				button.textContent = 'Copied';
+			});
+		}
+	}
+</script>

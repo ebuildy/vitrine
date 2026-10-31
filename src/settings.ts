@@ -7,6 +7,7 @@ const harborSourceSchema = z
 		name: z.string().min(1),
 		type: z.literal('harbor'),
 		url: z.url(),
+		projects: z.array(z.string().min(1)).min(1),
 		username: z.string().optional(),
 		passwordEnv: z.string().optional(),
 		allowedAgeMinutes: z.number().nonnegative().default(15),
@@ -16,7 +17,7 @@ const harborSourceSchema = z
 	});
 
 const controllerParamsSchemas = {
-	'harbor-images': z.strictObject({ source: z.string(), project: z.string() }),
+	'harbor-images': z.strictObject({ source: z.string().optional() }),
 };
 
 export type ControllerName = keyof typeof controllerParamsSchemas;
@@ -82,7 +83,8 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 
 function sourceProblems(sources: z.infer<typeof harborSourceSchema>[], env: Record<string, string | undefined>) {
 	const problems = duplicates(sources.map((source) => source.name)).map((name) => `Source "${name}" is declared twice`);
-	for (const { name, passwordEnv } of sources) {
+	for (const { name, projects, passwordEnv } of sources) {
+		problems.push(...duplicates(projects).map((project) => `Source "${name}" selects Harbor project "${project}" twice`));
 		if (passwordEnv && !env[passwordEnv]) {
 			problems.push(`Source "${name}" needs the environment variable ${passwordEnv}`);
 		}
