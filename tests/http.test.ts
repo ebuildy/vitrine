@@ -145,12 +145,12 @@ describe('reading a Source through the cache', () => {
 	test('serves Stale data with a warning while the Source is down', async () => {
 		const { harbor, images } = await start({ allowedAgeMinutes: 0 });
 
-		expect((await images()).html).not.toContain('may be out of date');
+		expect((await images()).html).not.toContain('This list is Stale');
 		harbor.behave('down');
 		const { html } = await images();
 
 		expect(html).toContain('platform/api');
-		expect(html).toContain('may be out of date');
+		expect(html).toContain('This list is Stale');
 	});
 
 	test('drops the warning once the Source is back', async () => {
@@ -161,7 +161,7 @@ describe('reading a Source through the cache', () => {
 		await images();
 		harbor.behave('up');
 
-		expect((await images()).html).not.toContain('may be out of date');
+		expect((await images()).html).not.toContain('This list is Stale');
 	});
 
 	test('shows an error in the section and keeps the page when nothing is cached', async () => {
@@ -188,6 +188,17 @@ describe('reading a Source through the cache', () => {
 		expect(elapsed).toBeLessThan(12_000);
 	});
 
+	test('serves Stale data with a warning when the Source takes over 10 seconds', async () => {
+		const { harbor, images } = await start({ allowedAgeMinutes: 0 });
+
+		await images();
+		harbor.behave('hanging');
+		const { html } = await images();
+
+		expect(html).toContain('platform/api');
+		expect(html).toContain('This list is Stale');
+	});
+
 	test('shares one Source call between simultaneous requests', async () => {
 		const { harbor, images } = await start();
 
@@ -196,6 +207,16 @@ describe('reading a Source through the cache', () => {
 
 		expect(pages.map(({ html }) => html.includes('platform/api'))).toEqual([true, true, true, true, true]);
 		expect(harbor.requests).toHaveLength(1);
+	});
+
+	test('shares one Source call when simultaneous requests refresh data older than its allowed age', async () => {
+		const { harbor, images } = await start({ allowedAgeMinutes: 0 });
+
+		await images();
+		harbor.behave('slow');
+		await Promise.all([images(), images(), images(), images(), images()]);
+
+		expect(harbor.requests).toHaveLength(2);
 	});
 });
 

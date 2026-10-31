@@ -15,7 +15,7 @@ const { data: images, stale } = await readThrough(`${source}/images/${project}`,
 );
 ---
 
-{stale && <p role="status">{source} is down, so this list may be out of date.</p>}
+{stale && <p role="status">This list is Stale because {source} is down.</p>}
 {
 	!images ? (
 		<p role="alert">Images could not be loaded because {source} is down.</p>

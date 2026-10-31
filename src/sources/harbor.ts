@@ -6,7 +6,7 @@ export interface Image {
 	name: string;
 }
 
-export async function listImages(source: HarborSource, project: string, signal?: AbortSignal): Promise<Image[]> {
+export async function listImages(source: HarborSource, project: string, signal: AbortSignal): Promise<Image[]> {
 	const images: Image[] = [];
 	for (let page = 1; ; page++) {
 		const batch = await fetchRepositories(source, project, page, signal);
@@ -19,7 +19,7 @@ async function fetchRepositories(
 	source: HarborSource,
 	project: string,
 	page: number,
-	signal?: AbortSignal,
+	signal: AbortSignal,
 ): Promise<{ name: string }[]> {
 	const url = new URL(`/api/v2.0/projects/${encodeURIComponent(project)}/repositories`, source.url);
 	url.searchParams.set('page', String(page));

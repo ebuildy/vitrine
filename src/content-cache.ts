@@ -5,22 +5,22 @@ interface Entry {
 	loadedAt: number;
 }
 
-export type CachedContent<T> = { data: T; stale: boolean; error?: undefined } | { data?: undefined; error: Error };
+export type CachedContent<T> = { data: T; stale: boolean; error?: undefined } | { data?: undefined; stale?: undefined; error: Error };
 
 /** Reads a Source, and is told through the signal when it has counted as down. */
 export type Loader<T> = (signal: AbortSignal) => Promise<T>;
 
 const entries = new Map<string, Entry>();
-const loads = new Map<string, Promise<CachedContent<unknown>>>();
+const inFlightLoads = new Map<string, Promise<CachedContent<unknown>>>();
 
 export async function readThrough<T>(key: string, allowedAgeMs: number, loader: Loader<T>): Promise<CachedContent<T>> {
 	const entry = entries.get(key);
 	if (entry && Date.now() - entry.loadedAt < allowedAgeMs) return { data: entry.data as T, stale: false };
 
-	let load = loads.get(key);
+	let load = inFlightLoads.get(key);
 	if (!load) {
-		load = refresh(key, loader).finally(() => loads.delete(key));
-		loads.set(key, load);
+		load = refresh(key, loader).finally(() => inFlightLoads.delete(key));
+		inFlightLoads.set(key, load);
 	}
 	return load as Promise<CachedContent<T>>;
 }

@@ -74,7 +74,7 @@ test('warns when showing Stale Images because the Source is down', async () => {
 	const html = await render({ source: 'five-minute-harbor', project: 'kept' });
 
 	expect(html).toContain('kept/api');
-	expect(html).toContain('may be out of date');
+	expect(html).toContain('This list is Stale');
 });
 
 test('shows an error when the Source is down with nothing cached', async () => {

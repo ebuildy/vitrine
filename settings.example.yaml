@@ -9,7 +9,7 @@ sources:
     username: robot$vitrine
     # The name of the environment variable holding the password, never the password itself.
     passwordEnv: HARBOR_PASSWORD
-    # How long content from this Source is served without asking it again. Defaults to 15.
+    # How long content from this Source is served without asking it again. Defaults to 15, and 0 asks it on every request.
     allowedAgeMinutes: 15
 
 routes:
