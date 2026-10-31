@@ -1,9 +1,10 @@
 ---
+import type { AstroComponentFactory } from 'astro/runtime/server/index.js';
 import HarborImages from '../controllers/HarborImages.astro';
 import { getSettings } from '../settings.ts';
 import type { ControllerName } from '../settings.ts';
 
-const controllers: Record<ControllerName, typeof HarborImages> = {
+const controllers: Record<ControllerName, AstroComponentFactory> = {
 	'harbor-images': HarborImages,
 };
 
@@ -12,7 +13,6 @@ const route = getSettings().routes.find((candidate) => candidate.url === url);
 if (!route) return new Response(null, { status: 404 });
 
 const Controller = controllers[route.controller];
-const { source = '', project = '' } = route.params;
 ---
 
-<Controller source={source} project={project} />
+<Controller {...route.params} />

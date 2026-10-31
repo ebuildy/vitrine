@@ -8,4 +8,5 @@ try {
 }
 
 const server = './dist/server/entry.mjs';
-await import(server);
+const { startServer } = await import(server);
+await startServer().done;

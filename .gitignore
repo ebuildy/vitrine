@@ -28,4 +28,5 @@ settings.yaml
 
 # test output
 test-results/
+.test-build/
 playwright-report/

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { startFakeHarbor } from './support/fake-harbor.ts';
 import type { FakeHarbor } from './support/fake-harbor.ts';
-import { startupFailure, startVitrine } from './support/vitrine.ts';
+import { devStartupFailure, runBuiltEntryDirectly, startupFailure, startVitrine } from './support/vitrine.ts';
 import type { RunningVitrine } from './support/vitrine.ts';
 
 describe('a Route to the harbor-images Controller', () => {
@@ -15,6 +15,7 @@ describe('a Route to the harbor-images Controller', () => {
 			sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url }],
 			routes: [
 				{ url: '/images', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } },
+				{ url: '/', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } },
 				{ url: '/fork-page', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } },
 			],
 		});
@@ -32,6 +33,10 @@ describe('a Route to the harbor-images Controller', () => {
 		const html = await response.text();
 		expect(html).toContain('platform/api');
 		expect(html).toContain('platform/worker');
+	});
+
+	test('serves a Route at the root URL', async () => {
+		expect((await fetch(`${vitrine.url}/`)).status).toBe(200);
 	});
 
 	test('returns a not-found page for a URL with no Route', async () => {
@@ -86,6 +91,7 @@ describe('reading Harbor', () => {
 
 		await vitrine.stop();
 		await harbor.stop();
+		expect(harbor.requests).toHaveLength(2);
 		expect(html).toContain('platform/image-0<');
 		expect(html).toContain('platform/image-149<');
 	});
@@ -98,6 +104,13 @@ describe('invalid Settings stop startup', () => {
 	test.each([
 		['malformed YAML', 'sources: [', 'settings.yaml'],
 		['a missing section', { sources: [source] }, 'routes'],
+		['an unknown section', { sources: [source], routes: [route], extra: true }, 'extra'],
+		['a misspelt key', { sources: [{ ...source, passwrodEnv: 'HARBOR_PASSWORD' }], routes: [route] }, 'passwrodEnv'],
+		['a password in the file', { sources: [{ ...source, password: 's3cret' }], routes: [route] }, 'password'],
+		['a username with no passwordEnv', { sources: [{ ...source, username: 'robot' }], routes: [route] }, 'username and passwordEnv'],
+		['a passwordEnv with no username', { sources: [{ ...source, passwordEnv: 'PATH' }], routes: [route] }, 'username and passwordEnv'],
+		['a Route URL with a trailing slash', { sources: [source], routes: [{ ...route, url: '/images/' }] }, 'trailing slash'],
+		['an unknown Controller parameter', { sources: [source], routes: [{ ...route, params: { ...route.params, extra: 'x' } }] }, 'extra'],
 		['an empty file', '', 'the file is empty, see settings.example.yaml'],
 		['an unknown Controller', { sources: [source], routes: [{ ...route, controller: 'nope' }] }, 'controller'],
 		['a Route to an unknown Source', { sources: [], routes: [route] }, 'unknown Source "main-harbor"'],
@@ -105,10 +118,23 @@ describe('invalid Settings stop startup', () => {
 		['the same URL twice', { sources: [source], routes: [route, route] }, 'Route "/images" is declared twice'],
 		['an unset secret', { sources: [{ ...source, username: 'robot', passwordEnv: 'VITRINE_UNSET' }], routes: [route] }, 'VITRINE_UNSET'],
 	])('with %s', async (_, settings, expectedError) => {
-		const { exitCode, stderr } = await startupFailure(settings);
+		const { exitCode, output } = await startupFailure(settings);
 
 		expect(exitCode).toBe(1);
-		expect(stderr).toContain(expectedError);
+		expect(output).toContain(expectedError);
+	});
+
+	test('with astro dev', async () => {
+		const { exitCode } = await devStartupFailure('sources: [');
+
+		expect(exitCode).not.toBe(0);
+	});
+
+	test('because the built entry serves nothing by itself', async () => {
+		const { exitCode, output } = await runBuiltEntryDirectly('sources: [');
+
+		expect(exitCode).toBe(0);
+		expect(output).not.toContain('Server listening');
 	});
 });
 

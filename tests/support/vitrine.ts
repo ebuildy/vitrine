@@ -1,13 +1,23 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { stringify } from 'yaml';
 
+const BUILD_DIR = '.test-build';
+const ASTRO = resolve('node_modules/.bin/astro');
+
+/** Builds a throwaway copy with a fork's pages added, so they never reach the real build. */
 export function buildVitrine() {
-	execFileSync('npx', ['astro', 'build', '--config', 'tests/astro.test.config.mjs'], { stdio: 'inherit' });
+	rmSync(BUILD_DIR, { recursive: true, force: true });
+	mkdirSync(BUILD_DIR);
+	for (const path of ['src', 'start.ts', 'astro.config.mjs', 'tsconfig.json', 'package.json']) {
+		cpSync(path, join(BUILD_DIR, path), { recursive: true });
+	}
+	cpSync('tests/fixtures/pages', join(BUILD_DIR, 'src/pages'), { recursive: true });
+	execFileSync(ASTRO, ['build'], { cwd: BUILD_DIR, stdio: 'inherit' });
 }
 
 export function writeSettings(settings: unknown): string {
@@ -21,8 +31,9 @@ export interface RunningVitrine {
 	stop: () => Promise<void>;
 }
 
-function spawnVitrine(settings: unknown, env: Record<string, string>) {
-	return spawn('node', ['start.ts'], {
+function spawnVitrine(command: string, args: string[], settings: unknown, env: Record<string, string>) {
+	return spawn(command, args, {
+		cwd: BUILD_DIR,
 		env: { ...process.env, VITRINE_SETTINGS: writeSettings(settings), ...env },
 		stdio: ['ignore', 'pipe', 'pipe'],
 	});
@@ -30,7 +41,7 @@ function spawnVitrine(settings: unknown, env: Record<string, string>) {
 
 export async function startVitrine(settings: unknown, env: Record<string, string> = {}): Promise<RunningVitrine> {
 	const port = await freePort();
-	const child = spawnVitrine(settings, { ...env, HOST: '127.0.0.1', PORT: String(port) });
+	const child = spawnVitrine('node', ['start.ts'], settings, { ...env, HOST: '127.0.0.1', PORT: String(port) });
 	let stderr = '';
 	child.stderr.on('data', (chunk) => (stderr += chunk));
 	const url = `http://127.0.0.1:${port}`;
@@ -55,16 +66,29 @@ export async function startVitrine(settings: unknown, env: Record<string, string
 	throw new Error(`Vitrine did not start:\n${stderr}`);
 }
 
-/** Runs Vitrine expecting it to refuse to start. */
-export async function startupFailure(settings: unknown, env: Record<string, string> = {}) {
+/** Runs a command that is expected to end by itself, and returns how it ended. */
+async function runToExit(command: string, args: string[], settings: unknown, env: Record<string, string>) {
 	const port = await freePort();
-	const child = spawnVitrine(settings, { ...env, HOST: '127.0.0.1', PORT: String(port) });
-	let stderr = '';
-	child.stderr.on('data', (chunk) => (stderr += chunk));
+	const child = spawnVitrine(command, args, settings, { ...env, HOST: '127.0.0.1', PORT: String(port) });
+	let output = '';
+	child.stdout.on('data', (chunk) => (output += chunk));
+	child.stderr.on('data', (chunk) => (output += chunk));
 	const timeout = setTimeout(() => child.kill(), 10_000);
 	const exitCode = await new Promise<number | null>((resolve) => child.once('exit', resolve));
 	clearTimeout(timeout);
-	return { exitCode, stderr };
+	return { exitCode, output };
+}
+
+export function startupFailure(settings: unknown, env: Record<string, string> = {}) {
+	return runToExit('node', ['start.ts'], settings, env);
+}
+
+export function devStartupFailure(settings: unknown) {
+	return runToExit(ASTRO, ['dev'], settings, {});
+}
+
+export function runBuiltEntryDirectly(settings: unknown) {
+	return runToExit('node', ['dist/server/entry.mjs'], settings, {});
 }
 
 async function freePort(): Promise<number> {

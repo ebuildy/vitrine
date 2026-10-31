@@ -2,27 +2,34 @@ import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 import { z } from 'zod';
 
-const harborSourceSchema = z.object({
-	name: z.string().min(1),
-	type: z.literal('harbor'),
-	url: z.url(),
-	username: z.string().optional(),
-	passwordEnv: z.string().optional(),
-});
+const harborSourceSchema = z
+	.strictObject({
+		name: z.string().min(1),
+		type: z.literal('harbor'),
+		url: z.url(),
+		username: z.string().optional(),
+		passwordEnv: z.string().optional(),
+	})
+	.refine(({ username, passwordEnv }) => Boolean(username) === Boolean(passwordEnv), {
+		message: 'username and passwordEnv must be set together',
+	});
 
 const controllerParamsSchemas = {
-	'harbor-images': z.object({ source: z.string(), project: z.string() }),
+	'harbor-images': z.strictObject({ source: z.string(), project: z.string() }),
 };
 
 export type ControllerName = keyof typeof controllerParamsSchemas;
 
-const routeSchema = z.object({
-	url: z.string().startsWith('/'),
+const routeSchema = z.strictObject({
+	url: z
+		.string()
+		.startsWith('/')
+		.refine((url) => url === '/' || !url.endsWith('/'), { message: 'must not end with a trailing slash' }),
 	controller: z.enum(Object.keys(controllerParamsSchemas) as [ControllerName, ...ControllerName[]]),
 	params: z.record(z.string(), z.string()).default({}),
 });
 
-const settingsSchema = z.object({
+const settingsSchema = z.strictObject({
 	sources: z.array(harborSourceSchema),
 	routes: z.array(routeSchema),
 });
@@ -87,9 +94,12 @@ function routeProblems(routes: Route[], sources: z.infer<typeof harborSourceSche
 	for (const { url, controller, params } of routes) {
 		const parsed = controllerParamsSchemas[controller].safeParse(params);
 		if (!parsed.success) {
-			problems.push(...parsed.error.issues.map((issue) => `Route "${url}": parameter ${issue.path.join('.')} is required`));
-		} else if (!sources.some((source) => source.name === parsed.data.source)) {
-			problems.push(`Route "${url}": unknown Source "${parsed.data.source}"`);
+			problems.push(...parsed.error.issues.map((issue) => `Route "${url}": ${[...issue.path, issue.message].join(': ')}`));
+			continue;
+		}
+		const source = 'source' in parsed.data ? parsed.data.source : undefined;
+		if (source !== undefined && !sources.some((candidate) => candidate.name === source)) {
+			problems.push(`Route "${url}": unknown Source "${source}"`);
 		}
 	}
 	return problems;
