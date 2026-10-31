@@ -52,6 +52,14 @@ _Avoid_: Widget, block, partial
 A GitLab group named as the starting point for what Vitrine aggregates from that Source. Everything beneath it is included.
 _Avoid_: Root group, top-level group
 
+**Group**:
+A GitLab group at or beneath a Main Group.
+_Avoid_: Namespace, team, subgroup when the Main Group itself is meant
+
+**Project**:
+A GitLab project beneath a Main Group and not archived.
+_Avoid_: Repository, repo, Harbor project
+
 **Member**:
 A person belonging to a Main Group or anything beneath it.
 _Avoid_: User, staff, employee

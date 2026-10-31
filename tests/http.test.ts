@@ -584,7 +584,7 @@ describe('invalid Settings stop startup', () => {
 });
 
 test('the example Settings file starts Vitrine', async () => {
-	const vitrine = await startVitrine(readFileSync('settings.example.yaml', 'utf8'), { HARBOR_PASSWORD: 's3cret' });
+	const vitrine = await startVitrine(readFileSync('settings.example.yaml', 'utf8'), { HARBOR_PASSWORD: 's3cret', GITLAB_TOKEN: 's3cret' });
 
 	const response = await fetch(`${vitrine.url}/nowhere`);
 

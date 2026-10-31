@@ -16,14 +16,34 @@ const harborSourceSchema = z
 		message: 'username and passwordEnv must be set together',
 	});
 
+const gitlabSourceSchema = z.strictObject({
+	name: z.string().min(1),
+	type: z.literal('gitlab'),
+	url: z.url(),
+	mainGroups: z.array(z.string().regex(/^[^/]+(\/[^/]+)*$/, 'must be a Group path, like platform or platform/backend')).min(1),
+	tokenEnv: z.string().optional(),
+	allowedAgeMinutes: z.number().nonnegative().default(15),
+});
+
+const sourceSchema = z.discriminatedUnion('type', [harborSourceSchema, gitlabSourceSchema]);
+
 const controllerParamsSchemas = {
 	harbor: z.strictObject({ source: z.string() }),
 	'harbor-images': z
 		.strictObject({ source: z.string().optional(), project: z.string().optional() })
 		.refine(({ source, project }) => source !== undefined || project === undefined, { message: 'project needs a source' }),
+	'gitlab-group': z.strictObject({ source: z.string().optional(), group: z.string() }),
+	'gitlab-project': z.strictObject({ source: z.string().optional(), group: z.string(), project: z.string() }),
 };
 
 export type ControllerName = keyof typeof controllerParamsSchemas;
+
+const controllerSourceTypes: Record<ControllerName, z.infer<typeof sourceSchema>['type']> = {
+	harbor: 'harbor',
+	'harbor-images': 'harbor',
+	'gitlab-group': 'gitlab',
+	'gitlab-project': 'gitlab',
+};
 
 const routeSchema = z.strictObject({
 	url: z
@@ -41,18 +61,20 @@ const cacheStoreSchema = z.discriminatedUnion('type', [
 ]);
 
 const settingsSchema = z.strictObject({
-	sources: z.array(harborSourceSchema),
+	sources: z.array(sourceSchema),
 	routes: z.array(routeSchema),
 	cacheStore: cacheStoreSchema.default({ type: 'memory' }),
 });
 
 export type HarborSource = z.infer<typeof harborSourceSchema> & { password?: string };
+export type GitlabSource = z.infer<typeof gitlabSourceSchema> & { token?: string };
+export type Source = HarborSource | GitlabSource;
 export type Route = z.infer<typeof routeSchema>;
 export type CacheStoreSettings =
 	| Exclude<z.infer<typeof cacheStoreSchema>, { type: 'redis' }>
 	| (Extract<z.infer<typeof cacheStoreSchema>, { type: 'redis' }> & { url: string });
 export interface Settings {
-	sources: HarborSource[];
+	sources: Source[];
 	routes: Route[];
 	cacheStore: CacheStoreSettings;
 }
@@ -89,25 +111,32 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 	return {
 		routes,
 		cacheStore: cacheStore.type === 'redis' ? { ...cacheStore, url: env[cacheStore.urlEnv] as string } : cacheStore,
-		sources: sources.map((source) => ({
-			...source,
-			password: source.passwordEnv ? env[source.passwordEnv] : undefined,
-		})),
+		sources: sources.map((source) =>
+			source.type === 'harbor'
+				? { ...source, password: source.passwordEnv ? env[source.passwordEnv] : undefined }
+				: { ...source, token: source.tokenEnv ? env[source.tokenEnv] : undefined },
+		),
 	};
 }
 
-function sourceProblems(sources: z.infer<typeof harborSourceSchema>[], env: Record<string, string | undefined>) {
+function sourceProblems(sources: z.infer<typeof sourceSchema>[], env: Record<string, string | undefined>) {
 	const problems = duplicates(sources.map((source) => source.name)).map((name) => `Source "${name}" is declared twice`);
-	for (const { name, projects, passwordEnv } of sources) {
-		problems.push(...duplicates(projects).map((project) => `Source "${name}" selects Harbor project "${project}" twice`));
-		if (passwordEnv && !env[passwordEnv]) {
-			problems.push(`Source "${name}" needs the environment variable ${passwordEnv}`);
+	for (const source of sources) {
+		const { name } = source;
+		if (source.type === 'harbor') {
+			problems.push(...duplicates(source.projects).map((project) => `Source "${name}" selects Harbor project "${project}" twice`));
+		} else {
+			problems.push(...duplicates(source.mainGroups).map((group) => `Source "${name}" names Main Group "${group}" twice`));
+		}
+		const secretEnv = source.type === 'harbor' ? source.passwordEnv : source.tokenEnv;
+		if (secretEnv && !env[secretEnv]) {
+			problems.push(`Source "${name}" needs the environment variable ${secretEnv}`);
 		}
 	}
 	return problems;
 }
 
-function routeProblems(routes: Route[], sources: z.infer<typeof harborSourceSchema>[]) {
+function routeProblems(routes: Route[], sources: z.infer<typeof sourceSchema>[]) {
 	const problems = duplicates(routes.map((route) => route.url)).map((url) => `Route "${url}" is declared twice`);
 	for (const { url, controller, params } of routes) {
 		// A URL placeholder has no value until a request comes in, so only its name can be checked here.
@@ -117,11 +146,17 @@ function routeProblems(routes: Route[], sources: z.infer<typeof harborSourceSche
 			problems.push(...parsed.error.issues.map((issue) => `Route "${url}": ${[...issue.path, issue.message].join(': ')}`));
 			continue;
 		}
-		if (params.source !== undefined && !sources.some((candidate) => candidate.name === params.source)) {
+		if (url.split('/').filter(isListSegment).length > 1) {
+			problems.push(`Route "${url}": only one :name+ segment is allowed`);
+		}
+		if (params.source !== undefined && !sources.some((candidate) => candidate.name === params.source && candidate.type === controllerSourceTypes[controller])) {
 			problems.push(`Route "${url}": unknown Source "${params.source}"`);
 		}
 		if (controller === 'harbor' && !routes.some(showsProjectImages)) {
 			problems.push(`Route "${url}": needs a harbor-images Route with :source and :project in its URL`);
+		}
+		if (controller === 'gitlab-group' && !routes.some(showsProjects)) {
+			problems.push(`Route "${url}": needs a gitlab-project Route with :group and :project in its URL`);
 		}
 	}
 	return problems;
@@ -131,12 +166,29 @@ function urlParamNames(url: string) {
 	return url
 		.split('/')
 		.filter((segment) => segment.startsWith(':'))
-		.map((segment) => segment.slice(1));
+		.map(paramName);
+}
+
+function paramName(segment: string) {
+	return segment.slice(1).replace(/\+$/, '');
+}
+
+function isListSegment(segment: string) {
+	return segment.startsWith(':') && segment.endsWith('+');
 }
 
 function showsProjectImages({ url, controller }: Route) {
 	const names = urlParamNames(url);
 	return controller === 'harbor-images' && names.includes('source') && names.includes('project');
+}
+
+function showsGroups({ url, controller }: Route) {
+	return controller === 'gitlab-group' && urlParamNames(url).includes('group');
+}
+
+function showsProjects({ url, controller }: Route) {
+	const names = urlParamNames(url);
+	return controller === 'gitlab-project' && names.includes('group') && names.includes('project');
 }
 
 function cacheStoreProblems(cacheStore: z.infer<typeof cacheStoreSchema>, env: Record<string, string | undefined>) {
@@ -156,38 +208,75 @@ export function getSettings(): Settings {
 	return settings;
 }
 
+export function getHarborSources(): HarborSource[] {
+	return getSettings().sources.filter((source) => source.type === 'harbor');
+}
+
 export function getHarborSource(name: string): HarborSource {
-	const source = getSettings().sources.find((candidate) => candidate.name === name);
+	const source = getHarborSources().find((candidate) => candidate.name === name);
 	if (!source) throw new Error(`Unknown Source "${name}"`);
 	return source;
 }
 
-/** Finds the first Route matching a URL, skipping any whose URL names an unknown Source. */
+export function getGitlabSource(name: string): GitlabSource {
+	const source = getGitlabSources().find((candidate) => candidate.name === name);
+	if (!source) throw new Error(`Unknown Source "${name}"`);
+	return source;
+}
+
+function getGitlabSources(): GitlabSource[] {
+	return getSettings().sources.filter((source) => source.type === 'gitlab');
+}
+
+/** The Main Group that holds a Group or Project path, which is that path itself for a Main Group. */
+export function findMainGroup({ mainGroups }: GitlabSource, path: string): string | undefined {
+	return mainGroups.find((mainGroup) => path === mainGroup || path.startsWith(`${mainGroup}/`));
+}
+
+/** Finds the first Route matching a URL, skipping any that names an unknown Source or a Group outside every Main Group. */
 export function matchRoute(url: string): { route: Route; params: Record<string, string> } | undefined {
 	for (const route of getSettings().routes) {
 		const urlParams = matchUrl(route.url, url);
 		if (!urlParams) continue;
-		const params = { ...route.params, ...urlParams };
-		if (isKnownSource(params.source)) return { route, params };
+		const params = resolveSource(route, { ...route.params, ...urlParams });
+		if (params) return { route, params };
 	}
 	return undefined;
 }
 
 function matchUrl(routeUrl: string, url: string) {
 	const expected = routeUrl.split('/');
-	const actual = url.split('/');
-	if (expected.length !== actual.length) return undefined;
+	const actual = joinListSegment(expected, url.split('/'));
+	if (expected.length !== actual?.length) return undefined;
 
 	const params: Record<string, string> = {};
 	for (const [index, segment] of expected.entries()) {
-		if (segment.startsWith(':')) params[segment.slice(1)] = actual[index];
+		if (segment.startsWith(':')) params[paramName(segment)] = actual[index];
 		else if (segment !== actual[index]) return undefined;
 	}
 	return params;
 }
 
-function isKnownSource(source: string | undefined) {
-	return source === undefined || getSettings().sources.some((candidate) => candidate.name === source);
+/** Joins what a :name+ segment takes: one URL segment or more, none empty, and never the "-" that ends a Group path in GitLab. */
+function joinListSegment(expected: string[], actual: string[]) {
+	const start = expected.findIndex(isListSegment);
+	if (start === -1) return actual;
+
+	const end = actual.length - (expected.length - start - 1);
+	const taken = actual.slice(start, end);
+	if (taken.length === 0 || taken.some((segment) => segment === '' || segment === '-')) return undefined;
+	return [...actual.slice(0, start), taken.join('/'), ...actual.slice(end)];
+}
+
+function resolveSource({ controller }: Route, params: Record<string, string>) {
+	const { source, group } = params;
+	if (group !== undefined) {
+		// A Route may leave out the Source, which is then the first one with a Main Group holding the Group.
+		const found = getGitlabSources().find((candidate) => (source ?? candidate.name) === candidate.name && findMainGroup(candidate, group));
+		return found && { ...params, source: found.name };
+	}
+	const known = getSettings().sources.some(({ name, type }) => name === source && type === controllerSourceTypes[controller]);
+	return source === undefined || known ? params : undefined;
 }
 
 /** The URL showing the Images of one Harbor project, if a Route offers one. */
@@ -196,4 +285,22 @@ export function harborImagesUrl(source: string, project: string): string | undef
 		.routes.find(showsProjectImages)
 		?.url.replace(':source', encodeURIComponent(source))
 		.replace(':project', encodeURIComponent(project));
+}
+
+/** The URL showing one Group, if a Route offers one. */
+export function gitlabGroupUrl(source: string, group: string): string | undefined {
+	return gitlabUrl(showsGroups, source, group);
+}
+
+/** The URL showing one Project, if a Route offers one. */
+export function gitlabProjectUrl(source: string, path: string): string | undefined {
+	const separator = path.lastIndexOf('/');
+	return gitlabUrl(showsProjects, source, path.slice(0, separator))?.replace(':project', encodeURIComponent(path.slice(separator + 1)));
+}
+
+function gitlabUrl(shows: (route: Route) => boolean, source: string, group: string) {
+	return getSettings()
+		.routes.find((route) => shows(route) && (route.params.source ?? source) === source)
+		?.url.replace(':source', encodeURIComponent(source))
+		.replace(/:group\+?/, encodeURI(group));
 }

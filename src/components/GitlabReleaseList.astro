@@ -1,0 +1,53 @@
+---
+import { formatDate } from '../format.ts';
+import { getGitlabSource } from '../settings.ts';
+import { listReleases } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	project: string;
+}
+
+const { source, project } = Astro.props;
+const { data: releases, stale } = await listReleases(getGitlabSource(source), project);
+---
+
+<section>
+	<h2>Releases</h2>
+	{stale && <p role="status">This list is Stale because {source} is down.</p>}
+	{
+		!releases ? (
+			<p role="alert">Releases could not be loaded from {source}.</p>
+		) : releases.length > 0 ? (
+			<ul>
+				{releases.map((release) => (
+					<li>
+						{release.webUrl ? <a href={release.webUrl}>{release.name}</a> : release.name}
+						<p>
+							{release.tagName}, {formatDate(release.releasedAt)}
+						</p>
+					</li>
+				))}
+			</ul>
+		) : (
+			<p>No releases found.</p>
+		)
+	}
+</section>
+
+<style>
+	ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	li {
+		padding: 0.5rem 0;
+		overflow-wrap: anywhere;
+	}
+
+	li p {
+		margin: 0;
+	}
+</style>

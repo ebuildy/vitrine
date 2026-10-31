@@ -1,7 +1,7 @@
 ---
 import ImageList from '../components/ImageList.astro';
 import Layout from '../layouts/Layout.astro';
-import { getSettings } from '../settings.ts';
+import { getHarborSources } from '../settings.ts';
 
 interface Props {
 	source?: string;
@@ -9,7 +9,7 @@ interface Props {
 }
 
 const { source, project } = Astro.props;
-const sources = getSettings().sources.filter(({ name }) => source === undefined || name === source);
+const sources = getHarborSources().filter(({ name }) => source === undefined || name === source);
 ---
 
 <Layout title="Images">

@@ -1,13 +1,19 @@
 ---
 import type { AstroComponentFactory } from 'astro/runtime/server/index.js';
+import GitlabGroup from '../controllers/GitlabGroup.astro';
+import GitlabProject from '../controllers/GitlabProject.astro';
 import Harbor from '../controllers/Harbor.astro';
 import HarborImages from '../controllers/HarborImages.astro';
-import { matchRoute } from '../settings.ts';
+import Layout from '../layouts/Layout.astro';
+import { getGitlabSource, matchRoute } from '../settings.ts';
 import type { ControllerName } from '../settings.ts';
+import { getGroup, getProject } from '../sources/gitlab.ts';
 
 const controllers: Record<ControllerName, AstroComponentFactory> = {
 	harbor: Harbor,
 	'harbor-images': HarborImages,
+	'gitlab-group': GitlabGroup,
+	'gitlab-project': GitlabProject,
 };
 
 const url = `/${Astro.params.path ?? ''}`;
@@ -15,6 +21,27 @@ const match = matchRoute(url);
 if (!match) return new Response(null, { status: 404 });
 
 const Controller = controllers[match.route.controller];
+const { controller } = match.route;
+const { source, group, project } = match.params;
+
+// Read once here, as only a page can answer not found, and a Source that is down should cost one timeout.
+const subject =
+	controller === 'gitlab-group'
+		? await getGroup(getGitlabSource(source), group)
+		: controller === 'gitlab-project'
+			? await getProject(getGitlabSource(source), `${group}/${project}`)
+			: undefined;
+if (subject && !subject.error && !subject.data) return new Response(null, { status: 404 });
 ---
 
-<Controller {...match.params} />
+{
+	subject?.error ? (
+		<Layout title={project ?? group}>
+			<p role="alert">
+				{project ?? group} could not be loaded from {source}.
+			</p>
+		</Layout>
+	) : (
+		<Controller {...match.params} />
+	)
+}

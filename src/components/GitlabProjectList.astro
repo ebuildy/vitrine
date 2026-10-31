@@ -1,0 +1,95 @@
+---
+import { formatDate } from '../format.ts';
+import { getGitlabSource, gitlabProjectUrl } from '../settings.ts';
+import { listProjects } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	group: string;
+}
+
+const { source, group } = Astro.props;
+const { data: projects, stale } = await listProjects(getGitlabSource(source), group);
+---
+
+{stale && <p role="status">This list is Stale because {source} is down.</p>}
+{
+	!projects ? (
+		<p role="alert">Projects could not be loaded from {source}.</p>
+	) : (
+		<section>
+			<h2>Projects</h2>
+			{projects.length > 0 ? (
+				<ul>
+					{projects.map((project) => {
+						const url = gitlabProjectUrl(source, project.path);
+						return (
+							<li>
+								<h3>{url ? <a href={url}>{project.name}</a> : project.name}</h3>
+								{project.description && <p>{project.description}</p>}
+								<p>Last activity {formatDate(project.lastActivityAt)}</p>
+								<a class="source-link" href={project.webUrl}>
+									View in GitLab
+								</a>
+							</li>
+						);
+					})}
+				</ul>
+			) : (
+				<p>No Projects found.</p>
+			)}
+		</section>
+	)
+}
+
+<style>
+	section {
+		padding: 1rem;
+	}
+
+	h2 {
+		margin: 0 0 0.75rem;
+	}
+
+	ul {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+		gap: 1rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	li {
+		position: relative;
+		padding: 1rem;
+		border: 1px solid #8884;
+		border-radius: 0.5rem;
+	}
+
+	li:hover {
+		border-color: currentColor;
+	}
+
+	h3 {
+		margin: 0 0 0.75rem;
+		font-size: 1.125rem;
+		overflow-wrap: anywhere;
+	}
+
+	p {
+		margin: 0 0 0.75rem;
+	}
+
+	/* Stretches the link over its card, so that a click anywhere opens the Project. */
+	h3 a::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+	}
+
+	/* Lifts the link to GitLab above the one stretched over the card. */
+	.source-link {
+		position: relative;
+	}
+</style>

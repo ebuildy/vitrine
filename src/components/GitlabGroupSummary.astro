@@ -1,0 +1,40 @@
+---
+import { getGitlabSource } from '../settings.ts';
+import { getGroup } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	group: string;
+}
+
+const { source, group } = Astro.props;
+const { data, stale, error } = await getGroup(getGitlabSource(source), group);
+---
+
+<header>
+	<h1>{data?.name ?? group}</h1>
+	{stale && <p role="status">This Group is Stale because {source} is down.</p>}
+	{error && <p role="alert">This Group could not be loaded from {source}.</p>}
+	{!error && !data && <p role="alert">Group {group} was not found in {source}.</p>}
+	{
+		data && (
+			<>
+				{data.description && <p>{data.description}</p>}
+				<p>
+					<a href={data.webUrl}>View in GitLab</a>
+				</p>
+			</>
+		)
+	}
+</header>
+
+<style>
+	header {
+		padding: 1rem;
+	}
+
+	h1 {
+		margin: 0;
+		overflow-wrap: anywhere;
+	}
+</style>

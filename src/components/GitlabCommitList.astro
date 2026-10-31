@@ -1,0 +1,53 @@
+---
+import { formatDate } from '../format.ts';
+import { getGitlabSource } from '../settings.ts';
+import { listCommits } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	project: string;
+}
+
+const { source, project } = Astro.props;
+const { data: commits, stale } = await listCommits(getGitlabSource(source), project);
+---
+
+<section>
+	<h2>Latest commits</h2>
+	{stale && <p role="status">This list is Stale because {source} is down.</p>}
+	{
+		!commits ? (
+			<p role="alert">Commits could not be loaded from {source}.</p>
+		) : commits.length > 0 ? (
+			<ul>
+				{commits.map((commit) => (
+					<li>
+						<a href={commit.webUrl}>{commit.title}</a>
+						<p>
+							{commit.authorName}, {formatDate(commit.committedAt)}
+						</p>
+					</li>
+				))}
+			</ul>
+		) : (
+			<p>No commits found.</p>
+		)
+	}
+</section>
+
+<style>
+	ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	li {
+		padding: 0.5rem 0;
+		overflow-wrap: anywhere;
+	}
+
+	li p {
+		margin: 0;
+	}
+</style>

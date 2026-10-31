@@ -1,0 +1,42 @@
+---
+import { formatDate } from '../format.ts';
+import { getGitlabSource } from '../settings.ts';
+import { getProject } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	project: string;
+}
+
+const { source, project } = Astro.props;
+const { data, stale, error } = await getProject(getGitlabSource(source), project);
+---
+
+<header>
+	<h1>{data?.name ?? project}</h1>
+	{stale && <p role="status">This Project is Stale because {source} is down.</p>}
+	{error && <p role="alert">This Project could not be loaded from {source}.</p>}
+	{!error && !data && <p role="alert">Project {project} was not found in {source}.</p>}
+	{
+		data && (
+			<>
+				{data.description && <p>{data.description}</p>}
+				<p>Last activity {formatDate(data.lastActivityAt)}</p>
+				<p>
+					<a href={data.webUrl}>View in GitLab</a>
+				</p>
+			</>
+		)
+	}
+</header>
+
+<style>
+	header {
+		padding: 1rem;
+	}
+
+	h1 {
+		margin: 0;
+		overflow-wrap: anywhere;
+	}
+</style>
