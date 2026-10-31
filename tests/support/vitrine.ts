@@ -28,6 +28,8 @@ export function writeSettings(settings: unknown): string {
 
 export interface RunningVitrine {
 	url: string;
+	/** Everything logged as an error so far. */
+	stderr: () => string;
 	stop: () => Promise<void>;
 }
 
@@ -52,6 +54,7 @@ export async function startVitrine(settings: unknown, env: Record<string, string
 			await fetch(url);
 			return {
 				url,
+				stderr: () => stderr,
 				stop: () =>
 					new Promise((resolve) => {
 						child.once('exit', () => resolve());

@@ -31,16 +31,27 @@ const routeSchema = z.strictObject({
 	params: z.record(z.string(), z.string()).default({}),
 });
 
+const cacheStoreSchema = z.discriminatedUnion('type', [
+	z.strictObject({ type: z.literal('memory') }),
+	z.strictObject({ type: z.literal('files'), directory: z.string().min(1) }),
+	z.strictObject({ type: z.literal('redis'), urlEnv: z.string().min(1) }),
+]);
+
 const settingsSchema = z.strictObject({
 	sources: z.array(harborSourceSchema),
 	routes: z.array(routeSchema),
+	cacheStore: cacheStoreSchema.default({ type: 'memory' }),
 });
 
 export type HarborSource = z.infer<typeof harborSourceSchema> & { password?: string };
 export type Route = z.infer<typeof routeSchema>;
+export type CacheStoreSettings =
+	| Exclude<z.infer<typeof cacheStoreSchema>, { type: 'redis' }>
+	| (Extract<z.infer<typeof cacheStoreSchema>, { type: 'redis' }> & { url: string });
 export interface Settings {
 	sources: HarborSource[];
 	routes: Route[];
+	cacheStore: CacheStoreSettings;
 }
 
 export class SettingsError extends Error {
@@ -68,12 +79,13 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 		);
 	}
 
-	const { sources, routes } = parsed.data;
-	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources)];
+	const { sources, routes, cacheStore } = parsed.data;
+	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources), ...cacheStoreProblems(cacheStore, env)];
 	if (problems.length > 0) throw new SettingsError(path, problems);
 
 	return {
 		routes,
+		cacheStore: cacheStore.type === 'redis' ? { ...cacheStore, url: env[cacheStore.urlEnv] as string } : cacheStore,
 		sources: sources.map((source) => ({
 			...source,
 			password: source.passwordEnv ? env[source.passwordEnv] : undefined,
@@ -106,6 +118,10 @@ function routeProblems(routes: Route[], sources: z.infer<typeof harborSourceSche
 		}
 	}
 	return problems;
+}
+
+function cacheStoreProblems(cacheStore: z.infer<typeof cacheStoreSchema>, env: Record<string, string | undefined>) {
+	return cacheStore.type === 'redis' && !env[cacheStore.urlEnv] ? [`The Redis cache store needs the environment variable ${cacheStore.urlEnv}`] : [];
 }
 
 function duplicates(values: string[]) {
