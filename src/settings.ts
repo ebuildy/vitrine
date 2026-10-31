@@ -17,7 +17,10 @@ const harborSourceSchema = z
 	});
 
 const controllerParamsSchemas = {
-	'harbor-images': z.strictObject({ source: z.string().optional() }),
+	harbor: z.strictObject({ source: z.string() }),
+	'harbor-images': z
+		.strictObject({ source: z.string().optional(), project: z.string().optional() })
+		.refine(({ source, project }) => source !== undefined || project === undefined, { message: 'project needs a source' }),
 };
 
 export type ControllerName = keyof typeof controllerParamsSchemas;
@@ -95,17 +98,33 @@ function sourceProblems(sources: z.infer<typeof harborSourceSchema>[], env: Reco
 function routeProblems(routes: Route[], sources: z.infer<typeof harborSourceSchema>[]) {
 	const problems = duplicates(routes.map((route) => route.url)).map((url) => `Route "${url}" is declared twice`);
 	for (const { url, controller, params } of routes) {
-		const parsed = controllerParamsSchemas[controller].safeParse(params);
+		// A URL placeholder has no value until a request comes in, so only its name can be checked here.
+		const urlParams = Object.fromEntries(urlParamNames(url).map((name) => [name, name]));
+		const parsed = controllerParamsSchemas[controller].safeParse({ ...urlParams, ...params });
 		if (!parsed.success) {
 			problems.push(...parsed.error.issues.map((issue) => `Route "${url}": ${[...issue.path, issue.message].join(': ')}`));
 			continue;
 		}
-		const source = 'source' in parsed.data ? parsed.data.source : undefined;
-		if (source !== undefined && !sources.some((candidate) => candidate.name === source)) {
-			problems.push(`Route "${url}": unknown Source "${source}"`);
+		if (params.source !== undefined && !sources.some((candidate) => candidate.name === params.source)) {
+			problems.push(`Route "${url}": unknown Source "${params.source}"`);
+		}
+		if (controller === 'harbor' && !routes.some(showsProjectImages)) {
+			problems.push(`Route "${url}": needs a harbor-images Route with :source and :project in its URL`);
 		}
 	}
 	return problems;
+}
+
+function urlParamNames(url: string) {
+	return url
+		.split('/')
+		.filter((segment) => segment.startsWith(':'))
+		.map((segment) => segment.slice(1));
+}
+
+function showsProjectImages({ url, controller }: Route) {
+	const names = urlParamNames(url);
+	return controller === 'harbor-images' && names.includes('source') && names.includes('project');
 }
 
 function duplicates(values: string[]) {
@@ -125,4 +144,40 @@ export function getHarborSource(name: string): HarborSource {
 	const source = getSettings().sources.find((candidate) => candidate.name === name);
 	if (!source) throw new Error(`Unknown Source "${name}"`);
 	return source;
+}
+
+/** Finds the first Route matching a URL, skipping any whose URL names an unknown Source. */
+export function matchRoute(url: string): { route: Route; params: Record<string, string> } | undefined {
+	for (const route of getSettings().routes) {
+		const urlParams = matchUrl(route.url, url);
+		if (!urlParams) continue;
+		const params = { ...route.params, ...urlParams };
+		if (isKnownSource(params.source)) return { route, params };
+	}
+	return undefined;
+}
+
+function matchUrl(routeUrl: string, url: string) {
+	const expected = routeUrl.split('/');
+	const actual = url.split('/');
+	if (expected.length !== actual.length) return undefined;
+
+	const params: Record<string, string> = {};
+	for (const [index, segment] of expected.entries()) {
+		if (segment.startsWith(':')) params[segment.slice(1)] = actual[index];
+		else if (segment !== actual[index]) return undefined;
+	}
+	return params;
+}
+
+function isKnownSource(source: string | undefined) {
+	return source === undefined || getSettings().sources.some((candidate) => candidate.name === source);
+}
+
+/** The URL showing the Images of one Harbor project, if a Route offers one. */
+export function harborImagesUrl(source: string, project: string): string | undefined {
+	return getSettings()
+		.routes.find(showsProjectImages)
+		?.url.replace(':source', encodeURIComponent(source))
+		.replace(':project', encodeURIComponent(project));
 }

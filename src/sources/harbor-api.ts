@@ -1,8 +1,15 @@
 import type { HarborSource } from '../settings.ts';
 
 const PAGE_SIZE = 100;
-// A project's whole list must load within the Source timeout, without one request per repository at once.
-const REPOSITORIES_AT_ONCE = 10;
+// A whole list must load within the Source timeout, without sending every one of its requests at once.
+const REQUESTS_AT_ONCE = 10;
+
+export interface Project {
+	name: string;
+	repositoryCount: number;
+	createdAt: string;
+	storageUsed?: number;
+}
 
 export interface Scan {
 	critical: number;
@@ -25,6 +32,17 @@ export interface Image {
 	tags: Tag[];
 }
 
+interface HarborProject {
+	project_id: number;
+	name: string;
+	repo_count?: number;
+	creation_time: string;
+}
+
+interface HarborProjectSummary {
+	quota?: { used?: { storage?: number } };
+}
+
 interface HarborRepository {
 	name: string;
 }
@@ -45,12 +63,35 @@ export async function listImages(source: HarborSource, project: string, signal: 
 	const path = `/api/v2.0/projects/${encodeURIComponent(project)}/repositories`;
 	const repositories = await fetchAllPages<HarborRepository>(source, path, {}, signal);
 
-	const images: Image[] = [];
-	for (let start = 0; start < repositories.length; start += REPOSITORIES_AT_ONCE) {
-		const batch = repositories.slice(start, start + REPOSITORIES_AT_ONCE);
-		images.push(...(await Promise.all(batch.map(({ name }) => readImage(source, path, project, name, signal)))));
+	return inBatches(repositories, ({ name }) => readImage(source, path, project, name, signal));
+}
+
+export async function listProjects(source: HarborSource, signal: AbortSignal): Promise<Project[]> {
+	const projects = await fetchAllPages<HarborProject>(source, '/api/v2.0/projects', {}, signal);
+	return inBatches(projects, async ({ project_id, name, repo_count, creation_time }) => ({
+		name,
+		repositoryCount: repo_count ?? 0,
+		createdAt: creation_time,
+		storageUsed: await fetchStorageUsed(source, project_id, signal),
+	}));
+}
+
+/** Harbor keeps quotas from some readers, so a refusal only leaves the storage used unknown. */
+async function fetchStorageUsed(source: HarborSource, projectId: number, signal: AbortSignal): Promise<number | undefined> {
+	const path = `/api/v2.0/projects/${projectId}/summary`;
+	const response = await fetch(new URL(path, source.url), { headers: authHeaders(source), signal });
+	if (response.status === 401 || response.status === 403) return undefined;
+	if (!response.ok) throw new Error(`Harbor "${source.name}" answered ${response.status} for ${path}`);
+	const summary: HarborProjectSummary = await response.json();
+	return summary.quota?.used?.storage;
+}
+
+async function inBatches<T, R>(items: T[], read: (item: T) => Promise<R>): Promise<R[]> {
+	const results: R[] = [];
+	for (let start = 0; start < items.length; start += REQUESTS_AT_ONCE) {
+		results.push(...(await Promise.all(items.slice(start, start + REQUESTS_AT_ONCE).map(read))));
 	}
-	return images;
+	return results;
 }
 
 async function readImage(source: HarborSource, repositoriesPath: string, project: string, name: string, signal: AbortSignal): Promise<Image> {

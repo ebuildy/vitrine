@@ -1,0 +1,97 @@
+---
+import { formatDate, formatSize } from '../format.ts';
+import { getHarborSource, harborImagesUrl } from '../settings.ts';
+import { listProjects } from '../sources/harbor.ts';
+
+interface Props {
+	source: string;
+}
+
+const { source } = Astro.props;
+const { data: projects, stale } = await listProjects(getHarborSource(source));
+---
+
+{stale && <p role="status">This list is Stale because {source} is down.</p>}
+{
+	!projects ? (
+		<p role="alert">Harbor projects could not be loaded because {source} is down.</p>
+	) : projects.length > 0 ? (
+		<ul>
+			{projects.map((project) => {
+				const url = harborImagesUrl(source, project.name);
+				return (
+					<li>
+						<h2>{url ? <a href={url}>{project.name}</a> : project.name}</h2>
+						<dl>
+							<div>
+								<dt>Repositories</dt>
+								<dd>{project.repositoryCount}</dd>
+							</div>
+							<div>
+								<dt>Created</dt>
+								<dd>{formatDate(project.createdAt)}</dd>
+							</div>
+							{project.storageUsed !== undefined && (
+								<div>
+									<dt>Storage used</dt>
+									<dd>{formatSize(project.storageUsed)}</dd>
+								</div>
+							)}
+						</dl>
+					</li>
+				);
+			})}
+		</ul>
+	) : (
+		<p>No Harbor projects found.</p>
+	)
+}
+
+<style>
+	ul {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 1rem;
+		margin: 0;
+		padding: 1rem;
+		list-style: none;
+	}
+
+	li {
+		position: relative;
+		padding: 1rem;
+		border: 1px solid #8884;
+		border-radius: 0.5rem;
+	}
+
+	li:hover {
+		border-color: currentColor;
+	}
+
+	h2 {
+		margin: 0 0 0.75rem;
+		font-size: 1.125rem;
+		overflow-wrap: anywhere;
+	}
+
+	/* Stretches the link over its card, so that a click anywhere opens the Harbor project. */
+	a::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+	}
+
+	dl {
+		margin: 0;
+	}
+
+	dl div {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	dd {
+		margin: 0;
+	}
+</style>

@@ -31,3 +31,10 @@ routes:
     controller: harbor-images
     params:
       source: tools-harbor
+  # A :source or :project segment takes its value from the URL.
+  # The harbor Controller lists every Harbor project the Source reports, whatever projects says above,
+  # so give the Source a token that only reads what Visitors may see. It links them to the Route below.
+  - url: /harbor/:source
+    controller: harbor
+  - url: /harbor/:source/:project
+    controller: harbor-images
