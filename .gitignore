@@ -18,7 +18,7 @@ pnpm-debug.log*
 .env.production
 
 # installation Settings hold real hostnames, this repo is public
-settings.yaml
+/settings.yaml
 
 # macOS-specific files
 .DS_Store
