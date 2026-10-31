@@ -1,4 +1,5 @@
 ---
+import { readThrough } from '../content-cache.ts';
 import { getHarborSource } from '../settings.ts';
 import { listImages } from '../sources/harbor.ts';
 
@@ -8,11 +9,17 @@ interface Props {
 }
 
 const { source, project } = Astro.props;
-const images = await listImages(getHarborSource(source), project);
+const harbor = getHarborSource(source);
+const { data: images, stale } = await readThrough(`${source}/images/${project}`, harbor.allowedAgeMinutes * 60_000, (signal) =>
+	listImages(harbor, project, signal),
+);
 ---
 
+{stale && <p role="status">{source} is down, so this list may be out of date.</p>}
 {
-	images.length > 0 ? (
+	!images ? (
+		<p role="alert">Images could not be loaded because {source} is down.</p>
+	) : images.length > 0 ? (
 		<ul>
 			{images.map((image) => (
 				<li>{image.name}</li>

@@ -9,19 +9,31 @@ export interface FakeHarborOptions {
 	credentials?: { username: string; password: string };
 }
 
+/** up answers at once, slow after a short wait, down with a 503, and hanging never. */
+export type FakeHarborBehaviour = 'up' | 'slow' | 'down' | 'hanging';
+
 export interface FakeHarbor {
 	url: string;
 	/** Every request received, as path and query. */
 	requests: string[];
+	/** Changes how the following requests are answered. */
+	behave: (behaviour: FakeHarborBehaviour) => void;
 	stop: () => Promise<void>;
 }
 
 /** Answers the parts of Harbor's v2 API that Vitrine reads. */
 export async function startFakeHarbor({ projects, credentials }: FakeHarborOptions): Promise<FakeHarbor> {
 	const requests: string[] = [];
-	const handle = (request: IncomingMessage, response: ServerResponse) => {
+	let behaviour: FakeHarborBehaviour = 'up';
+	const handle = async (request: IncomingMessage, response: ServerResponse) => {
 		const url = new URL(request.url ?? '/', 'http://fake-harbor');
 		requests.push(`${url.pathname}${url.search}`);
+		if (behaviour === 'hanging') return;
+		if (behaviour === 'down') {
+			response.writeHead(503).end();
+			return;
+		}
+		if (behaviour === 'slow') await new Promise((resolve) => setTimeout(resolve, 200));
 		if (credentials && request.headers.authorization !== basicAuth(credentials)) {
 			response.writeHead(401).end();
 			return;
@@ -44,7 +56,14 @@ export async function startFakeHarbor({ projects, credentials }: FakeHarborOptio
 	return {
 		url: `http://127.0.0.1:${port}`,
 		requests,
-		stop: () => new Promise((resolve) => server.close(() => resolve())),
+		behave: (next) => {
+			behaviour = next;
+		},
+		stop: () =>
+			new Promise((resolve) => {
+				server.close(() => resolve());
+				server.closeAllConnections();
+			}),
 	};
 }
 

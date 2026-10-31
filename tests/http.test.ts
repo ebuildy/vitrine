@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { startFakeHarbor } from './support/fake-harbor.ts';
 import type { FakeHarbor } from './support/fake-harbor.ts';
 import { devStartupFailure, runBuiltEntryDirectly, startupFailure, startVitrine } from './support/vitrine.ts';
@@ -97,6 +97,108 @@ describe('reading Harbor', () => {
 	});
 });
 
+describe('reading a Source through the cache', () => {
+	const route = { url: '/images', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } };
+
+	async function start(source: Record<string, unknown> = {}, projects = { platform: ['platform/api'] }) {
+		const harbor = await startFakeHarbor({ projects });
+		const vitrine = await startVitrine({
+			sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, ...source }],
+			routes: [route],
+		});
+		cleanups.push(vitrine.stop, harbor.stop);
+		const images = async () => {
+			const response = await fetch(`${vitrine.url}/images`);
+			return { status: response.status, html: await response.text() };
+		};
+		return { harbor, images };
+	}
+
+	const cleanups: (() => Promise<void>)[] = [];
+
+	afterEach(async () => {
+		await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()));
+	});
+
+	test('serves fresh data without calling the Source', async () => {
+		const { harbor, images } = await start();
+
+		await images();
+		const { html } = await images();
+
+		expect(html).toContain('platform/api');
+		expect(harbor.requests).toHaveLength(1);
+	});
+
+	test('loads data older than its allowed age and replaces the cached data', async () => {
+		const projects = { platform: ['platform/old'] };
+		const { images } = await start({ allowedAgeMinutes: 0 }, projects);
+
+		await images();
+		projects.platform = ['platform/new'];
+		const { html } = await images();
+
+		expect(html).toContain('platform/new');
+		expect(html).not.toContain('platform/old');
+	});
+
+	test('serves Stale data with a warning while the Source is down', async () => {
+		const { harbor, images } = await start({ allowedAgeMinutes: 0 });
+
+		expect((await images()).html).not.toContain('may be out of date');
+		harbor.behave('down');
+		const { html } = await images();
+
+		expect(html).toContain('platform/api');
+		expect(html).toContain('may be out of date');
+	});
+
+	test('drops the warning once the Source is back', async () => {
+		const { harbor, images } = await start({ allowedAgeMinutes: 0 });
+
+		await images();
+		harbor.behave('down');
+		await images();
+		harbor.behave('up');
+
+		expect((await images()).html).not.toContain('may be out of date');
+	});
+
+	test('shows an error in the section and keeps the page when nothing is cached', async () => {
+		const { harbor, images } = await start();
+
+		harbor.behave('down');
+		const { status, html } = await images();
+
+		expect(status).toBe(200);
+		expect(html).toContain('<h1>Images</h1>');
+		expect(html).toContain('Images could not be loaded');
+	});
+
+	test('counts a Source that takes over 10 seconds as down', async () => {
+		const { harbor, images } = await start();
+
+		harbor.behave('hanging');
+		const startedAt = Date.now();
+		const { html } = await images();
+		const elapsed = Date.now() - startedAt;
+
+		expect(html).toContain('Images could not be loaded');
+		expect(elapsed).toBeGreaterThanOrEqual(9_900);
+		expect(elapsed).toBeLessThan(12_000);
+	});
+
+	test('shares one Source call between simultaneous requests', async () => {
+		const { harbor, images } = await start();
+
+		harbor.behave('slow');
+		const pages = await Promise.all([images(), images(), images(), images(), images()]);
+
+		expect(pages.map(({ html }) => html.includes('platform/api'))).toEqual([true, true, true, true, true]);
+		expect(harbor.requests).toHaveLength(1);
+	});
+});
+
 describe('invalid Settings stop startup', () => {
 	const source = { name: 'main-harbor', type: 'harbor', url: 'http://harbor.test' };
 	const route = { url: '/images', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } };
@@ -116,6 +218,7 @@ describe('invalid Settings stop startup', () => {
 		['a Route to an unknown Source', { sources: [], routes: [route] }, 'unknown Source "main-harbor"'],
 		['a missing Controller parameter', { sources: [source], routes: [{ ...route, params: { source: 'main-harbor' } }] }, 'project'],
 		['the same URL twice', { sources: [source], routes: [route, route] }, 'Route "/images" is declared twice'],
+		['a negative allowed age', { sources: [{ ...source, allowedAgeMinutes: -1 }], routes: [route] }, 'allowedAgeMinutes'],
 		['an unset secret', { sources: [{ ...source, username: 'robot', passwordEnv: 'VITRINE_UNSET' }], routes: [route] }, 'VITRINE_UNSET'],
 	])('with %s', async (_, settings, expectedError) => {
 		const { exitCode, output } = await startupFailure(settings);
