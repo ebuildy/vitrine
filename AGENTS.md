@@ -8,6 +8,8 @@ astro dev --background
 
 Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
 
+Commit with `git commit -s`, amends included: the sign-off respects the DCO.
+
 `npm test` needs the Redis from `compose.yaml`: run `docker compose up -d --wait` first.
 
 ## Documentation

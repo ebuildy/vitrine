@@ -1,16 +1,17 @@
 ---
 import ImageList from '../components/ImageList.astro';
 import Layout from '../layouts/Layout.astro';
+import { getSettings } from '../settings.ts';
 
 interface Props {
-	source: string;
-	project: string;
+	source?: string;
 }
 
-const { source, project } = Astro.props;
+const { source } = Astro.props;
+const sources = getSettings().sources.filter(({ name }) => source === undefined || name === source);
 ---
 
 <Layout title="Images">
 	<h1>Images</h1>
-	<ImageList source={source} project={project} />
+	{sources.map(({ name, projects }) => projects.map((project) => <ImageList source={name} project={project} />))}
 </Layout>

@@ -9,6 +9,12 @@ import type { FakeHarbor } from './support/fake-harbor.ts';
 import { devStartupFailure, runBuiltEntryDirectly, startupFailure, startVitrine, writeSettings } from './support/vitrine.ts';
 import type { RunningVitrine } from './support/vitrine.ts';
 
+const artifact = {
+	size: 1024,
+	push_time: '2026-10-01T08:00:00.000Z',
+	tags: [{ name: '1.0', push_time: '2026-10-01T08:00:00.000Z' }],
+};
+
 describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, empty }) => {
 	describe('a Route to the harbor-images Controller', () => {
 		let harbor: FakeHarbor;
@@ -17,11 +23,11 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 		beforeAll(async () => {
 			harbor = await startFakeHarbor({ projects: { platform: ['platform/api', 'platform/worker'] } });
 			vitrine = await startVitrine({
-				sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url }],
+				sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: ['platform'] }],
 				routes: [
-					{ url: '/images', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } },
-					{ url: '/', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } },
-					{ url: '/fork-page', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } },
+					{ url: '/images', controller: 'harbor-images' },
+					{ url: '/', controller: 'harbor-images' },
+					{ url: '/fork-page', controller: 'harbor-images' },
 				],
 				cacheStore: await empty(),
 			});
@@ -32,7 +38,7 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 			await harbor?.stop();
 		});
 
-		test('shows the Images of the configured Harbor project', async () => {
+		test('shows the Images of the selected Harbor project', async () => {
 			const response = await fetch(`${vitrine.url}/images`);
 
 			expect(response.status).toBe(200);
@@ -62,17 +68,107 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 		});
 	});
 
+	describe('a Route over several Harbor Sources', () => {
+		let harbors: FakeHarbor[];
+		let vitrine: RunningVitrine;
+
+		beforeAll(async () => {
+			harbors = await Promise.all([
+				startFakeHarbor({
+					projects: { platform: ['platform/api'], data: ['data/etl'], hidden: ['hidden/secret'] },
+					artifacts: { 'platform/api': [artifact], 'data/etl': [artifact] },
+				}),
+				startFakeHarbor({ projects: { tools: ['tools/cli'] }, artifacts: { 'tools/cli': [artifact] } }),
+			]);
+			vitrine = await startVitrine({
+				sources: [
+					{ name: 'main-harbor', type: 'harbor', url: harbors[0].url, projects: ['platform', 'data'] },
+					{ name: 'tools-harbor', type: 'harbor', url: harbors[1].url, projects: ['tools'] },
+				],
+				routes: [
+					{ url: '/images', controller: 'harbor-images' },
+					{ url: '/tools', controller: 'harbor-images', params: { source: 'tools-harbor' } },
+				],
+				cacheStore: await empty(),
+			});
+		});
+
+		afterAll(async () => {
+			await vitrine?.stop();
+			await Promise.all(harbors.map((harbor) => harbor.stop()));
+		});
+
+		afterEach(() => {
+			harbors[1].behave('up');
+		});
+
+		test('shows the Images of every selected Harbor project of every Source', async () => {
+			const html = await (await fetch(`${vitrine.url}/images`)).text();
+
+			expect(html).toContain('platform/api');
+			expect(html).toContain('data/etl');
+			expect(html).toContain('tools/cli');
+			expect(html).toContain(`${new URL(harbors[1].url).host}/tools/cli:1.0`);
+		});
+
+		test('leaves out a Harbor project that is not selected', async () => {
+			const html = await (await fetch(`${vitrine.url}/images`)).text();
+
+			expect(html).not.toContain('hidden/secret');
+			expect(harbors[0].requests.filter((request) => request.includes('hidden'))).toEqual([]);
+		});
+
+		test('can be limited to one Source', async () => {
+			const html = await (await fetch(`${vitrine.url}/tools`)).text();
+
+			expect(html).toContain('tools/cli');
+			expect(html).not.toContain('platform/api');
+		});
+
+		test('never asks Harbor for individual CVEs', async () => {
+			await fetch(`${vitrine.url}/images`);
+
+			expect(harbors[0].requests.filter((request) => request.includes('/additions/'))).toEqual([]);
+		});
+	});
+
+	describe('one Harbor Source down among several', () => {
+		test('limits the error to the Harbor project of that Source', async () => {
+			const up = await startFakeHarbor({ projects: { platform: ['platform/api'] } });
+			const down = await startFakeHarbor({ projects: { tools: ['tools/cli'] } });
+			down.behave('down');
+			const vitrine = await startVitrine({
+				sources: [
+					{ name: 'main-harbor', type: 'harbor', url: up.url, projects: ['platform'] },
+					{ name: 'tools-harbor', type: 'harbor', url: down.url, projects: ['tools'] },
+				],
+				routes: [{ url: '/images', controller: 'harbor-images' }],
+				cacheStore: await empty(),
+			});
+
+			const response = await fetch(`${vitrine.url}/images`);
+			const html = await response.text();
+
+			await vitrine.stop();
+			await Promise.all([up.stop(), down.stop()]);
+			expect(response.status).toBe(200);
+			expect(html).toContain('platform/api');
+			expect(html).toContain('Images could not be loaded because tools-harbor is down.');
+		});
+	});
+
 	describe('reading Harbor', () => {
-		const route = { url: '/images', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } };
+		const route = { url: '/images', controller: 'harbor-images' };
 
 		test('authenticates with a password from the environment', async () => {
 			const harbor = await startFakeHarbor({
 				projects: { platform: ['platform/private'] },
+				artifacts: { 'platform/private': [artifact] },
 				credentials: { username: 'robot', password: 's3cret' },
 			});
 			const vitrine = await startVitrine(
 				{
-					sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, username: 'robot', passwordEnv: 'HARBOR_PASSWORD' }],
+					sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: ['platform'], username: 'robot', passwordEnv: 'HARBOR_PASSWORD' }],
 					routes: [route],
 					cacheStore: await empty(),
 				},
@@ -84,13 +180,14 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 			await vitrine.stop();
 			await harbor.stop();
 			expect(html).toContain('platform/private');
+			expect(html).toContain('1.0');
 		});
 
 		test('shows every Image when a project spans several API pages', async () => {
 			const names = Array.from({ length: 150 }, (_, index) => `platform/image-${index}`);
 			const harbor = await startFakeHarbor({ projects: { platform: names } });
 			const vitrine = await startVitrine({
-				sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url }],
+				sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: ['platform'] }],
 				routes: [route],
 				cacheStore: await empty(),
 			});
@@ -99,19 +196,19 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 
 			await vitrine.stop();
 			await harbor.stop();
-			expect(harbor.requests).toHaveLength(2);
+			expect(harbor.repositoryListRequests()).toHaveLength(2);
 			expect(html).toContain('platform/image-0<');
 			expect(html).toContain('platform/image-149<');
 		});
 	});
 
 	describe('reading a Source through the cache', () => {
-		const route = { url: '/images', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } };
+		const route = { url: '/images', controller: 'harbor-images' };
 
-		async function start(source: Record<string, unknown> = {}, projects = { platform: ['platform/api'] }) {
-			const harbor = await startFakeHarbor({ projects });
+		async function start(source: Record<string, unknown> = {}, projects: Record<string, string[]> = { platform: ['platform/api'] }) {
+			const harbor = await startFakeHarbor({ projects, artifacts: { 'platform/api': [artifact] } });
 			const vitrine = await startVitrine({
-				sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, ...source }],
+				sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: Object.keys(projects), ...source }],
 				routes: [route],
 				cacheStore: await empty(),
 			});
@@ -140,7 +237,39 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 			const { html } = await images();
 
 			expect(html).toContain('platform/api');
-			expect(harbor.requests).toHaveLength(1);
+			expect(harbor.repositoryListRequests()).toHaveLength(1);
+		});
+
+		test('caches the whole list of a Harbor project, its tags and scans included', async () => {
+			const { harbor, images } = await start();
+
+			const first = await images();
+			const requestsAfterFirstLoad = harbor.requests.length;
+			const second = await images();
+
+			expect(requestsAfterFirstLoad).toBeGreaterThan(1);
+			expect(harbor.requests).toHaveLength(requestsAfterFirstLoad);
+			expect(second.html).toBe(first.html);
+			expect(second.html).toContain('docker pull');
+		});
+
+		test('serves Stale data when only the tags of an Image cannot be loaded', async () => {
+			const { harbor, images } = await start({ allowedAgeMinutes: ONE_MILLISECOND });
+
+			await images();
+			harbor.behave('down-after-repositories');
+			const { html } = await images();
+
+			expect(html).toContain('docker pull');
+			expect(html).toContain('This list is Stale');
+		});
+
+		test('loads each selected Harbor project on its own', async () => {
+			const { harbor, images } = await start({}, { platform: ['platform/api'], data: ['data/etl'] });
+
+			await images();
+
+			expect(harbor.repositoryListRequests()).toHaveLength(2);
 		});
 
 		test('loads data older than its allowed age and replaces the cached data', async () => {
@@ -221,7 +350,7 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 			await images();
 			await images();
 
-			expect(harbor.requests).toHaveLength(2);
+			expect(harbor.repositoryListRequests()).toHaveLength(2);
 		});
 
 		test('never serves Stale data when the allowed age is 0', async () => {
@@ -244,7 +373,7 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 			const pages = await Promise.all([images(), images(), images(), images(), images()]);
 
 			expect(pages.map(({ html }) => html.includes('platform/api'))).toEqual([true, true, true, true, true]);
-			expect(harbor.requests).toHaveLength(1);
+			expect(harbor.repositoryListRequests()).toHaveLength(1);
 		});
 
 		test('shares one Source call when simultaneous requests refresh data older than its allowed age', async () => {
@@ -254,17 +383,17 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 			harbor.behave('slow');
 			await Promise.all([images(), images(), images(), images(), images()]);
 
-			expect(harbor.requests).toHaveLength(2);
+			expect(harbor.repositoryListRequests()).toHaveLength(2);
 		});
 	});
 
 	describe('restarting Vitrine', () => {
-		const route = { url: '/images', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } };
+		const route = { url: '/images', controller: 'harbor-images' };
 
 		test(`${survivesRestart ? 'keeps' : 'loses'} cached data across a restart`, async () => {
 			const harbor = await startFakeHarbor({ projects: { platform: ['platform/api'] } });
 			const settings = {
-				sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url }],
+				sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: ['platform'] }],
 				routes: [route],
 				cacheStore: await empty(),
 			};
@@ -278,13 +407,13 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 			await after.stop();
 			await harbor.stop();
 			expect(html).toContain('platform/api');
-			expect(harbor.requests).toHaveLength(survivesRestart ? 1 : 2);
+			expect(harbor.repositoryListRequests()).toHaveLength(survivesRestart ? 1 : 2);
 		});
 	});
 });
 
 describe('a failing cache store', () => {
-	const route = { url: '/images', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } };
+	const route = { url: '/images', controller: 'harbor-images' };
 
 	test.each([
 		['local files in a directory that cannot exist', async () => ({ type: 'files', directory: join(writeSettings(''), 'cache') })],
@@ -296,7 +425,7 @@ describe('a failing cache store', () => {
 		const { port } = silentRedis.address() as AddressInfo;
 		const harbor = await startFakeHarbor({ projects: { platform: ['platform/api'] } });
 		const vitrine = await startVitrine(
-			{ sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url }], routes: [route], cacheStore: await cacheStore() },
+			{ sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: ['platform'] }], routes: [route], cacheStore: await cacheStore() },
 			{ VITRINE_DOWN_REDIS_URL: 'redis://127.0.0.1:1', VITRINE_SILENT_REDIS_URL: `redis://127.0.0.1:${port}` },
 		);
 
@@ -317,14 +446,14 @@ describe('a failing cache store', () => {
 			expect(html).toContain('platform/api');
 			expect(elapsed).toBeLessThan(5_000);
 		}
-		expect(harbor.requests).toHaveLength(2);
+		expect(harbor.repositoryListRequests()).toHaveLength(2);
 		expect(stderr).toContain('Cache store');
 	});
 });
 
 describe('invalid Settings stop startup', () => {
-	const source = { name: 'main-harbor', type: 'harbor', url: 'http://harbor.test' };
-	const route = { url: '/images', controller: 'harbor-images', params: { source: 'main-harbor', project: 'platform' } };
+	const source = { name: 'main-harbor', type: 'harbor', url: 'http://harbor.test', projects: ['platform'] };
+	const route = { url: '/images', controller: 'harbor-images', params: { source: 'main-harbor' } };
 
 	test.each([
 		['malformed YAML', 'sources: [', 'settings.yaml'],
@@ -339,7 +468,9 @@ describe('invalid Settings stop startup', () => {
 		['an empty file', '', 'the file is empty, see settings.example.yaml'],
 		['an unknown Controller', { sources: [source], routes: [{ ...route, controller: 'nope' }] }, 'controller'],
 		['a Route to an unknown Source', { sources: [], routes: [route] }, 'unknown Source "main-harbor"'],
-		['a missing Controller parameter', { sources: [source], routes: [{ ...route, params: { source: 'main-harbor' } }] }, 'project'],
+		['a Source with no Harbor projects', { sources: [{ ...source, projects: [] }], routes: [route] }, 'projects'],
+		['a Source without a projects key', { sources: [{ name: 'main-harbor', type: 'harbor', url: 'http://harbor.test' }], routes: [route] }, 'projects'],
+		['the same Harbor project twice', { sources: [{ ...source, projects: ['platform', 'platform'] }], routes: [route] }, 'Source "main-harbor" selects Harbor project "platform" twice'],
 		['the same URL twice', { sources: [source], routes: [route, route] }, 'Route "/images" is declared twice'],
 		['a negative allowed age', { sources: [{ ...source, allowedAgeMinutes: -1 }], routes: [route] }, 'allowedAgeMinutes'],
 		['an unknown cache store', { sources: [], routes: [], cacheStore: { type: 'nope' } }, 'cacheStore.type'],
