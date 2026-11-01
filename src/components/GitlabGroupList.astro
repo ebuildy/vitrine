@@ -1,36 +1,50 @@
 ---
-import { gitlabGroupUrl } from '../router.ts';
+import { gitlabGroupUrl, gitlabIssuesUrl, gitlabRoadmapUrl } from '../router.ts';
 import { getGitlabSource, getSettings } from '../settings.ts';
-import { listSubgroups } from '../sources/gitlab.ts';
+import { listMainGroups, listSubgroups } from '../sources/gitlab.ts';
+import type { MainGroupList } from '../sources/gitlab.ts';
 
 interface Props {
 	source: string;
-	group: string;
+	/** The Group whose subgroups to list. Left out, it lists the Main Groups of the Source. */
+	group?: string;
+	/** Left empty, the page heads this list itself. */
+	title?: string;
+	maxItems?: number;
 }
 
-const { source, group } = Astro.props;
-const { data: subgroups, stale } = await listSubgroups(getGitlabSource(source), group);
+const { source, group, maxItems } = Astro.props;
+const kind = group === undefined ? 'Main Groups' : 'Subgroups';
+const { title = kind } = Astro.props;
+const gitlabSource = getGitlabSource(source);
+const { routes } = getSettings();
+const { data: groups, stale, detailsMissing }: MainGroupList = await (group === undefined ? listMainGroups(gitlabSource) : listSubgroups(gitlabSource, group));
 ---
 
 {stale && <p role="status">This list is Stale because {source} is down.</p>}
-{!subgroups && <p role="alert">Subgroups could not be loaded from {source}.</p>}
+{detailsMissing && <p role="alert">Some Groups could not be loaded from {source}.</p>}
+{!groups && <p role="alert">{kind} could not be loaded from {source}.</p>}
 {
-	subgroups && subgroups.length > 0 && (
+	groups && groups.length > 0 && (
 		<section>
-			<h2>Subgroups</h2>
+			{title && <h2>{title}</h2>}
 			<ul>
-				{subgroups.map((subgroup) => {
-					const url = gitlabGroupUrl(getSettings().routes, source, subgroup.path);
+				{groups.slice(0, maxItems).map((listed) => {
+					const url = gitlabGroupUrl(routes, source, listed.path);
+					const issuesUrl = gitlabIssuesUrl(routes, source, listed.path);
+					const roadmapUrl = gitlabSource.mainGroups.includes(listed.path) ? gitlabRoadmapUrl(routes, source, listed.path) : undefined;
 					return (
 						<li>
-							<h3>{url ? <a href={url}>{subgroup.name}</a> : subgroup.name}</h3>
-							{subgroup.description && <p>{subgroup.description}</p>}
+							<h3>{url ? <a href={url}>{listed.name}</a> : listed.name}</h3>
+							{listed.description && <p>{listed.description}</p>}
 							<p>
-								{subgroup.projectCount} {subgroup.projectCount === 1 ? 'Project' : 'Projects'}
+								{listed.projectCount} {listed.projectCount === 1 ? 'Project' : 'Projects'}
 							</p>
-							<a class="source-link" href={subgroup.webUrl}>
-								View in GitLab
-							</a>
+							<p class="links">
+								{issuesUrl && <a href={issuesUrl}>Issues</a>}
+								{roadmapUrl && <a href={roadmapUrl}>Roadmap</a>}
+								<a href={listed.webUrl}>View in GitLab</a>
+							</p>
 						</li>
 					);
 				})}
@@ -85,8 +99,12 @@ const { data: subgroups, stale } = await listSubgroups(getGitlabSource(source), 
 		inset: 0;
 	}
 
-	/* Lifts the link to GitLab above the one stretched over the card. */
-	.source-link {
+	/* Lifts these links above the one stretched over the card. */
+	.links {
 		position: relative;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0 1rem;
+		margin: 0;
 	}
 </style>

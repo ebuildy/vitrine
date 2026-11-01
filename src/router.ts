@@ -3,7 +3,18 @@ import { z } from 'zod';
 import type { GitlabSource, Settings, Source } from './settings.ts';
 import type { CompiledTemplate } from './template-compiler.ts';
 
+const navigationArrangementSchema = z.enum(['grid', 'columns', 'list']);
+
+export type NavigationArrangement = z.infer<typeof navigationArrangementSchema>;
+
 const controllerParamsSchemas = {
+	navigation: z.strictObject({
+		arrangement: navigationArrangementSchema.optional(),
+		maxItems: z
+			.string()
+			.regex(/^[1-9]\d*$/, 'must be a whole number above zero')
+			.optional(),
+	}),
 	harbor: z.strictObject({ source: z.string() }),
 	'harbor-images': z
 		.strictObject({ source: z.string().optional(), project: z.string().optional() })
@@ -16,7 +27,8 @@ const controllerParamsSchemas = {
 
 export type ControllerName = keyof typeof controllerParamsSchemas;
 
-export const controllerSourceTypes: Record<ControllerName, Source['type']> = {
+export const controllerSourceTypes: Record<ControllerName, Source['type'] | undefined> = {
+	navigation: undefined,
 	harbor: 'harbor',
 	'harbor-images': 'harbor',
 	'gitlab-group': 'gitlab',
@@ -31,7 +43,8 @@ export const routeSchema = z.strictObject({
 		.startsWith('/')
 		.refine((url) => url === '/' || !url.endsWith('/'), { message: 'must not end with a trailing slash' }),
 	controller: z.enum(Object.keys(controllerParamsSchemas) as [ControllerName, ...ControllerName[]]),
-	params: z.record(z.string(), z.string()).default({}),
+	// URL parameters are text, so a number from Settings becomes text too.
+	params: z.record(z.string(), z.union([z.string(), z.number().transform(String)])).default({}),
 	template: z.string().min(1).optional(),
 });
 
@@ -83,6 +96,10 @@ function isListSegment(segment: string) {
 	return segment.startsWith(':') && segment.endsWith('+');
 }
 
+function showsHarborProjects({ url, controller }: Route) {
+	return controller === 'harbor' && urlParamNames(url).includes('source');
+}
+
 function showsProjectImages({ url, controller }: Route) {
 	const names = urlParamNames(url);
 	return controller === 'harbor-images' && names.includes('source') && names.includes('project');
@@ -90,6 +107,14 @@ function showsProjectImages({ url, controller }: Route) {
 
 function showsGroups({ url, controller }: Route) {
 	return controller === 'gitlab-group' && urlParamNames(url).includes('group');
+}
+
+function showsGroupIssues({ url, controller }: Route) {
+	return controller === 'gitlab-issues' && urlParamNames(url).includes('group');
+}
+
+function showsRoadmaps({ url, controller }: Route) {
+	return controller === 'gitlab-roadmap' && urlParamNames(url).includes('group');
 }
 
 function showsProjects({ url, controller }: Route) {
@@ -158,9 +183,29 @@ export function harborImagesUrl(routes: Route[], source: string, project: string
 	return routes.find(showsProjectImages)?.url.replace(':source', encodeURIComponent(source)).replace(':project', encodeURIComponent(project));
 }
 
+/** The URLs that need no value from anyone, which are all a page can link to without knowing what a Route shows. */
+export function fixedUrls(routes: Route[]): string[] {
+	return routes.map(({ url }) => url).filter((url) => urlParamNames(url).length === 0);
+}
+
+/** The URL listing the Harbor projects of one Source, if a Route offers one. */
+export function harborProjectsUrl(routes: Route[], source: string): string | undefined {
+	return routes.find(showsHarborProjects)?.url.replace(':source', encodeURIComponent(source));
+}
+
 /** The URL showing one Group, if a Route offers one. */
 export function gitlabGroupUrl(routes: Route[], source: string, group: string): string | undefined {
 	return gitlabUrl(routes, showsGroups, source, group);
+}
+
+/** The URL showing the Issues of one Group, if a Route offers one. */
+export function gitlabIssuesUrl(routes: Route[], source: string, group: string): string | undefined {
+	return gitlabUrl(routes, showsGroupIssues, source, group);
+}
+
+/** The URL showing the Roadmap of one Main Group, if a Route offers one. */
+export function gitlabRoadmapUrl(routes: Route[], source: string, group: string): string | undefined {
+	return gitlabUrl(routes, showsRoadmaps, source, group);
 }
 
 /** The URL showing one Project, if a Route offers one. */

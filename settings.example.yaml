@@ -49,6 +49,16 @@ cacheStore:
   # urlEnv: REDIS_URL
 
 routes:
+  # Shows the latest releases, Harbor projects, Members and Groups of every Source, and leads to the other pages.
+  # Add as many of these as you like, on any URL, even the root one.
+  - url: /
+    controller: navigation
+    params:
+      # grid sets releases and Harbor projects side by side above the rest, which is the default. columns gives
+      # the Overview, Members and Groups a column each, and list runs everything down the page.
+      arrangement: grid
+      # How many items each list shows. Defaults to 5.
+      maxItems: 5
   # Shows the Images of every selected Harbor project of every Source.
   - url: /images
     controller: harbor-images

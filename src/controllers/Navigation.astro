@@ -1,0 +1,138 @@
+---
+import GitlabGroupList from '../components/GitlabGroupList.astro';
+import GitlabGroupReleases from '../components/GitlabGroupReleases.astro';
+import GroupMembers from '../components/GroupMembers.astro';
+import HarborProjectList from '../components/HarborProjectList.astro';
+import Arrangement from '../layouts/Arrangement.astro';
+import Layout from '../layouts/Layout.astro';
+import { fixedUrls, harborProjectsUrl } from '../router.ts';
+import type { NavigationArrangement } from '../router.ts';
+import { getGitlabSources, getHarborSources, getSettings } from '../settings.ts';
+import type { CompiledTemplate } from '../template-compiler.ts';
+
+interface Props {
+	arrangement?: NavigationArrangement;
+	maxItems?: string;
+	template?: CompiledTemplate;
+}
+
+const { arrangement = 'grid', template } = Astro.props;
+const maxItems = Number(Astro.props.maxItems ?? 5);
+const { routes } = getSettings();
+const otherPages = fixedUrls(routes).filter((url) => url !== Astro.url.pathname);
+const mainGroups = getGitlabSources().flatMap(({ name, mainGroups }) => mainGroups.map((group) => ({ source: name, group })));
+---
+
+<Layout title="Vitrine">
+	<Arrangement template={template} title="Vitrine">
+		<h1>Vitrine</h1>
+		<div class:list={['sections', arrangement]}>
+			<section>
+				<h2>Overview</h2>
+				<div class="overview">
+					{
+						mainGroups.map(({ source, group }) => (
+							<div>
+								<h3>Releases of {group}</h3>
+								<GitlabGroupReleases source={source} group={group} title="" maxItems={maxItems} />
+							</div>
+						))
+					}
+					{
+						getHarborSources().map(({ name, projects }) => {
+							const url = harborProjectsUrl(routes, name);
+							return (
+								<div>
+									<h3>Harbor projects of {name}</h3>
+									<HarborProjectList source={name} projects={projects} maxItems={maxItems} />
+									{url && (
+										<p class="all">
+											<a href={url}>All Harbor projects</a>
+										</p>
+									)}
+								</div>
+							);
+						})
+					}
+				</div>
+			</section>
+			{
+				mainGroups.length > 0 && (
+					<section>
+						<h2>Members</h2>
+						{mainGroups.map(({ source, group }) => (
+							<>
+								<h3>{group}</h3>
+								<GroupMembers source={source} group={group} title="" maxItems={maxItems} />
+							</>
+						))}
+					</section>
+					<section>
+						<h2>Groups</h2>
+						{getGitlabSources().map(({ name }) => (
+							<>
+								<h3>{name}</h3>
+								<GitlabGroupList source={name} title="" maxItems={maxItems} />
+							</>
+						))}
+					</section>
+				)
+			}
+		</div>
+		{
+			otherPages.length > 0 && (
+				<section>
+					<h2>Pages</h2>
+					<ul class="pages">
+						{otherPages.map((url) => (
+							<li>
+								<a href={url}>{url}</a>
+							</li>
+						))}
+					</ul>
+				</section>
+			)
+		}
+	</Arrangement>
+</Layout>
+
+<style>
+	h1 {
+		margin: 0;
+		padding: 1rem 1rem 0;
+	}
+
+	h2,
+	h3 {
+		margin: 1rem 1rem 0;
+	}
+
+	.pages {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 1rem;
+		margin: 0.75rem 1rem 1rem;
+		padding: 0;
+		list-style: none;
+	}
+
+	.all {
+		margin: 0;
+		padding: 0 1rem;
+	}
+
+	.sections {
+		display: grid;
+	}
+
+	.overview {
+		display: grid;
+	}
+
+	/* Sets the lists of the Overview, or the sections, side by side, wrapping on a narrow screen. */
+	.grid .overview,
+	.columns {
+		grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+		align-items: start;
+	}
+</style>

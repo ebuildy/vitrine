@@ -83,6 +83,8 @@ export interface FakeGitlabProject {
 	commits?: Record<string, unknown>[];
 	issues?: Record<string, unknown>[];
 	releases?: Record<string, unknown>[];
+	/** What a Project that turned releases off answers about them. */
+	releasesRefused?: boolean;
 	contributors?: { name: string; email: string; commits: number }[];
 	/** Direct members. */
 	members?: FakeGitlabMember[];
@@ -332,7 +334,8 @@ export async function startFakeGitlab({
 			} else if (part === '/issues') {
 				respondWithPage(response, url, issuesJson([project], url));
 			} else if (part === '/releases') {
-				respondWithPage(response, url, project.releases ?? []);
+				if (project.releasesRefused) response.writeHead(403).end();
+				else respondWithPage(response, url, project.releases ?? []);
 			} else {
 				response.writeHead(404).end();
 			}
