@@ -19,6 +19,7 @@ const { bars, months, unscheduled } = layOutRoadmap(epics ?? []);
 	<h2>Roadmap</h2>
 	{stale && <p role="status">This Roadmap is Stale because {source} is down.</p>}
 	{error && (error instanceof EpicsUnavailableError ? <p role="alert">Epics are not available on {source}: they need a GitLab tier that includes them.</p> : <p role="alert">Epics could not be loaded from {source}.</p>)}
+	{!error && !epics && <p role="alert">{group} is not a Main Group of {source}, so it has no Roadmap.</p>}
 	{epics?.length === 0 && <p>No open Epics.</p>}
 	{
 		bars.length > 0 && (

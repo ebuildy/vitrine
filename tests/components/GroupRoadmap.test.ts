@@ -186,6 +186,10 @@ test('shows an error when GitLab answers the query with errors', async () => {
 test.each([
 	['a Group beneath a Main Group', 'platform/backend'],
 	['a Group outside the Main Groups', 'other'],
-])('shows an error for %s, as a Roadmap belongs to a Main Group', async (_, group) => {
-	expect(await render('main-gitlab', group)).toContain('Epics could not be loaded');
+])('says there is no Roadmap for %s, as a Roadmap belongs to a Main Group', async (_, group) => {
+	const html = await render('main-gitlab', group);
+
+	expect(html).toContain(`${group} is not a Main Group of main-gitlab, so it has no Roadmap.`);
+	expect(html).not.toContain('Epics could not be loaded');
+	expect(html).not.toContain('No open Epics.');
 });

@@ -15,8 +15,8 @@ export function getGroup(source: GitlabSource, path: string): Promise<CachedCont
 }
 
 /** Reads a Group only if it is a Main Group, for what exists once per Main Group. */
-export async function getMainGroup(source: GitlabSource, path: string): Promise<CachedContent<Group | undefined>> {
-	return source.mainGroups.includes(path) ? getGroup(source, path) : { data: undefined, stale: false };
+export function getMainGroup(source: GitlabSource, path: string): Promise<CachedContent<Group | undefined>> {
+	return ifMainGroup(source, path, () => getGroup(source, path));
 }
 
 export function listSubgroups(source: GitlabSource, group: string): Promise<CachedContent<Subgroup[]>> {
@@ -66,9 +66,8 @@ export async function listMembers(source: GitlabSource, group: string, deep: boo
 }
 
 /** Lists the Epics of a Main Group, cached apart from its other lists, as a GitLab without Epics must not stop browsing. */
-export async function listEpics(source: GitlabSource, mainGroup: string): Promise<CachedContent<Epic[]>> {
-	if (!source.mainGroups.includes(mainGroup)) return { error: new Error(`"${mainGroup}" is not a Main Group of "${source.name}"`) };
-	return readSource(source, `${source.name}/epics/${mainGroup}`, (signal) => gitlabApi.readEpics(source, mainGroup, signal));
+export function listEpics(source: GitlabSource, path: string): Promise<CachedContent<Epic[] | undefined>> {
+	return ifMainGroup(source, path, () => readSource(source, `${source.name}/epics/${path}`, (signal) => gitlabApi.readEpics(source, path, signal)));
 }
 
 /** Reads cards in list order and may stop early, as readWhileUp tells. */
@@ -112,6 +111,11 @@ function fromMainGroup<T>(source: GitlabSource, path: string, pick: (content: Ma
 		const content = await readSource(source, `${source.name}/main-group/${mainGroup}`, (signal) => gitlabApi.readMainGroup(source, mainGroup, signal));
 		return content.error ? content : { data: pick(content.data), stale: content.stale };
 	});
+}
+
+/** What exists once per Main Group is not there for any other Group, which is no failure. */
+async function ifMainGroup<T>(source: GitlabSource, path: string, read: () => Promise<CachedContent<T>>): Promise<CachedContent<T | undefined>> {
+	return source.mainGroups.includes(path) ? read() : { data: undefined, stale: false };
 }
 
 async function inMainGroup<T>(source: GitlabSource, path: string, read: (mainGroup: string) => Promise<CachedContent<T>>): Promise<CachedContent<T>> {
