@@ -1,8 +1,8 @@
 import { experimental_AstroContainer as AstroContainer } from 'astro/container';
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
 import GroupRoadmap from '../../src/components/GroupRoadmap.astro';
 import { startFakeGitlab } from '../support/fake-gitlab.ts';
-import type { FakeGitlab, FakeGitlabEpic, FakeGitlabOptions } from '../support/fake-gitlab.ts';
+import type { FakeGitlab, FakeGitlabEpic, FakeGitlabGroup, FakeGitlabOptions } from '../support/fake-gitlab.ts';
 import { writeSettings } from '../support/vitrine.ts';
 
 const planned: FakeGitlabEpic[] = [
@@ -17,12 +17,13 @@ const planned: FakeGitlabEpic[] = [
 ];
 
 const fakes: FakeGitlab[] = [];
+const downgraded: FakeGitlabGroup = { path: 'platform', epics: planned };
 
 /** A Source of its own, as each Source caches apart. */
-async function sourceWith(name: string, options: FakeGitlabOptions, mainGroups = ['platform']) {
+async function sourceWith(name: string, options: FakeGitlabOptions, settings = {}) {
 	const gitlab = await startFakeGitlab(options);
 	fakes.push(gitlab);
-	return { name, type: 'gitlab', url: gitlab.url, mainGroups };
+	return { name, type: 'gitlab', url: gitlab.url, mainGroups: ['platform'], ...settings };
 }
 
 beforeAll(async () => {
@@ -40,12 +41,17 @@ beforeAll(async () => {
 		sourceWith('decade-gitlab', { groups: [{ path: 'platform', epics: [{ title: 'Long work', startDate: '2020-01-01', dueDate: '2029-12-31' }] }] }),
 		sourceWith('reversed-gitlab', { groups: [{ path: 'platform', epics: [{ title: 'Reversed work', startDate: '2026-02-20', dueDate: '2026-02-10' }] }] }),
 		sourceWith('undated-gitlab', { groups: [{ path: 'platform', epics: [{ title: 'Undated work' }] }] }),
+		sourceWith('downgraded-gitlab', { groups: [downgraded] }, { allowedAgeMinutes: 5 }),
 	]);
 	process.env.VITRINE_SETTINGS = writeSettings({ sources, routes: [] });
 });
 
 afterAll(async () => {
 	await Promise.all(fakes.map((gitlab) => gitlab.stop()));
+});
+
+afterEach(() => {
+	vi.useRealTimers();
 });
 
 async function render(source: string, group = 'platform') {
@@ -147,6 +153,19 @@ test('says that Epics are unavailable when GitLab lists none because the tier ha
 
 	expect(html).toContain('role="alert"');
 	expect(html).toContain('Epics are not available on free-gitlab');
+});
+
+test('says that Epics are unavailable rather than Stale once a tier loses them, as the Source is up', async () => {
+	vi.useFakeTimers({ toFake: ['Date'] });
+	await render('downgraded-gitlab');
+
+	vi.advanceTimersByTime(6 * 60_000);
+	downgraded.epicsUnavailable = true;
+	const html = await render('downgraded-gitlab');
+
+	expect(html).toContain('Epics are not available on downgraded-gitlab');
+	expect(html).not.toContain('Later work');
+	expect(html).not.toContain('Stale');
 });
 
 test('tells no Epics apart from Epics being unavailable', async () => {

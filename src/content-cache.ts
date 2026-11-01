@@ -4,6 +4,9 @@ import type { Entry } from './cache-stores.ts';
 export const SOURCE_TIMEOUT_MS = 10_000;
 const CACHE_STORE_TIMEOUT_MS = 1_000;
 
+/** A Source that is up answering it cannot give this content, which Stale content must not stand in for. */
+export class ContentUnavailableError extends Error {}
+
 export type CachedContent<T> = { data: T; stale: boolean; error?: undefined } | { data?: undefined; stale?: undefined; error: Error };
 
 /** Reads a Source, and is told through the signal when it has counted as down. */
@@ -44,7 +47,7 @@ async function readStoreThenSource<T>(key: string, allowedAgeMs: number, loader:
 	if (entry && Date.now() - entry.loadedAt < allowedAgeMs) return { data: entry.data as T, stale: false };
 
 	const result = await readUncached(key, loader);
-	if (result.error) return entry ? { data: entry.data as T, stale: true } : result;
+	if (result.error) return entry && !(result.error instanceof ContentUnavailableError) ? { data: entry.data as T, stale: true } : result;
 	await writeEntry(key, { data: result.data, loadedAt: Date.now() });
 	return result;
 }

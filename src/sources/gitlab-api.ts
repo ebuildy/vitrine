@@ -1,3 +1,4 @@
+import { ContentUnavailableError } from '../content-cache.ts';
 import type { GitlabSource } from '../settings.ts';
 
 const PAGE_SIZE = 100;
@@ -223,7 +224,7 @@ const EPICS_QUERY = `query Epics($fullPath: ID!, $types: [IssueType!], $state: I
 }`;
 
 /** A GitLab without Epics, which no retry would change, unlike a Source that is down. */
-export class EpicsUnavailableError extends Error {}
+export class EpicsUnavailableError extends ContentUnavailableError {}
 
 export async function readEpics(source: GitlabSource, mainGroup: string, signal: AbortSignal): Promise<Epic[]> {
 	const epics: Epic[] = [];
