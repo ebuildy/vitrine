@@ -7,14 +7,17 @@ interface Props {
 	group: string;
 	/** Also lists the Members of every Group and Project beneath the Main Group, at a request each. */
 	deep?: boolean;
+	/** Left empty, the page heads this list itself. */
+	title?: string;
+	maxItems?: number;
 }
 
-const { source, group, deep = false } = Astro.props;
+const { source, group, deep = false, title = 'Members', maxItems } = Astro.props;
 const { data: members, stale, detailsStale, detailsMissing } = await listMembers(getGitlabSource(source), group, deep);
 ---
 
 <section>
-	<h2>Members</h2>
+	{title && <h2>{title}</h2>}
 	{stale && <p role="status">This list is Stale because {source} is down.</p>}
 	{!stale && detailsStale && <p role="status">Details of some Members are Stale because {source} is down.</p>}
 	{detailsMissing && <p role="alert">Details of some Members could not be loaded from {source}.</p>}
@@ -23,7 +26,7 @@ const { data: members, stale, detailsStale, detailsMissing } = await listMembers
 			<p role="alert">Members could not be loaded from {source}.</p>
 		) : members.length > 0 ? (
 			<ul>
-				{members.map(({ name, avatarUrl, location, email }) => (
+				{members.slice(0, maxItems).map(({ name, avatarUrl, location, email }) => (
 					<li>
 						{avatarUrl ? <img src={avatarUrl} alt="" width="40" height="40" loading="lazy" /> : <span class="avatar" />}
 						<div>

@@ -115,6 +115,7 @@ routes:
   - { url: '/harbor/:source', controller: harbor, template: ${JSON.stringify(shows('harbor'))} }
   - { url: '/harbor/:source/:project', controller: harbor-images, template: ${JSON.stringify(shows('harbor-images'))} }
   - { url: '/images', controller: harbor-images, template: ${JSON.stringify(shows('images'))} }
+  - { url: '/navigation', controller: navigation, template: ${JSON.stringify(shows('navigation'))} }
   - { url: '/gitlab/:group+', controller: gitlab-group, template: ${JSON.stringify(shows('gitlab-group'))} }
   - { url: '/gitlab/:group+/-/:project', controller: gitlab-project, template: ${JSON.stringify(shows('gitlab-project'))} }
   - { url: '/roadmap/:group+', controller: gitlab-roadmap, template: ${JSON.stringify(shows('gitlab-roadmap'))} }
@@ -140,6 +141,7 @@ routes:
 		['harbor', '/harbor/main-harbor', 'main-harbor', 'main-harbor||main-harbor|||'],
 		['harbor-images', '/harbor/main-harbor/platform', 'Images', 'Images||main-harbor||platform|'],
 		['images', '/images', 'Images', 'Images|||||'],
+		['navigation', '/navigation', 'Vitrine', 'Vitrine|||||'],
 		['gitlab-group', '/gitlab/platform', 'The Platform', 'The Platform|Everything we run|main-gitlab|platform||'],
 		['gitlab-project', '/gitlab/platform/backend/-/api', 'api', 'api|The public API|main-gitlab|platform/backend|api|platform/backend/api'],
 		['gitlab-roadmap', '/roadmap/platform', 'The Platform Roadmap', 'The Platform Roadmap|Everything we run|main-gitlab|platform||'],
@@ -320,8 +322,8 @@ describe('a Template stops startup', () => {
 		['with an unknown Component', onGroup('<GitlabNope />'), '<GitlabNope>'],
 		['with an unknown Component in a loop', onGroup(`{['a'].map(() => <div><GitlabNope /></div>)}`), '<GitlabNope>'],
 		['with an unknown Component behind a dot', onGroup('<Nope.Thing />'), '<Nope.Thing>'],
-		['with a missing prop', onGroup('<GitlabGroupList source={source} />'), '<GitlabGroupList> needs the prop "group"'],
-		['with a missing prop in a loop', onGroup(`{['a'].map(() => <GitlabGroupList source={source} />)}`), '<GitlabGroupList> needs the prop "group"'],
+		['with a missing prop', onGroup('<GitlabGroupSummary source={source} />'), '<GitlabGroupSummary> needs the prop "group"'],
+		['with a missing prop in a loop', onGroup(`{['a'].map(() => <GitlabGroupSummary source={source} />)}`), '<GitlabGroupSummary> needs the prop "group"'],
 		['with an unknown prop', onGroup('<GitlabGroupList source={source} group={group} sauce="x" />'), '<GitlabGroupList> has no prop "sauce"'],
 		['with an island', onGroup('<GitlabGroupList source={source} group={group} client:load />'), '<GitlabGroupList> has no prop "client:load"'],
 		['with a Component of the wrong Source type for the Route', onGroup('<HarborProjectList source={source} />'), '<HarborProjectList> needs a harbor Source'],
