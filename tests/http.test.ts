@@ -303,7 +303,7 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 		}
 
 		const ONE_MILLISECOND = 1 / 60_000;
-		const cleanups: (() => Promise<void>)[] = [];
+		const cleanups: (() => Promise<unknown>)[] = [];
 
 		afterEach(async () => {
 			await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()));
@@ -580,6 +580,14 @@ describe('invalid Settings stop startup', () => {
 
 		expect(exitCode).toBe(0);
 		expect(output).not.toContain('Server listening');
+	});
+});
+
+describe('stopping Vitrine', () => {
+	test('exits by itself on SIGTERM, as it must when a container runs it as PID 1', async () => {
+		const vitrine = await startVitrine({ sources: [], routes: [] });
+
+		expect(await vitrine.stop()).toBe(0);
 	});
 });
 
