@@ -16,6 +16,21 @@ Open the URL Astro prints. `/`, `/images`, `/images/tools`, `/harbor/main-harbor
 
 Vitrine reads `.env` from its working directory at start, with `npm run dev` as with `npm start`, and works without one. A variable the environment already sets wins, and `VITRINE_ENV_FILE` names another file. Restart after changing it. `.env` is ignored by git, and `.env.example` lists the variables.
 
+## Container image
+
+`ghcr.io/ebuildy/vitrine` runs from a Settings file mounted at `/etc/vitrine/settings.yaml`, such as a Kubernetes ConfigMap, with secrets in environment variables. It holds no Settings of its own and stops with a clear error without one.
+
+```sh
+docker run -p 8080:8080 \
+  -v "$PWD/settings.yaml:/etc/vitrine/settings.yaml:ro" \
+  -e GITLAB_TOKEN -e HARBOR_PASSWORD \
+  ghcr.io/ebuildy/vitrine:edge
+```
+
+Two kinds of tag exist, for `linux/amd64` and `linux/arm64`: `edge` follows `main`, and a release `v1.2.3` is published as `1.2.3`, `1.2` and `1`. There is no `latest`.
+
+The image listens on port 8080, as user `node` (uid 1000). It creates no directory for a `files` cache store, so mount a writable one for that user. `src/pages` is built in: to change pages, fork and build your own image with `podman build .` or `docker build --file Containerfile .`.
+
 # Astro Starter Kit: Basics
 
 ```sh

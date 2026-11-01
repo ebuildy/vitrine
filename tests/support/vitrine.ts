@@ -38,7 +38,8 @@ export interface RunningVitrine {
 	url: string;
 	/** Everything logged as an error so far. */
 	stderr: () => string;
-	stop: () => Promise<void>;
+	/** Resolves with the exit code, or null when a signal killed the process. */
+	stop: () => Promise<number | null>;
 }
 
 function spawnVitrine(command: string, args: string[], settings: unknown, env: Record<string, string | undefined>) {
@@ -74,7 +75,7 @@ async function untilServing(child: ChildProcessByStdio<null, Readable, Readable>
 				stderr: () => stderr,
 				stop: () =>
 					new Promise((resolve) => {
-						child.once('exit', () => resolve());
+						child.once('exit', (code) => resolve(code));
 						child.kill();
 					}),
 			};

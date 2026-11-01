@@ -1,0 +1,75 @@
+name: Container image
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+
+jobs:
+  tests:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yaml
+
+  image:
+    needs: tests
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/ebuildy/vitrine
+          flavor: latest=false
+          tags: |
+            type=edge,branch=main
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+      - name: Build the image to smoke test
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Containerfile
+          platforms: linux/amd64
+          load: true
+          tags: vitrine:smoke
+      - name: Smoke test the image
+        shell: bash
+        run: |
+          if output=$(docker run --rm vitrine:smoke 2>&1); then
+            echo 'The image started without Settings' >&2
+            exit 1
+          fi
+          echo "$output"
+          grep --quiet 'Invalid Settings' <<<"$output"
+
+          docker run --detach --name vitrine-smoke --publish 8080:8080 \
+            --volume "$PWD/tests/fixtures/container-settings.yaml:/etc/vitrine/settings.yaml:ro" \
+            vitrine:smoke
+          trap 'docker logs vitrine-smoke; docker rm --force vitrine-smoke' EXIT
+          page=$(curl --silent --show-error --fail --retry 20 --retry-all-errors --retry-delay 1 http://localhost:8080/)
+          grep --quiet '<h1>Images</h1>' <<<"$page"
+      - name: Build both platforms, from the same builder's cache
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Containerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

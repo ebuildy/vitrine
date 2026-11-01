@@ -1,0 +1,4 @@
+sources: []
+routes:
+  - url: /
+    controller: harbor-images

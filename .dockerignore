@@ -1,0 +1,16 @@
+# An allowlist: a checkout holds a real settings.yaml and .env, and neither may reach any layer.
+*
+
+!LICENSE
+!astro.config.mjs
+!package-lock.json
+!package.json
+!src
+!start.ts
+!tsconfig.json
+
+# Last match wins: these stay out even inside an allowed directory.
+**/.env*
+**/settings.yaml
+**/node_modules
+**/.DS_Store
