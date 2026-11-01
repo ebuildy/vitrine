@@ -46,8 +46,12 @@ _Avoid_: Path, page, mapping
 The named unit responsible for one kind of page, chosen by a Route.
 _Avoid_: Handler, view, page type
 
+**Arrangement**:
+What a page shows and in what order, which its Controller decides unless a Template replaces it.
+_Avoid_: Layout, view, content
+
 **Template**:
-Astro markup written in Settings that replaces how a Route's Controller arranges the content of its page, usually by placing Components.
+Astro markup written in Settings that replaces the Arrangement of a Route's Controller, usually by placing Components.
 _Avoid_: Layout, theme, page
 
 **Component**:
