@@ -1,0 +1,50 @@
+---
+import GitlabCommitList from '../components/GitlabCommitList.astro';
+import GitlabContributorList from '../components/GitlabContributorList.astro';
+import GitlabIssueList from '../components/GitlabIssueList.astro';
+import GitlabProjectSummary from '../components/GitlabProjectSummary.astro';
+import GitlabReadme from '../components/GitlabReadme.astro';
+import GitlabReleaseList from '../components/GitlabReleaseList.astro';
+import Layout from '../layouts/Layout.astro';
+
+interface Props {
+	source: string;
+	group: string;
+	project: string;
+	title: string;
+	description: string;
+}
+
+const { source, group, project, title, description } = Astro.props;
+const path = `${group}/${project}`;
+---
+
+<Layout title={title} description={description}>
+	<GitlabProjectSummary source={source} project={path} />
+	<div class="columns">
+		<main>
+			<GitlabReadme source={source} project={path} />
+			<GitlabCommitList source={source} project={path} />
+			<GitlabIssueList source={source} project={path} />
+		</main>
+		<aside>
+			<GitlabReleaseList source={source} project={path} />
+			<GitlabContributorList source={source} project={path} />
+		</aside>
+	</div>
+</Layout>
+
+<style>
+	.columns {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 20rem;
+		gap: 2rem;
+		padding: 0 1rem 1rem;
+	}
+
+	@media (max-width: 48rem) {
+		.columns {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

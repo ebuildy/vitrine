@@ -1,0 +1,159 @@
+---
+import { formatDate } from '../format.ts';
+import { getGitlabSource, gitlabProjectUrl } from '../settings.ts';
+import { listProjects, readProjectCards } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	group: string;
+}
+
+const { source, group } = Astro.props;
+const gitlabSource = getGitlabSource(source);
+const { data: projects, stale } = await listProjects(gitlabSource, group);
+const cards = await readProjectCards(gitlabSource, projects ?? []);
+const incomplete = cards.length < (projects?.length ?? 0) || cards.some(({ error }) => error);
+
+function initialsOf(name: string) {
+	return name
+		.split(/\s+/)
+		.map((word) => word.charAt(0))
+		.join('')
+		.slice(0, 2)
+		.toUpperCase();
+}
+---
+
+{stale && <p role="status">This list is Stale because {source} is down.</p>}
+{!stale && cards.some((card) => card.stale) && <p role="status">Details of some Projects are Stale because {source} is down.</p>}
+{incomplete && <p role="alert">Details of some Projects could not be loaded from {source}.</p>}
+{
+	!projects ? (
+		<p role="alert">Projects could not be loaded from {source}.</p>
+	) : (
+		<section>
+			<h2>Projects</h2>
+			{projects.length > 0 ? (
+				<ul>
+					{projects.map((project, index) => {
+						const url = gitlabProjectUrl(source, project.path);
+						const card = cards[index]?.data;
+						return (
+							<li>
+								<h3>{url ? <a href={url}>{project.name}</a> : project.name}</h3>
+								{project.description && <p>{project.description}</p>}
+								{project.topics.length > 0 && (
+									<p class="topics">
+										{project.topics.map((topic) => (
+											<span>{topic}</span>
+										))}
+									</p>
+								)}
+								<p>Last activity {formatDate(project.lastActivityAt)}</p>
+								{card?.commitCount !== undefined && (
+									<p>
+										{card.commitCount} {card.commitCount === 1 ? 'commit' : 'commits'}
+									</p>
+								)}
+								{card?.latestRelease && <p>Latest release {card.latestRelease}</p>}
+								{card && card.contributors.length > 0 && (
+									<p class="contributors">
+										{card.contributors.map(({ name, avatarUrl }) =>
+											avatarUrl ? (
+												<img src={avatarUrl} alt={name} title={name} width="28" height="28" loading="lazy" />
+											) : (
+												<span title={name}>{initialsOf(name)}</span>
+											),
+										)}
+									</p>
+								)}
+								<a class="source-link" href={project.webUrl}>
+									View in GitLab
+								</a>
+							</li>
+						);
+					})}
+				</ul>
+			) : (
+				<p>No Projects found.</p>
+			)}
+		</section>
+	)
+}
+
+<style>
+	section {
+		padding: 1rem;
+	}
+
+	h2 {
+		margin: 0 0 0.75rem;
+	}
+
+	ul {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+		gap: 1rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	li {
+		position: relative;
+		padding: 1rem;
+		border: 1px solid #8884;
+		border-radius: 0.5rem;
+	}
+
+	li:hover {
+		border-color: currentColor;
+	}
+
+	h3 {
+		margin: 0 0 0.75rem;
+		font-size: 1.125rem;
+		overflow-wrap: anywhere;
+	}
+
+	p {
+		margin: 0 0 0.75rem;
+	}
+
+	.topics,
+	.contributors {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem;
+	}
+
+	.topics span {
+		padding: 0 0.5rem;
+		border: 1px solid #8884;
+		border-radius: 1rem;
+		font-size: 0.875rem;
+	}
+
+	.contributors img,
+	.contributors span {
+		display: grid;
+		place-items: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		border-radius: 50%;
+		background: #8884;
+		font-size: 0.75rem;
+	}
+
+	/* Stretches the link over its card, so that a click anywhere opens the Project. */
+	h3 a::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+	}
+
+	/* Lifts the link to GitLab above the one stretched over the card. */
+	.source-link {
+		position: relative;
+	}
+</style>

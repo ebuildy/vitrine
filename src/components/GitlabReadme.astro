@@ -1,0 +1,35 @@
+---
+import { renderMarkdown } from '../markdown.ts';
+import { getGitlabSource } from '../settings.ts';
+import { getReadme } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	project: string;
+}
+
+const { source, project } = Astro.props;
+const { data: readme, stale, error } = await getReadme(getGitlabSource(source), project);
+---
+
+<section>
+	<h2>README</h2>
+	{stale && <p role="status">This README is Stale because {source} is down.</p>}
+	{error && <p role="alert">The README could not be loaded from {source}.</p>}
+	{!error && !readme && <p>No README found.</p>}
+	{readme && <div class="readme" set:html={renderMarkdown(readme.markdown, readme)} />}
+</section>
+
+<style>
+	.readme {
+		overflow-wrap: anywhere;
+	}
+
+	.readme :global(img) {
+		max-width: 100%;
+	}
+
+	.readme :global(pre) {
+		overflow-x: auto;
+	}
+</style>

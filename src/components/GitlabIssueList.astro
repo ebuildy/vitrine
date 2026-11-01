@@ -1,0 +1,51 @@
+---
+import { getGitlabSource } from '../settings.ts';
+import { listIssues } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	project: string;
+}
+
+const { source, project } = Astro.props;
+const { data: issues, stale } = await listIssues(getGitlabSource(source), project);
+---
+
+<section>
+	<h2>Latest Issues</h2>
+	{stale && <p role="status">This list is Stale because {source} is down.</p>}
+	{
+		!issues ? (
+			<p role="alert">Issues could not be loaded from {source}.</p>
+		) : issues.length > 0 ? (
+			<ul>
+				{issues.map((issue) => (
+					<li>
+						<a href={issue.webUrl}>{issue.title}</a>
+						{issue.assignees.length > 0 && <p>Assigned to {issue.assignees.join(', ')}</p>}
+						{issue.labels.length > 0 && <p>Labels: {issue.labels.join(', ')}</p>}
+					</li>
+				))}
+			</ul>
+		) : (
+			<p>No open Issues.</p>
+		)
+	}
+</section>
+
+<style>
+	ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	li {
+		padding: 0.5rem 0;
+		overflow-wrap: anywhere;
+	}
+
+	li p {
+		margin: 0;
+	}
+</style>

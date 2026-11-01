@@ -1,0 +1,21 @@
+---
+import GitlabGroupList from '../components/GitlabGroupList.astro';
+import GitlabGroupSummary from '../components/GitlabGroupSummary.astro';
+import GitlabProjectList from '../components/GitlabProjectList.astro';
+import Layout from '../layouts/Layout.astro';
+
+interface Props {
+	source: string;
+	group: string;
+	title: string;
+	description: string;
+}
+
+const { source, group, title, description } = Astro.props;
+---
+
+<Layout title={title} description={description}>
+	<GitlabGroupSummary source={source} group={group} />
+	<GitlabGroupList source={source} group={group} />
+	<GitlabProjectList source={source} group={group} />
+</Layout>

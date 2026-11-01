@@ -1,7 +1,7 @@
 import { getCacheStore } from './cache-stores.ts';
 import type { Entry } from './cache-stores.ts';
 
-const SOURCE_TIMEOUT_MS = 10_000;
+export const SOURCE_TIMEOUT_MS = 10_000;
 const CACHE_STORE_TIMEOUT_MS = 1_000;
 
 export type CachedContent<T> = { data: T; stale: boolean; error?: undefined } | { data?: undefined; stale?: undefined; error: Error };
@@ -12,12 +12,21 @@ export type Loader<T> = (signal: AbortSignal) => Promise<T>;
 const inFlightReads = new Map<string, Promise<CachedContent<unknown>>>();
 
 export async function readThrough<T>(key: string, allowedAgeMs: number, loader: Loader<T>): Promise<CachedContent<T>> {
+	return shared(key, () => readStoreThenSource(key, allowedAgeMs, loader));
+}
+
+function shared<T>(key: string, start: () => Promise<CachedContent<T>>): Promise<CachedContent<T>> {
 	let read = inFlightReads.get(key);
 	if (!read) {
-		read = readStoreThenSource(key, allowedAgeMs, loader).finally(() => inFlightReads.delete(key));
+		read = start().finally(() => inFlightReads.delete(key));
 		inFlightReads.set(key, read);
 	}
 	return read as Promise<CachedContent<T>>;
+}
+
+/** Reads a Source the way it is set up to be read, where an allowed age of zero leaves the cache out. */
+export function readSource<T>({ allowedAgeMinutes }: { allowedAgeMinutes: number }, key: string, loader: Loader<T>): Promise<CachedContent<T>> {
+	return allowedAgeMinutes === 0 ? shared(key, () => readUncached(key, loader)) : readThrough(key, allowedAgeMinutes * 60_000, loader);
 }
 
 /** Reads a Source with the cache left out, so it never stores or falls back on anything. */

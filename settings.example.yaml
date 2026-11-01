@@ -21,6 +21,18 @@ sources:
     url: https://tools-harbor.example.com
     projects:
       - tools
+  - name: main-gitlab
+    type: gitlab
+    url: https://gitlab.example.com
+    # The Groups Vitrine aggregates, with everything beneath them. Anything else is not found.
+    mainGroups:
+      - platform
+      - data/analytics
+    # The name of the environment variable holding a token, never the token itself.
+    # Vitrine shows whatever the token can read, so give it read_api on what Visitors may see.
+    # Leave it out for a Main Group with anonymous read access.
+    tokenEnv: GITLAB_TOKEN
+    allowedAgeMinutes: 15
 
 # Where content read from Sources is kept. Defaults to memory.
 cacheStore:
@@ -51,3 +63,10 @@ routes:
     controller: harbor
   - url: /harbor/:source/:project
     controller: harbor-images
+  # A :group+ segment takes one URL segment or more, as Groups nest. The Source is the first one
+  # whose Main Groups hold the Group: when two Sources share a Group path, put :source in the URL too.
+  - url: /gitlab/:group+
+    controller: gitlab-group
+  # Like GitLab, a "-" ends the Group path, as in /gitlab/platform/backend/-/api.
+  - url: /gitlab/:group+/-/:project
+    controller: gitlab-project
