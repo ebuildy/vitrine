@@ -519,7 +519,7 @@ describe.each(cacheStores)('the Roadmap of a Main Group with the $name cache sto
 		vitrine = await startVitrine(
 			{
 				sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform', 'data'], tokenEnv: 'GITLAB_TOKEN' }],
-				routes: [...routes, { url: '/roadmap/:group+', controller: 'gitlab-roadmap' }, { url: '/plans', controller: 'gitlab-roadmap', params: { group: 'data' } }],
+				routes: [...routes, { url: '/roadmap/:group+', controller: 'gitlab-roadmap' }, { url: '/roadmap', controller: 'gitlab-roadmap', params: { group: 'data' } }],
 				cacheStore: await empty(),
 			},
 			{ GITLAB_TOKEN: 'secret-token' },
@@ -553,22 +553,22 @@ describe.each(cacheStores)('the Roadmap of a Main Group with the $name cache sto
 	});
 
 	test('takes the Main Group from the Route', async () => {
-		expect(await (await fetch(`${vitrine.url}/plans`)).text()).toContain('Weekly numbers');
+		expect(await (await fetch(`${vitrine.url}/roadmap`)).text()).toContain('Weekly numbers');
 	});
 
 	test('reads Epics once per Main Group while they are fresh', async () => {
 		await fetch(`${vitrine.url}/roadmap/platform`);
-		await fetch(`${vitrine.url}/plans`);
+		await fetch(`${vitrine.url}/roadmap`);
 		const before = gitlab.graphqlRequests().length;
 
 		await fetch(`${vitrine.url}/roadmap/platform`);
-		await fetch(`${vitrine.url}/plans`);
+		await fetch(`${vitrine.url}/roadmap`);
 
 		expect(gitlab.graphqlRequests().length).toBe(before);
 	});
 
 	test('keeps the Epics of each Main Group apart', async () => {
-		const html = await (await fetch(`${vitrine.url}/plans`)).text();
+		const html = await (await fetch(`${vitrine.url}/roadmap`)).text();
 
 		expect(html).toContain('Weekly numbers');
 		expect(html).not.toContain('Faster checkout');

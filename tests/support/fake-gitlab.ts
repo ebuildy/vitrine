@@ -2,8 +2,6 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-const GRAPHQL_MAX_PAGE_SIZE = 100;
-
 interface EpicsVariables {
 	fullPath: string;
 	types: string[];
@@ -186,7 +184,7 @@ export async function startFakeGitlab({
 			.flatMap(({ path, epics = [] }) => epics.map((epic, index) => ({ ...epic, webUrl: `${baseUrl}/groups/${path}/-/work_items/${index + 1}` })))
 			.filter((epic) => types.includes('EPIC') && (epic.state ?? 'opened') === state && (confidential !== false || confidentialFilterIgnored || !epic.confidential));
 		const start = Number(after ?? 0);
-		const end = start + Math.min(first, GRAPHQL_MAX_PAGE_SIZE);
+		const end = start + first;
 		return {
 			group: {
 				workItemTypes: { nodes: [...(group.epicsUnavailable ? [] : [{ name: group.epicTypeName ?? 'Epic' }]), { name: 'Issue' }, { name: 'Task' }] },
@@ -207,10 +205,10 @@ export async function startFakeGitlab({
 		const url = new URL(request.url ?? '/', 'http://fake-gitlab');
 		requests.push(`${url.pathname}${url.search}`);
 		const graphql = url.pathname === '/api/graphql';
-		const aboutProject = graphql || url.pathname.startsWith('/api/v4/projects/') || /^\/api\/v4\/groups\/[^/]+\/members/.test(url.pathname);
+		const afterLists = graphql || url.pathname.startsWith('/api/v4/projects/') || /^\/api\/v4\/groups\/[^/]+\/members/.test(url.pathname);
 		const aboutProfile = url.pathname.startsWith('/api/v4/users/');
-		if (behaviour === 'hanging' || (behaviour === 'hanging-after-lists' && aboutProject) || (behaviour === 'hanging-profiles' && aboutProfile)) return;
-		if (behaviour === 'down' || (behaviour === 'down-after-lists' && aboutProject) || (behaviour === 'down-profiles' && aboutProfile)) {
+		if (behaviour === 'hanging' || (behaviour === 'hanging-after-lists' && afterLists) || (behaviour === 'hanging-profiles' && aboutProfile)) return;
+		if (behaviour === 'down' || (behaviour === 'down-after-lists' && afterLists) || (behaviour === 'down-profiles' && aboutProfile)) {
 			response.writeHead(503).end();
 			return;
 		}
