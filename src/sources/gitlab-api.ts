@@ -359,17 +359,18 @@ async function inBatches<T, R>(items: T[], size: number, read: (item: T) => Prom
 }
 
 async function fetchGraphql<T>(source: GitlabSource, query: string, variables: Record<string, unknown>, signal: AbortSignal): Promise<T> {
-	const response = await fetch(`${baseUrl(source)}/api/graphql`, {
+	const path = '/api/graphql';
+	const response = await fetch(`${baseUrl(source)}${path}`, {
 		method: 'POST',
 		headers: { 'content-type': 'application/json', ...(source.token ? { authorization: `Bearer ${source.token}` } : {}) },
 		body: JSON.stringify({ query, variables }),
 		signal,
 	});
-	if (!response.ok) throw new Error(`GitLab "${source.name}" answered ${response.status} for /api/graphql`);
+	assertOk(source, path, response);
 
 	const { data, errors } = await response.json();
 	// GitLab answers 200 for a query it could not run.
-	if (errors?.length) throw new Error(`GitLab "${source.name}" answered "${errors[0].message}" for /api/graphql`);
+	if (errors?.length) throw answerError(source, path, `"${errors[0].message}"`);
 	return data;
 }
 
@@ -390,14 +391,22 @@ async function fetchAllPages<T>(source: GitlabSource, path: string, query: Recor
 async function fetchIfAllowed<T>(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal, refusals = [401, 403]): Promise<T | undefined> {
 	const response = await request(source, path, query, signal);
 	if (refusals.includes(response.status)) return undefined;
-	if (!response.ok) throw new Error(`GitLab "${source.name}" answered ${response.status} for ${path}`);
+	assertOk(source, path, response);
 	return response.json();
 }
 
 async function fetchApi(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal): Promise<Response> {
 	const response = await request(source, path, query, signal);
-	if (!response.ok) throw new Error(`GitLab "${source.name}" answered ${response.status} for ${path}`);
+	assertOk(source, path, response);
 	return response;
+}
+
+function assertOk(source: GitlabSource, path: string, response: Response) {
+	if (!response.ok) throw answerError(source, path, response.status);
+}
+
+function answerError(source: GitlabSource, path: string, answer: number | string) {
+	return new Error(`GitLab "${source.name}" answered ${answer} for ${path}`);
 }
 
 function request(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal): Promise<Response> {
