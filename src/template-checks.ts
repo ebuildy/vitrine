@@ -67,16 +67,16 @@ function propProblems(name: string, props: ComponentEntry['props'], given: Map<s
 function fixedValue(value: Node | undefined, { url, params }: Route, rebound: Set<string>): string | undefined {
 	if (value?.type === 'Literal' && typeof value.value === 'string') return value.value;
 	if (value?.type === 'TemplateLiteral' && value.expressions.length === 0) return value.quasis[0].value.cooked;
-	if (isRouteValue(value, rebound) && !urlParamNames(url).includes(value?.name)) return params[value?.name];
+	if (isRouteValue(value, rebound) && !urlParamNames(url).includes(value.name)) return params[value.name];
 	return undefined;
 }
 
 /** A `source` taken from the URL is not known yet, but the Route only matches Sources of its Controller's type. */
 function routeSourceType(value: Node | undefined, { controller }: Route, rebound: Set<string>) {
-	return value?.name === 'source' && isRouteValue(value, rebound) ? controllerSourceTypes[controller] : undefined;
+	return isRouteValue(value, rebound) && value.name === 'source' ? controllerSourceTypes[controller] : undefined;
 }
 
-function isRouteValue(value: Node | undefined, rebound: Set<string>) {
+function isRouteValue(value: Node | undefined, rebound: Set<string>): value is Node {
 	return value?.type === 'Identifier' && !rebound.has(value.name);
 }
 

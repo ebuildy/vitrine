@@ -37,7 +37,7 @@ export function compileTemplate(template: string): CompiledTemplate {
 		// Modules are strict, and an `import` left in the frontmatter is a syntax error here, as it has nothing to load.
 		instantiate = new Function('$$runtime', '$$scope', `'use strict'; const { ${runtimeNames} } = $$runtime; const { ${names.join(', ')} } = $$scope;\n${body}`) as CompiledTemplate;
 	} catch (error) {
-		throw new TemplateError((error as Error).message);
+		throw new TemplateError(error instanceof Error ? error.message : String(error));
 	}
 
 	return (runtime, scope) =>
