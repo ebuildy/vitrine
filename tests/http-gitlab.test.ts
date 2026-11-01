@@ -439,13 +439,13 @@ describe.each(cacheStores)('the Members of a Group with the $name cache store', 
 		for (const name of ['Deploy Bot', 'Gone Person', 'Directory Leaver', 'Banned Person']) expect(html).not.toContain(name);
 	});
 
-	test('shows the people of everything beneath a Main Group, each once and by name', async () => {
+	test('shows the Members of everything beneath a Main Group, each once and by name', async () => {
 		const text = textOf(membersOf(await open('platform'))).replace('Members', '');
 
 		expect(text.match(/[A-Z][a-z]+ [A-Z][a-z]+/g)).toEqual(['Ada Lovelace', 'Grace Hopper', 'Katherine Johnson', 'Linus Torvalds']);
 	});
 
-	test('shows a subgroup with the people at or beneath it, and those it inherits', async () => {
+	test('shows a subgroup with the Members at or beneath it, and those it inherits', async () => {
 		const text = textOf(membersOf(await open('platform/backend')));
 
 		expect(text).toContain('Ada Lovelace');
@@ -454,7 +454,7 @@ describe.each(cacheStores)('the Members of a Group with the $name cache store', 
 		expect(text).not.toContain('Linus Torvalds');
 	});
 
-	test('reads the whole list once per Main Group, and each person once', async () => {
+	test('reads the whole list once per Main Group, and each Member once', async () => {
 		await open('platform');
 		await open('platform/backend');
 		await open('platform/frontend');
@@ -471,9 +471,9 @@ describe.each(cacheStores)('the Members of a Group with the $name cache store', 
 
 	test('shows the avatar, name, location and email of a Member at the bottom of the page', async () => {
 		const html = await open('platform');
-		const members = html.slice(html.search(/<h2[^>]*>Members/));
+		const members = membersOf(html);
 
-		expect(html.search(/<h2[^>]*>Members/)).toBeGreaterThan(html.search(/<h2[^>]*>Projects/));
+		expect(html.indexOf(members)).toBeGreaterThan(html.search(/<h2[^>]*>Projects/));
 		expect(members).toContain('src="http://gitlab.test/ada.png"');
 		expect(members).toContain('Ada Lovelace');
 		expect(members).toContain('London');
@@ -488,12 +488,13 @@ describe.each(cacheStores)('the Members of a Group with the $name cache store', 
 describe('Members when GitLab holds something back', () => {
 	const ada = { id: 1, name: 'Ada Lovelace', avatar_url: 'http://gitlab.test/ada.png' };
 
+	const running: { gitlab: FakeGitlab; vitrine: RunningVitrine }[] = [];
 	const start = async (options: Parameters<typeof startFakeGitlab>[0]) => {
 		const gitlab = await startFakeGitlab(options);
 		const vitrine = await startVitrine({ sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform'] }], routes });
+		running.push({ gitlab, vitrine });
 		return { gitlab, vitrine };
 	};
-	const running: { gitlab: FakeGitlab; vitrine: RunningVitrine }[] = [];
 
 	afterEach(async () => {
 		for (const { gitlab, vitrine } of running.splice(0)) {
@@ -502,9 +503,8 @@ describe('Members when GitLab holds something back', () => {
 		}
 	});
 
-	test('still shows the person when GitLab refuses their profile', async () => {
-		const { gitlab, vitrine } = await start({ groups: [{ path: 'platform', members: [ada] }], profilesRefused: true });
-		running.push({ gitlab, vitrine });
+	test('still shows the Member when GitLab refuses their profile', async () => {
+		const { vitrine } = await start({ groups: [{ path: 'platform', members: [ada] }], profilesRefused: true });
 
 		const html = await (await fetch(`${vitrine.url}/gitlab/platform`)).text();
 
@@ -514,7 +514,6 @@ describe('Members when GitLab holds something back', () => {
 
 	test('limits a failure to the Members section', async () => {
 		const { gitlab, vitrine } = await start({ groups: [{ path: 'platform', members: [ada] }], projects: [{ path: 'platform/api' }] });
-		running.push({ gitlab, vitrine });
 		gitlab.behave('down-after-lists');
 
 		const html = await (await fetch(`${vitrine.url}/gitlab/platform`)).text();
@@ -525,7 +524,6 @@ describe('Members when GitLab holds something back', () => {
 
 	test('waits for one Source timeout when Members hang alongside Project details', async () => {
 		const { gitlab, vitrine } = await start({ groups: [{ path: 'platform', members: [ada] }], projects: [{ path: 'platform/api' }] });
-		running.push({ gitlab, vitrine });
 		gitlab.behave('hanging-after-lists');
 
 		const started = Date.now();

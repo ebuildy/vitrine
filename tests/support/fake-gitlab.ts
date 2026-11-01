@@ -2,8 +2,8 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-/** A person with an account on GitLab, as a profile holds it. */
-export interface FakeGitlabUser {
+/** A Member of a Group or Project, as their GitLab profile holds them. */
+export interface FakeGitlabMember {
 	id: number;
 	name: string;
 	/** GitLab's own value, which is active unless set. */
@@ -13,7 +13,7 @@ export interface FakeGitlabUser {
 	location?: string | null;
 	public_email?: string | null;
 	bot?: boolean;
-	/** The private email, which GitLab only gives an administrator's token: set it to be read with one. */
+	/** The private email, which GitLab only gives a GitLab admin's token: set it to be read with one. */
 	email?: string;
 }
 
@@ -24,7 +24,7 @@ export interface FakeGitlabGroup {
 	/** GitLab leaves such a group out unless asked for everything the reader can see. */
 	notMember?: boolean;
 	/** Direct members. GitLab adds those of the ancestor groups only when asked for all of them. */
-	members?: FakeGitlabUser[];
+	members?: FakeGitlabMember[];
 }
 
 export interface FakeGitlabProject {
@@ -47,7 +47,7 @@ export interface FakeGitlabProject {
 	releases?: Record<string, unknown>[];
 	contributors?: { name: string; email: string; commits: number }[];
 	/** Direct members. */
-	members?: FakeGitlabUser[];
+	members?: FakeGitlabMember[];
 }
 
 export interface FakeGitlabOptions {
@@ -57,7 +57,7 @@ export interface FakeGitlabOptions {
 	avatars?: Record<string, string>;
 	/** Whether this GitLab refuses avatars to its reader, as it does anonymous ones when public visibility is restricted. */
 	avatarsRefused?: boolean;
-	/** Whether this GitLab refuses user profiles to its reader. */
+	/** Whether this GitLab refuses Member profiles to its reader. */
 	profilesRefused?: boolean;
 	/** When set, requests must carry this token. */
 	token?: string;
@@ -103,22 +103,22 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 		web_url: `${baseUrl}/${project.path}`,
 	});
 	/** GitLab keeps location, public email and whether an account is a bot to its profile. */
-	const memberJson = ({ id, name, state, avatar_url }: FakeGitlabUser) => ({
+	const memberJson = ({ id, name, state, avatar_url }: FakeGitlabMember) => ({
 		id,
 		name,
 		state: state ?? 'active',
 		avatar_url: avatar_url ?? null,
 		web_url: `${baseUrl}/users/${id}`,
 	});
-	const profileJson = (user: FakeGitlabUser) => ({
-		...memberJson(user),
-		location: user.location ?? null,
-		public_email: user.public_email ?? null,
-		bot: user.bot ?? false,
-		...(user.email ? { email: user.email } : {}),
+	const profileJson = (member: FakeGitlabMember) => ({
+		...memberJson(member),
+		location: member.location ?? null,
+		public_email: member.public_email ?? null,
+		bot: member.bot ?? false,
+		...(member.email ? { email: member.email } : {}),
 	});
 	const groupsHolding = (path: string) => groups.filter((group) => path === group.path || path.startsWith(`${group.path}/`));
-	const allUsers = () => [...groups, ...projects].flatMap(({ members = [] }) => members);
+	const allMembers = () => [...groups, ...projects].flatMap(({ members = [] }) => members);
 
 	const handle = async (request: IncomingMessage, response: ServerResponse) => {
 		const url = new URL(request.url ?? '/', 'http://fake-gitlab');
@@ -140,11 +140,11 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 			return;
 		}
 
-		const userMatch = url.pathname.match(/^\/api\/v4\/users\/(\d+)$/);
-		if (userMatch) {
-			const user = allUsers().find(({ id }) => id === Number(userMatch[1]));
+		const profileMatch = url.pathname.match(/^\/api\/v4\/users\/(\d+)$/);
+		if (profileMatch) {
+			const member = allMembers().find(({ id }) => id === Number(profileMatch[1]));
 			if (profilesRefused) response.writeHead(403).end();
-			else if (user) respondWithJson(response, profileJson(user));
+			else if (member) respondWithJson(response, profileJson(member));
 			else response.writeHead(404).end();
 			return;
 		}
@@ -172,7 +172,7 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 				respondWithPage(response, url, (group.members ?? []).map(memberJson));
 			} else if (groupMatch[2] === '/members/all') {
 				const inherited = groupsHolding(group.path).flatMap(({ members = [] }) => members);
-				respondWithPage(response, url, [...new Map(inherited.map((user) => [user.id, user])).values()].map(memberJson));
+				respondWithPage(response, url, [...new Map(inherited.map((member) => [member.id, member])).values()].map(memberJson));
 			} else {
 				respondWithJson(response, groupJson(group));
 			}
