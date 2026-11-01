@@ -1,0 +1,48 @@
+# The Settings of `npm run demo`, whose fake Sources listen on these ports. Secrets come from .env.
+
+sources:
+  - name: main-harbor
+    type: harbor
+    url: http://127.0.0.1:4402
+    projects:
+      - platform
+      - library
+    username: robot$vitrine
+    passwordEnv: HARBOR_PASSWORD
+  # Anonymous read access, so no secret.
+  - name: tools-harbor
+    type: harbor
+    url: http://127.0.0.1:4403
+    projects:
+      - tools
+  - name: main-gitlab
+    type: gitlab
+    url: http://127.0.0.1:4401
+    mainGroups:
+      - platform
+      - data/analytics
+    tokenEnv: GITLAB_TOKEN
+
+# Restarting the demo starts from its seed data. Use `type: redis` with `urlEnv: REDIS_URL` to try the shared store.
+cacheStore:
+  type: memory
+
+routes:
+  - url: /
+    controller: gitlab-group
+    params:
+      group: platform
+  - url: /images
+    controller: harbor-images
+  - url: /images/tools
+    controller: harbor-images
+    params:
+      source: tools-harbor
+  - url: /harbor/:source
+    controller: harbor
+  - url: /harbor/:source/:project
+    controller: harbor-images
+  - url: /gitlab/:group+
+    controller: gitlab-group
+  - url: /gitlab/:group+/-/:project
+    controller: gitlab-project

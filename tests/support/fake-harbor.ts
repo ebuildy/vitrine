@@ -11,6 +11,8 @@ export interface FakeHarborOptions {
 	projectDetails?: Record<string, { creation_time: string; repo_count: number; summary?: Record<string, unknown> }>;
 	/** When set, requests must carry these credentials. */
 	credentials?: { username: string; password: string };
+	/** Any free port when left out. */
+	port?: number;
 }
 
 export type FakeArtifact = Record<string, unknown>;
@@ -30,7 +32,7 @@ export interface FakeHarbor {
 }
 
 /** Answers the parts of Harbor's v2 API that Vitrine reads. */
-export async function startFakeHarbor({ projects, artifacts = {}, projectDetails = {}, credentials }: FakeHarborOptions): Promise<FakeHarbor> {
+export async function startFakeHarbor({ projects, artifacts = {}, projectDetails = {}, credentials, port: requestedPort = 0 }: FakeHarborOptions): Promise<FakeHarbor> {
 	const requests: string[] = [];
 	let behaviour: FakeHarborBehaviour = 'up';
 	const handle = async (request: IncomingMessage, response: ServerResponse) => {
@@ -86,7 +88,7 @@ export async function startFakeHarbor({ projects, artifacts = {}, projectDetails
 	};
 
 	const server = createServer(handle);
-	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+	await new Promise<void>((resolve) => server.listen(requestedPort, '127.0.0.1', resolve));
 	const { port } = server.address() as AddressInfo;
 	return {
 		url: `http://127.0.0.1:${port}`,
