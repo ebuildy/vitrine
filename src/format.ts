@@ -12,12 +12,3 @@ export function formatSize(bytes: number) {
 export function formatDate(date: string) {
 	return date.slice(0, 10);
 }
-
-export function initialsOf(name: string) {
-	return name
-		.split(/\s+/)
-		.map((word) => word.charAt(0))
-		.join('')
-		.slice(0, 2)
-		.toUpperCase();
-}

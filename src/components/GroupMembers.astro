@@ -1,5 +1,4 @@
 ---
-import { initialsOf } from '../format.ts';
 import { getGitlabSource } from '../settings.ts';
 import { listMembers } from '../sources/gitlab.ts';
 
@@ -22,7 +21,7 @@ const { data: members, stale } = await listMembers(getGitlabSource(source), grou
 			<ul>
 				{members.map(({ name, avatarUrl, location, email }) => (
 					<li>
-						{avatarUrl ? <img src={avatarUrl} alt="" width="40" height="40" loading="lazy" /> : <span class="initials">{initialsOf(name)}</span>}
+						{avatarUrl ? <img src={avatarUrl} alt="" width="40" height="40" loading="lazy" /> : <span class="avatar" />}
 						<div>
 							<h3>{name}</h3>
 							{location && <p>{location}</p>}
@@ -72,10 +71,8 @@ const { data: members, stale } = await listMembers(getGitlabSource(source), grou
 	}
 
 	img,
-	.initials {
+	.avatar {
 		flex: none;
-		display: grid;
-		place-items: center;
 		width: 2.5rem;
 		height: 2.5rem;
 		border-radius: 50%;

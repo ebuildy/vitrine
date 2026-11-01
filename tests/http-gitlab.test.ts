@@ -427,7 +427,8 @@ describe.each(cacheStores)('the Members of a Group with the $name cache store', 
 	test('leaves blank what a profile does not give', async () => {
 		const card = cardOf(await open('platform'), 'Grace Hopper');
 
-		expect(card).toContain('GH');
+		expect(textOf(card)).not.toContain('GH');
+		expect(card).toMatch(/<span class="avatar"[^>]*><\/span>/);
 		expect(card).not.toContain('<img');
 		expect(card).not.toContain('<p');
 		expect(card).not.toContain('mailto');
