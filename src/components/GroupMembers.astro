@@ -5,10 +5,12 @@ import { listMembers } from '../sources/gitlab.ts';
 interface Props {
 	source: string;
 	group: string;
+	/** Also lists the Members of every Group and Project beneath the Main Group, at a request each. */
+	deep?: boolean;
 }
 
-const { source, group } = Astro.props;
-const { data: members, stale, detailsStale, detailsMissing } = await listMembers(getGitlabSource(source), group);
+const { source, group, deep = false } = Astro.props;
+const { data: members, stale, detailsStale, detailsMissing } = await listMembers(getGitlabSource(source), group, deep);
 ---
 
 <section>

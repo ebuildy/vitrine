@@ -425,7 +425,7 @@ describe.each(cacheStores)('the Members of a Group with the $name cache store', 
 	const cardOf = (html: string, name: string) => membersOf(html).split('<li').find((card) => card.includes(name)) ?? '';
 
 	test('leaves blank what a profile does not give', async () => {
-		const card = cardOf(await open('platform'), 'Grace Hopper');
+		const card = cardOf(await open('platform/backend'), 'Grace Hopper');
 
 		expect(textOf(card)).not.toContain('GH');
 		expect(card).toMatch(/<span class="avatar"[^>]*><\/span>/);
@@ -440,28 +440,35 @@ describe.each(cacheStores)('the Members of a Group with the $name cache store', 
 		for (const name of ['Deploy Bot', 'Gone Person', 'Directory Leaver', 'Banned Person']) expect(html).not.toContain(name);
 	});
 
-	test('shows the Members of everything beneath a Main Group, each once and by name', async () => {
+	test('shows the Members of the Group itself, not those beneath it', async () => {
 		const text = textOf(membersOf(await open('platform'))).replace('Members', '');
 
-		expect(text.match(/[A-Z][a-z]+ [A-Z][a-z]+/g)).toEqual(['Ada Lovelace', 'Grace Hopper', 'Katherine Johnson', 'Linus Torvalds']);
+		expect(text.match(/[A-Z][a-z]+ [A-Z][a-z]+/g)).toEqual(['Ada Lovelace']);
 	});
 
-	test('shows a subgroup with the Members at or beneath it, and those it inherits', async () => {
+	test('shows a subgroup with its own Members and those it inherits', async () => {
 		const text = textOf(membersOf(await open('platform/backend')));
 
 		expect(text).toContain('Ada Lovelace');
 		expect(text).toContain('Grace Hopper');
-		expect(text).toContain('Katherine Johnson');
+		expect(text).not.toContain('Katherine Johnson');
 		expect(text).not.toContain('Linus Torvalds');
 	});
 
-	test('reads the whole list once per Main Group, and each Member once', async () => {
+	test('reads the list once per Group, and each Member once', async () => {
 		await open('platform');
 		await open('platform/backend');
 		await open('platform/frontend');
 
 		expect(gitlab.memberRequests().filter((request) => request === '/api/v4/users/1')).toHaveLength(1);
 		expect(gitlab.memberRequests().filter((request) => request.includes('/groups/platform/members'))).toHaveLength(1);
+	});
+
+	test('asks GitLab nothing about the Members of Projects', async () => {
+		await open('platform');
+		await open('platform/backend');
+
+		expect(gitlab.memberRequests().filter((request) => request.includes('/projects/'))).toEqual([]);
 	});
 
 	test('reads no profile of a blocked account', async () => {
@@ -707,7 +714,7 @@ describe('Project cards when GitLab holds something back', () => {
 		expect(html).toContain('project-11');
 		expect(html.match(/Details of some Projects could not be loaded/g)).toHaveLength(1);
 		// The first five cards, of three requests each, out of twelve.
-		expect(gitlab.requests.length - requests).toBe(15);
+		expect(gitlab.requests.slice(requests).filter((request) => request.startsWith('/api/v4/projects/'))).toHaveLength(15);
 	});
 
 	test('waits for one Source timeout when Project details hang', async () => {

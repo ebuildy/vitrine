@@ -192,7 +192,7 @@ export async function readMainGroup(source: GitlabSource, mainGroup: string, sig
 }
 
 /** GitLab has no list of everyone beneath a Group, so each Group and Project takes a request. */
-export async function readMembers(source: GitlabSource, { groups, projects }: MainGroupContent, signal: AbortSignal): Promise<Member[]> {
+export async function readMembers(source: GitlabSource, { groups, projects }: { groups: Pick<Group, 'path'>[]; projects: Project[] }, signal: AbortSignal): Promise<Member[]> {
 	const lists = await inBatches(
 		[
 			// Only a Group's full list holds who it inherits, which a Project's would repeat.

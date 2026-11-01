@@ -51,10 +51,11 @@ beforeAll(async () => {
 				path: 'platform',
 				members: [{ id: 1, name: 'Ada Lovelace' }, ...Array.from({ length: 120 }, (_, index) => ({ id: index + 2, name: `Person ${index}` }))],
 			},
-			{ path: 'platform/backend' },
+			{ path: 'platform/backend', members: [{ id: 200, name: 'Grace Hopper' }] },
+			{ path: 'platform/frontend', members: [{ id: 201, name: 'Linus Torvalds' }] },
 		],
 		projects: [
-			project,
+			{ ...project, members: [{ id: 202, name: 'Katherine Johnson' }] },
 			...Array.from({ length: 149 }, (_, index) => ({ path: `platform/backend/extra-${index}` })),
 		],
 	});
@@ -83,7 +84,7 @@ afterEach(() => {
 	gitlab.behave('up');
 });
 
-async function render(component: (typeof components)[number]['component'], props: Record<string, string>) {
+async function render(component: (typeof components)[number]['component'], props: Record<string, string | boolean>) {
 	const container = await AstroContainer.create();
 	return container.renderToString(component, { props });
 }
@@ -130,6 +131,37 @@ test('shows every Project when they span several API pages', async () => {
 
 test('shows every Member when they span several API pages', async () => {
 	expect(await render(GroupMembers, { source: 'main-gitlab', group: 'platform' })).toContain('Person 119');
+});
+
+test('shows only the Members of the Group unless deep', async () => {
+	const html = await render(GroupMembers, { source: 'main-gitlab', group: 'platform' });
+
+	expect(html).toContain('Ada Lovelace');
+	expect(html).not.toContain('Grace Hopper');
+	expect(html).not.toContain('Katherine Johnson');
+});
+
+test('shows the Members of every Group and Project beneath the Main Group when deep, each once', async () => {
+	const html = await render(GroupMembers, { source: 'main-gitlab', group: 'platform', deep: true });
+
+	for (const name of ['Grace Hopper', 'Linus Torvalds', 'Katherine Johnson']) expect(html).toContain(name);
+	expect(html.match(/Ada Lovelace/g)).toHaveLength(1);
+});
+
+test('shows a subgroup with the Members at or beneath it, and those it inherits, when deep', async () => {
+	const html = await render(GroupMembers, { source: 'main-gitlab', group: 'platform/backend', deep: true });
+
+	expect(html).toContain('Ada Lovelace');
+	expect(html).toContain('Grace Hopper');
+	expect(html).not.toContain('Linus Torvalds');
+});
+
+test('keeps the deep list apart from the list of the Group', async () => {
+	const props = { source: 'main-gitlab', group: 'platform' };
+
+	await render(GroupMembers, { ...props, deep: true });
+	expect(await render(GroupMembers, props)).not.toContain('Grace Hopper');
+	expect(await render(GroupMembers, { ...props, deep: true })).toContain('Grace Hopper');
 });
 
 test('warns when the details of some Members are Stale because the Source cannot give them', async () => {

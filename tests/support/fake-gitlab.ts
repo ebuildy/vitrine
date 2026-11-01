@@ -71,7 +71,8 @@ export interface FakeGitlabOptions {
 
 /**
  * up answers at once, slow after a short wait, down with a 503, and hanging never.
- * The after-lists variants only hit requests about one Project, and the profiles variants only Member profiles.
+ * The after-lists variants only hit requests about one Project or the members of a Group, and the profiles variants
+ * only Member profiles.
  */
 export type FakeGitlabBehaviour = 'up' | 'slow' | 'down' | 'down-after-lists' | 'down-profiles' | 'hanging' | 'hanging-after-lists' | 'hanging-profiles';
 
@@ -133,7 +134,7 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 	const handle = async (request: IncomingMessage, response: ServerResponse) => {
 		const url = new URL(request.url ?? '/', 'http://fake-gitlab');
 		requests.push(`${url.pathname}${url.search}`);
-		const aboutProject = url.pathname.startsWith('/api/v4/projects/');
+		const aboutProject = url.pathname.startsWith('/api/v4/projects/') || /^\/api\/v4\/groups\/[^/]+\/members/.test(url.pathname);
 		const aboutProfile = url.pathname.startsWith('/api/v4/users/');
 		if (behaviour === 'hanging' || (behaviour === 'hanging-after-lists' && aboutProject) || (behaviour === 'hanging-profiles' && aboutProfile)) return;
 		if (behaviour === 'down' || (behaviour === 'down-after-lists' && aboutProject) || (behaviour === 'down-profiles' && aboutProfile)) {

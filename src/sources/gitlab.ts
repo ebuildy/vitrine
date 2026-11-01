@@ -31,16 +31,20 @@ export function getProject(source: GitlabSource, path: string): Promise<CachedCo
 }
 
 /**
- * The list is cached whole per Main Group, apart from its other lists, as it fails and takes time of its own. Profiles
- * are cached per Member, as they cost a request each: a Member whose profile is not read yet shows what the list gives.
+ * Lists the Members of the Group, at one request per list page. Deep lists those of every Group and Project beneath the
+ * Main Group, which costs a request each, cached whole per Main Group. Either list stays apart from the Group's other
+ * lists, as it fails and takes time of its own. Profiles are cached per Member, as they cost a request each: a Member
+ * whose profile is not read yet shows what the list gives.
  */
-export async function listMembers(source: GitlabSource, group: string): Promise<MemberList> {
+export async function listMembers(source: GitlabSource, group: string, deep: boolean): Promise<MemberList> {
 	const list = await inMainGroup(source, group, (mainGroup) =>
-		readSource(source, `${source.name}/members/${mainGroup}`, async (signal) => {
-			const content = await fromMainGroup(source, mainGroup, (mainGroupContent) => mainGroupContent);
-			if (content.error) throw content.error;
-			return gitlabApi.readMembers(source, content.data, signal);
-		}),
+		deep
+			? readSource(source, `${source.name}/members/${mainGroup}`, async (signal) => {
+					const content = await fromMainGroup(source, mainGroup, (mainGroupContent) => mainGroupContent);
+					if (content.error) throw content.error;
+					return gitlabApi.readMembers(source, content.data, signal);
+				})
+			: readSource(source, `${source.name}/group-members/${group}`, (signal) => gitlabApi.readMembers(source, { groups: [{ path: group }], projects: [] }, signal)),
 	);
 	if (list.error) return list;
 
