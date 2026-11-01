@@ -505,13 +505,56 @@ describe('Members when GitLab holds something back', () => {
 		}
 	});
 
-	test('still shows the Member when GitLab refuses their profile', async () => {
-		const { vitrine } = await start({ groups: [{ path: 'platform', members: [ada] }], profilesRefused: true });
+	/** Usernames GitLab gives the accounts behind access tokens and service accounts, from the examples in its docs. */
+	const botUsernames = [
+		'project_123_bot_4ffca233d8298ea1',
+		'group_123_bot_4ffca233d8298ea1',
+		'service_account_6018816a18e515214e0c34c2b33523fc',
+		'service_account_group_345_6018816a18e515214e0c34c2b33523fc',
+		'service_account_project_345_6018816a18e515214e0c34c2b33523fc',
+	];
+	const bots = botUsernames.map((username, index) => ({ id: index + 100, name: `Token Account ${index}`, username }));
+
+	test('still shows a Member when GitLab refuses their profile, leaving out bots by username', async () => {
+		const { vitrine } = await start({ groups: [{ path: 'platform', members: [ada, ...bots] }], profilesRefused: true });
 
 		const html = await open(vitrine);
 
 		expect(html).toContain('Ada Lovelace');
+		expect(html).not.toContain('Token Account');
 		expect(html).not.toContain('could not be loaded');
+	});
+
+	test('leaves out bots by username while their profiles are not read yet', async () => {
+		const { gitlab, vitrine } = await start({ groups: [{ path: 'platform', members: [ada, ...bots] }] });
+		gitlab.behave('down-profiles');
+
+		const html = await open(vitrine);
+
+		expect(html).toContain('Ada Lovelace');
+		expect(html).not.toContain('Token Account');
+	});
+
+	test('believes a profile over a username', async () => {
+		const lookalike = { id: 2, name: 'Grace Hopper', username: 'group_1_bot_fan', bot: false };
+		const unlikely = { id: 3, name: 'Quiet Automation', username: 'quiet.automation', bot: true };
+		const { vitrine } = await start({ groups: [{ path: 'platform', members: [lookalike, unlikely] }] });
+
+		const html = await open(vitrine);
+
+		expect(html).toContain('Grace Hopper');
+		expect(html).not.toContain('Quiet Automation');
+	});
+
+	test('keeps a Member whose username only resembles a bot', async () => {
+		const members = ['project_bot_fan', 'my_group_1_bot', 'service_accounts_team'].map((username, index) => ({ id: index + 2, name: `Lookalike ${index}`, username }));
+		const { vitrine } = await start({ groups: [{ path: 'platform', members }], profilesRefused: true });
+
+		const html = await open(vitrine);
+
+		expect(textOf(html)).toContain('Lookalike 0');
+		expect(textOf(html)).toContain('Lookalike 1');
+		expect(textOf(html)).toContain('Lookalike 2');
 	});
 
 	test('keeps the list when profiles fail, and fills in the details once they can be read', async () => {

@@ -3,11 +3,9 @@ import type { CachedContent, Loader } from '../content-cache.ts';
 import { findMainGroup } from '../router.ts';
 import type { GitlabSource } from '../settings.ts';
 import * as gitlabApi from './gitlab-api.ts';
-import type { Commit, Contributor, Group, Issue, MainGroupContent, Member, MemberProfile, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
+import type { Commit, Contributor, DetailedMember, Group, Issue, MainGroupContent, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
 
 export type Subgroup = Group & { projectCount: number };
-
-export type DetailedMember = Member & Partial<MemberProfile>;
 
 /** The list of Members, and how far their profiles could be read. */
 export type MemberList = CachedContent<DetailedMember[]> & { detailsStale?: boolean; detailsMissing?: boolean };
@@ -51,7 +49,7 @@ export async function listMembers(source: GitlabSource, group: string): Promise<
 		readSource(source, `${source.name}/member/${member.id}/profile`, (signal) => gitlabApi.readMemberProfile(source, member, signal)),
 	);
 	return {
-		data: members.map((member, index) => ({ ...member, ...profiles[index]?.data })).filter(({ bot }) => !bot),
+		data: members.map((member, index) => ({ ...member, ...profiles[index]?.data })).filter((member) => !gitlabApi.isBot(member)),
 		stale: list.stale,
 		detailsStale: profiles.some(({ stale }) => stale),
 		detailsMissing: profiles.length < members.length || profiles.some(({ error }) => error),

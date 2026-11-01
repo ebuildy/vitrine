@@ -11,6 +11,8 @@ const CARD_CONTRIBUTORS = 5;
 export const CARDS_AT_ONCE = 5;
 // Members take a request per Group, Project and Member, which must not all go at once.
 export const MEMBER_READS_AT_ONCE = 10;
+// What GitLab starts the usernames of access token bots and service accounts with. A renamed service account no longer matches.
+const BOT_USERNAMES = /^(?:(?:project|group)_\d+_bot|service_account_)/;
 
 export interface Group {
 	path: string;
@@ -93,8 +95,10 @@ export interface Member {
 export interface MemberProfile {
 	location?: string;
 	email?: string;
-	bot: boolean;
+	bot?: boolean;
 }
+
+export type DetailedMember = Member & MemberProfile;
 
 interface GitlabGroup {
 	full_path: string;
@@ -154,7 +158,8 @@ interface GitlabMember {
 interface GitlabProfile {
 	location: string | null;
 	public_email: string | null;
-	bot: boolean;
+	/** GitLab's example of a profile read with a GitLab admin's token leaves this out. */
+	bot?: boolean;
 }
 
 export async function readMainGroup(source: GitlabSource, mainGroup: string, signal: AbortSignal): Promise<MainGroupContent> {
@@ -217,6 +222,11 @@ export async function readMembers(source: GitlabSource, { groups, projects }: Ma
 export async function readMemberProfile(source: GitlabSource, { id }: Member, signal: AbortSignal): Promise<MemberProfile | undefined> {
 	const profile = await fetchIfAllowed<GitlabProfile>(source, `/users/${id}`, {}, signal, [401, 403, 404]);
 	return profile && { location: profile.location || undefined, email: profile.public_email || undefined, bot: profile.bot };
+}
+
+/** A profile settles it. Member lists say nothing about bots, so without one only the username can tell. */
+export function isBot({ username, bot }: DetailedMember): boolean {
+	return bot ?? BOT_USERNAMES.test(username);
 }
 
 /** Only a Markdown README can be rendered, and GitLab names whichever README it finds. */
