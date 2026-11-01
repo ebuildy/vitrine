@@ -29,6 +29,8 @@ export interface FakeGitlabGroup {
 	notMember?: boolean;
 	/** Direct members. GitLab adds those of the ancestor groups only when asked for all of them. */
 	members?: FakeGitlabMember[];
+	/** Groups invited into this one, whose direct members GitLab adds only when asked for all of them. */
+	invitedGroups?: string[];
 }
 
 export interface FakeGitlabProject {
@@ -182,8 +184,10 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 			} else if (groupMatch[2] === '/members') {
 				respondWithPage(response, url, (group.members ?? []).map(memberJson));
 			} else if (groupMatch[2] === '/members/all') {
-				const inherited = groupsHolding(group.path).flatMap(({ members = [] }) => members);
-				respondWithPage(response, url, [...new Map(inherited.map((member) => [member.id, member])).values()].map(memberJson));
+				const holding = groupsHolding(group.path);
+				const invited = groups.filter(({ path }) => holding.some(({ invitedGroups = [] }) => invitedGroups.includes(path)));
+				const all = [...holding, ...invited].flatMap(({ members = [] }) => members);
+				respondWithPage(response, url, [...new Map(all.map((member) => [member.id, member])).values()].map(memberJson));
 			} else {
 				respondWithJson(response, groupJson(group));
 			}

@@ -491,9 +491,9 @@ describe('Members when GitLab holds something back', () => {
 
 	const running: { gitlab: FakeGitlab; vitrine: RunningVitrine }[] = [];
 	const open = async ({ url }: RunningVitrine) => (await fetch(`${url}/gitlab/platform`)).text();
-	const start = async (options: Parameters<typeof startFakeGitlab>[0]) => {
+	const start = async (options: Parameters<typeof startFakeGitlab>[0], mainGroups = ['platform']) => {
 		const gitlab = await startFakeGitlab(options);
-		const vitrine = await startVitrine({ sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform'] }], routes });
+		const vitrine = await startVitrine({ sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups }], routes });
 		running.push({ gitlab, vitrine });
 		return { gitlab, vitrine };
 	};
@@ -618,6 +618,27 @@ describe('Members when GitLab holds something back', () => {
 		expect(Date.now() - started).toBeLessThan(15_000);
 		expect(html).toContain('Ada Lovelace');
 		expect(html).toContain('Details of some Members could not be loaded');
+	});
+
+	test('keeps whoever GitLab lists as a member, from above the Main Group or an invited group, as its Members page does', async () => {
+		const { vitrine } = await start(
+			{
+				groups: [
+					{ path: 'company', members: [{ id: 2, name: 'From Above' }] },
+					{ path: 'company/platform', members: [ada], invitedGroups: ['partners'] },
+					{ path: 'company/sibling', members: [{ id: 3, name: 'From Sibling' }] },
+					{ path: 'partners', members: [{ id: 4, name: 'From Invited' }] },
+				],
+			},
+			['company/platform'],
+		);
+
+		const html = await (await fetch(`${vitrine.url}/gitlab/company/platform`)).text();
+
+		expect(html).toContain('Ada Lovelace');
+		expect(html).toContain('From Above');
+		expect(html).toContain('From Invited');
+		expect(html).not.toContain('From Sibling');
 	});
 
 	test('limits a failure to the Members section', async () => {

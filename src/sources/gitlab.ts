@@ -1,6 +1,6 @@
 import { readSource, SOURCE_TIMEOUT_MS } from '../content-cache.ts';
 import type { CachedContent, Loader } from '../content-cache.ts';
-import { findMainGroup } from '../router.ts';
+import { findMainGroup, isAtOrBeneath } from '../router.ts';
 import type { GitlabSource } from '../settings.ts';
 import * as gitlabApi from './gitlab-api.ts';
 import type { Commit, Contributor, DetailedMember, Group, Issue, MainGroupContent, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
@@ -44,7 +44,7 @@ export async function listMembers(source: GitlabSource, group: string): Promise<
 	);
 	if (list.error) return list;
 
-	const members = list.data.filter(({ paths }) => paths.some((path) => path === group || path.startsWith(`${group}/`)));
+	const members = list.data.filter(({ paths }) => paths.some((path) => isAtOrBeneath(path, group)));
 	const profiles = await readWhileUp(members, gitlabApi.MEMBER_READS_AT_ONCE, (member) =>
 		readSource(source, `${source.name}/member/${member.id}/profile`, (signal) => gitlabApi.readMemberProfile(source, member, signal)),
 	);
