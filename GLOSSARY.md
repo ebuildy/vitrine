@@ -26,6 +26,10 @@ _Avoid_: Admin, operator, maintainer
 The file an Administrator edits to configure an installation, including its Sources, Main Groups and cache store.
 _Avoid_: Config, configuration, options
 
+**Container image**:
+Vitrine itself, packaged for an Administrator to run. It is unrelated to any Image, which is content Vitrine shows.
+_Avoid_: Image, Docker image
+
 **Published**:
 The state of content that belongs to a Main Group or a selected Harbor project and is not confidential.
 _Avoid_: Public, visible, exposed, approved

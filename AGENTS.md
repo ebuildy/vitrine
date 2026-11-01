@@ -10,7 +10,7 @@ Manage the background server with `astro dev stop`, `astro dev status`, and `ast
 
 Commit with `git commit -s`, amends included: the sign-off respects the DCO.
 
-`npm test` needs the Redis from `compose.yaml`: run `docker compose up -d --wait` first.
+`npm test` needs the Redis from `compose.yaml`: run `docker compose up -d --wait` first. It also needs a Docker engine with BuildKit, for `docker build --output`.
 
 To see a page with content, run `npm run demo`: it serves fake Sources to `astro dev` in the foreground, with `demo/settings.yaml` instead of `settings.yaml`. Seed data lives in `demo/content.ts`.
 

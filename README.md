@@ -27,7 +27,9 @@ docker run -p 8080:8080 \
   ghcr.io/ebuildy/vitrine:edge
 ```
 
-`edge` follows `main`, and each `v*` tag is published as its version. It listens on port 8080, as user `node` (uid 1000), who needs write access to the directory of a `files` cache store. `src/pages` is built in: to change pages, fork and build your own image from the `Dockerfile`.
+Two kinds of tag exist, for `linux/amd64` and `linux/arm64`: `edge` follows `main`, and a release `v1.2.3` is published as `1.2.3`, `1.2` and `1`. There is no `latest`.
+
+The image listens on port 8080, as user `node` (uid 1000). It creates no directory for a `files` cache store, so mount a writable one for that user. `src/pages` is built in: to change pages, fork and build your own image from the `Dockerfile`.
 
 # Astro Starter Kit: Basics
 
