@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { cacheStores } from './support/cache-stores.ts';
 import { startFakeHarbor } from './support/fake-harbor.ts';
 import type { FakeHarbor } from './support/fake-harbor.ts';
-import { devStartupFailure, runBuiltEntryDirectly, startupFailure, startVitrine, writeSettings } from './support/vitrine.ts';
+import { devStartupFailure, runBuiltEntryDirectly, startDevVitrine, startupFailure, startVitrine, writeEnvFile, writeSettings } from './support/vitrine.ts';
 import type { RunningVitrine } from './support/vitrine.ts';
 
 const artifact = {
@@ -580,6 +580,44 @@ describe('invalid Settings stop startup', () => {
 
 		expect(exitCode).toBe(0);
 		expect(output).not.toContain('Server listening');
+	});
+});
+
+describe('an env file', () => {
+	let harbor: FakeHarbor;
+	let vitrine: RunningVitrine | undefined;
+
+	const settings = () => ({
+		sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: ['platform'], username: 'robot', passwordEnv: 'VITRINE_TEST_PASSWORD' }],
+		routes: [{ url: '/images', controller: 'harbor-images' }],
+	});
+
+	beforeAll(async () => {
+		harbor = await startFakeHarbor({ projects: { platform: ['platform/api'] }, credentials: { username: 'robot', password: 's3cret' } });
+	});
+
+	afterEach(async () => {
+		await vitrine?.stop();
+		vitrine = undefined;
+	});
+
+	afterAll(async () => {
+		await harbor?.stop();
+	});
+
+	test.each([
+		['node start.ts', startVitrine],
+		['astro dev', startDevVitrine],
+	])('gives Vitrine its secrets with %s', async (_, start) => {
+		vitrine = await start(settings(), { VITRINE_ENV_FILE: writeEnvFile('VITRINE_TEST_PASSWORD=s3cret\n') });
+
+		expect(await (await fetch(`${vitrine.url}/images`)).text()).toContain('platform/api');
+	});
+
+	test('gives way to a variable the environment already sets', async () => {
+		vitrine = await startVitrine(settings(), { VITRINE_ENV_FILE: writeEnvFile('VITRINE_TEST_PASSWORD=wrong\n'), VITRINE_TEST_PASSWORD: 's3cret' });
+
+		expect(await (await fetch(`${vitrine.url}/images`)).text()).toContain('platform/api');
 	});
 });
 
