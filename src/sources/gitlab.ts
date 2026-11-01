@@ -72,6 +72,12 @@ export function listEpics(source: GitlabSource, path: string): Promise<CachedCon
 	return ifMainGroup(source, path, () => readSource(source, `${source.name}/epics/${path}`, (signal) => gitlabApi.readEpics(source, path, signal)));
 }
 
+/** Lists the Issues beneath a Group, cached whole per Main Group and apart from its other lists, as each fails and takes time of its own. */
+export async function listGroupIssues(source: GitlabSource, group: string): Promise<CachedContent<Issue[]>> {
+	const list = await inMainGroup(source, group, (mainGroup) => readSource(source, `${source.name}/issues/${mainGroup}`, (signal) => gitlabApi.readIssues(source, mainGroup, signal)));
+	return list.error ? list : { data: list.data.filter(({ project }) => isAtOrBeneath(project, group)), stale: list.stale };
+}
+
 /** Reads cards in list order and may stop early, as readWhileUp tells. */
 export function readProjectCards(source: GitlabSource, projects: Project[]): Promise<CachedContent<ProjectCard>[]> {
 	return readWhileUp(projects, gitlabApi.CARDS_AT_ONCE, (project) =>

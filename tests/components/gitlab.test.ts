@@ -2,6 +2,7 @@ import { experimental_AstroContainer as AstroContainer } from 'astro/container';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import GitlabCommitList from '../../src/components/GitlabCommitList.astro';
 import GitlabContributorList from '../../src/components/GitlabContributorList.astro';
+import GitlabGroupIssues from '../../src/components/GitlabGroupIssues.astro';
 import GitlabGroupList from '../../src/components/GitlabGroupList.astro';
 import GitlabGroupSummary from '../../src/components/GitlabGroupSummary.astro';
 import GitlabProjectIssues from '../../src/components/GitlabProjectIssues.astro';
@@ -38,6 +39,7 @@ const components = [
 	{ name: 'GroupMembers', component: GroupMembers, ...onGroup, shown: 'Ada Lovelace', error: 'Members could not be loaded', none: 'No Members found.' },
 	{ name: 'GroupRoadmap', component: GroupRoadmap, ...onGroup, shown: 'Faster checkout', error: 'Epics could not be loaded', none: 'No open Epics.' },
 	{ name: 'GitlabEpics', component: GitlabEpics, ...onGroup, shown: 'Faster checkout', error: 'Epics could not be loaded', none: 'No open Epics.' },
+	{ name: 'GitlabGroupIssues', component: GitlabGroupIssues, ...onGroup, shown: 'Fix login', error: 'Issues could not be loaded', none: 'No open Issues.' },
 	{ name: 'GitlabProjectSummary', component: GitlabProjectSummary, ...onProject, shown: 'View in GitLab', error: 'This Project could not be loaded', none: undefined },
 	{ name: 'GitlabReadme', component: GitlabReadme, ...onProject, shown: 'Hello', error: 'The README could not be loaded', none: 'No README found.' },
 	{ name: 'GitlabCommitList', component: GitlabCommitList, ...onProject, shown: 'Add login', error: 'Commits could not be loaded', none: 'No commits found.' },

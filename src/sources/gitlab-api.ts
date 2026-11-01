@@ -65,6 +65,8 @@ export interface Commit {
 
 export interface Issue {
 	title: string;
+	/** The path of its Project, so that a Group can select its own from the Main Group's list. */
+	project: string;
 	assignees: string[];
 	labels: string[];
 	webUrl: string;
@@ -141,6 +143,8 @@ interface GitlabCommit {
 
 interface GitlabIssue {
 	title: string;
+	confidential: boolean;
+	references: { full: string };
 	assignees: { name: string }[];
 	labels: string[];
 	web_url: string;
@@ -353,8 +357,19 @@ export async function listCommits(source: GitlabSource, { id, defaultBranch }: P
 
 export async function listIssues(source: GitlabSource, { id }: Project, signal: AbortSignal): Promise<Issue[]> {
 	const query = { state: 'opened', confidential: 'false', order_by: 'created_at', sort: 'desc', per_page: String(LATEST_ISSUES) };
-	const issues = await fetchJson<GitlabIssue[]>(source, `/projects/${id}/issues`, query, signal);
-	return issues.map(({ title, assignees, labels, web_url }) => ({ title, assignees: assignees.map(({ name }) => name), labels, webUrl: web_url }));
+	return toIssues(await fetchJson<GitlabIssue[]>(source, `/projects/${id}/issues`, query, signal));
+}
+
+export async function readIssues(source: GitlabSource, mainGroup: string, signal: AbortSignal): Promise<Issue[]> {
+	const query = { state: 'opened', confidential: 'false', order_by: 'created_at', sort: 'desc' };
+	return toIssues(await fetchAllPages<GitlabIssue>(source, `/groups/${encodeURIComponent(mainGroup)}/issues`, query, signal));
+}
+
+/** Checked again, as a confidential Issue must not reach the cache whatever the filter did. */
+function toIssues(issues: GitlabIssue[]): Issue[] {
+	return issues
+		.filter(({ confidential }) => !confidential)
+		.map(({ title, references, assignees, labels, web_url }) => ({ title, project: references.full.split('#')[0], assignees: assignees.map(({ name }) => name), labels, webUrl: web_url }));
 }
 
 export async function listReleases(source: GitlabSource, { id }: Project, signal: AbortSignal): Promise<Release[]> {
