@@ -1,5 +1,6 @@
 ---
 import type { AstroComponentFactory } from 'astro/runtime/server/index.js';
+import type { CachedContent } from '../content-cache.ts';
 import GitlabGroup from '../controllers/GitlabGroup.astro';
 import GitlabProject from '../controllers/GitlabProject.astro';
 import GitlabRoadmap from '../controllers/GitlabRoadmap.astro';
@@ -19,23 +20,22 @@ const controllers: Record<ControllerName, AstroComponentFactory> = {
 	'gitlab-roadmap': GitlabRoadmap,
 };
 
+type Subject = CachedContent<{ name: string; description: string } | undefined>;
+
+// A page reads these once, as only a page can answer not found, and a Source that is down should cost one timeout.
+const subjectReaders: Partial<Record<ControllerName, (params: Record<string, string>) => Promise<Subject>>> = {
+	'gitlab-group': ({ source, group }) => getGroup(getGitlabSource(source), group),
+	'gitlab-project': ({ source, group, project }) => getProject(getGitlabSource(source), `${group}/${project}`),
+	'gitlab-roadmap': ({ source, group }) => getMainGroup(getGitlabSource(source), group),
+};
+
 const url = `/${Astro.params.path ?? ''}`;
 const match = matchRoute(getSettings(), url);
 if (!match) return new Response(null, { status: 404 });
 
 const Controller = controllers[match.route.controller];
-const { controller } = match.route;
 const { source, group, project } = match.params;
-
-// Read once here, as only a page can answer not found, and a Source that is down should cost one timeout.
-const subject =
-	controller === 'gitlab-group'
-		? await getGroup(getGitlabSource(source), group)
-		: controller === 'gitlab-project'
-			? await getProject(getGitlabSource(source), `${group}/${project}`)
-			: controller === 'gitlab-roadmap'
-				? await getMainGroup(getGitlabSource(source), group)
-				: undefined;
+const subject = await subjectReaders[match.route.controller]?.(match.params);
 if (subject && !subject.error && !subject.data) return new Response(null, { status: 404 });
 ---
 
