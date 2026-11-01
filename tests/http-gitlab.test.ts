@@ -374,6 +374,168 @@ describe.each(cacheStores)('a Project page with the $name cache store', ({ empty
 	});
 });
 
+describe.each(cacheStores)('the Members of a Group with the $name cache store', ({ empty }) => {
+	const ada = {
+		id: 1,
+		name: 'Ada Lovelace',
+		avatar_url: 'http://gitlab.test/ada.png',
+		location: 'London',
+		public_email: 'ada@example.com',
+		email: 'ada.private@example.com',
+	};
+	const grace = { id: 2, name: 'Grace Hopper', location: '', public_email: '' };
+	const linus = { id: 3, name: 'Linus Torvalds' };
+	const katherine = { id: 4, name: 'Katherine Johnson' };
+	let gitlab: FakeGitlab;
+	let vitrine: RunningVitrine;
+
+	beforeAll(async () => {
+		gitlab = await startFakeGitlab({
+			groups: [
+				{
+					path: 'platform',
+					members: [
+						ada,
+						{ id: 10, name: 'Deploy Bot', bot: true },
+						{ id: 11, name: 'Gone Person', state: 'blocked' },
+						{ id: 12, name: 'Directory Leaver', state: 'ldap_blocked' },
+						{ id: 13, name: 'Banned Person', state: 'banned' },
+					],
+				},
+				{ path: 'platform/backend', members: [ada, grace] },
+				{ path: 'platform/frontend', members: [linus] },
+			],
+			projects: [{ path: 'platform/backend/api', members: [katherine] }],
+		});
+		vitrine = await startVitrine({
+			sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform'] }],
+			routes,
+			cacheStore: await empty(),
+		});
+	});
+
+	afterAll(async () => {
+		await vitrine?.stop();
+		await gitlab?.stop();
+	});
+
+	const open = async (path: string) => (await fetch(`${vitrine.url}/gitlab/${path}`)).text();
+	const membersOf = (html: string) => html.slice(html.search(/<h2[^>]*>Members/));
+	/** The card of one Member. */
+	const cardOf = (html: string, name: string) => membersOf(html).split('<li').find((card) => card.includes(name)) ?? '';
+
+	test('leaves blank what a profile does not give', async () => {
+		const card = cardOf(await open('platform'), 'Grace Hopper');
+
+		expect(card).toContain('GH');
+		expect(card).not.toContain('<img');
+		expect(card).not.toContain('<p');
+		expect(card).not.toContain('mailto');
+	});
+
+	test('leaves out bots and blocked accounts', async () => {
+		const html = await open('platform');
+
+		for (const name of ['Deploy Bot', 'Gone Person', 'Directory Leaver', 'Banned Person']) expect(html).not.toContain(name);
+	});
+
+	test('shows the people of everything beneath a Main Group, each once and by name', async () => {
+		const text = textOf(membersOf(await open('platform'))).replace('Members', '');
+
+		expect(text.match(/[A-Z][a-z]+ [A-Z][a-z]+/g)).toEqual(['Ada Lovelace', 'Grace Hopper', 'Katherine Johnson', 'Linus Torvalds']);
+	});
+
+	test('shows a subgroup with the people at or beneath it, and those it inherits', async () => {
+		const text = textOf(membersOf(await open('platform/backend')));
+
+		expect(text).toContain('Ada Lovelace');
+		expect(text).toContain('Grace Hopper');
+		expect(text).toContain('Katherine Johnson');
+		expect(text).not.toContain('Linus Torvalds');
+	});
+
+	test('reads the whole list once per Main Group, and each person once', async () => {
+		await open('platform');
+		await open('platform/backend');
+		await open('platform/frontend');
+
+		expect(gitlab.memberRequests().filter((request) => request === '/api/v4/users/1')).toHaveLength(1);
+		expect(gitlab.memberRequests().filter((request) => request.includes('/groups/platform/members'))).toHaveLength(1);
+	});
+
+	test('reads no profile of a blocked account', async () => {
+		await open('platform');
+
+		expect(gitlab.requests).not.toContain('/api/v4/users/11');
+	});
+
+	test('shows the avatar, name, location and email of a Member at the bottom of the page', async () => {
+		const html = await open('platform');
+		const members = html.slice(html.search(/<h2[^>]*>Members/));
+
+		expect(html.search(/<h2[^>]*>Members/)).toBeGreaterThan(html.search(/<h2[^>]*>Projects/));
+		expect(members).toContain('src="http://gitlab.test/ada.png"');
+		expect(members).toContain('Ada Lovelace');
+		expect(members).toContain('London');
+		expect(members).toContain('ada@example.com');
+	});
+
+	test('never shows the private email of a token that can read it', async () => {
+		expect(await open('platform')).not.toContain('ada.private@example.com');
+	});
+});
+
+describe('Members when GitLab holds something back', () => {
+	const ada = { id: 1, name: 'Ada Lovelace', avatar_url: 'http://gitlab.test/ada.png' };
+
+	const start = async (options: Parameters<typeof startFakeGitlab>[0]) => {
+		const gitlab = await startFakeGitlab(options);
+		const vitrine = await startVitrine({ sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform'] }], routes });
+		return { gitlab, vitrine };
+	};
+	const running: { gitlab: FakeGitlab; vitrine: RunningVitrine }[] = [];
+
+	afterEach(async () => {
+		for (const { gitlab, vitrine } of running.splice(0)) {
+			await vitrine.stop();
+			await gitlab.stop();
+		}
+	});
+
+	test('still shows the person when GitLab refuses their profile', async () => {
+		const { gitlab, vitrine } = await start({ groups: [{ path: 'platform', members: [ada] }], profilesRefused: true });
+		running.push({ gitlab, vitrine });
+
+		const html = await (await fetch(`${vitrine.url}/gitlab/platform`)).text();
+
+		expect(html).toContain('Ada Lovelace');
+		expect(html).not.toContain('could not be loaded');
+	});
+
+	test('limits a failure to the Members section', async () => {
+		const { gitlab, vitrine } = await start({ groups: [{ path: 'platform', members: [ada] }], projects: [{ path: 'platform/api' }] });
+		running.push({ gitlab, vitrine });
+		gitlab.behave('down-after-lists');
+
+		const html = await (await fetch(`${vitrine.url}/gitlab/platform`)).text();
+
+		expect(html).toContain('href="/gitlab/platform/-/api"');
+		expect(html).toContain('Members could not be loaded');
+	});
+
+	test('waits for one Source timeout when Members hang alongside Project details', async () => {
+		const { gitlab, vitrine } = await start({ groups: [{ path: 'platform', members: [ada] }], projects: [{ path: 'platform/api' }] });
+		running.push({ gitlab, vitrine });
+		gitlab.behave('hanging-after-lists');
+
+		const started = Date.now();
+		const html = await (await fetch(`${vitrine.url}/gitlab/platform`)).text();
+
+		expect(Date.now() - started).toBeLessThan(15_000);
+		expect(html).toContain('Members could not be loaded');
+	});
+});
+
 describe('Project cards when GitLab holds something back', () => {
 	let gitlab: FakeGitlab;
 	let vitrine: RunningVitrine;

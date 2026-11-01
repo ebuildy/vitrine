@@ -1,5 +1,5 @@
 ---
-import { formatDate } from '../format.ts';
+import { formatDate, initialsOf } from '../format.ts';
 import { gitlabProjectUrl } from '../router.ts';
 import { getGitlabSource, getSettings } from '../settings.ts';
 import { listProjects, readProjectCards } from '../sources/gitlab.ts';
@@ -14,15 +14,6 @@ const gitlabSource = getGitlabSource(source);
 const { data: projects, stale } = await listProjects(gitlabSource, group);
 const cards = await readProjectCards(gitlabSource, projects ?? []);
 const incomplete = cards.length < (projects?.length ?? 0) || cards.some(({ error }) => error);
-
-function initialsOf(name: string) {
-	return name
-		.split(/\s+/)
-		.map((word) => word.charAt(0))
-		.join('')
-		.slice(0, 2)
-		.toUpperCase();
-}
 ---
 
 {stale && <p role="status">This list is Stale because {source} is down.</p>}

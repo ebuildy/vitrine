@@ -3,7 +3,7 @@ import type { CachedContent, Loader } from '../content-cache.ts';
 import { findMainGroup } from '../router.ts';
 import type { GitlabSource } from '../settings.ts';
 import * as gitlabApi from './gitlab-api.ts';
-import type { Commit, Contributor, Group, Issue, MainGroupContent, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
+import type { Commit, Contributor, Group, Issue, MainGroupContent, Member, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
 
 // A card takes several requests, so a page of cards must not send them all at once.
 const CARDS_AT_ONCE = 5;
@@ -28,6 +28,20 @@ export function listProjects(source: GitlabSource, group: string): Promise<Cache
 
 export function getProject(source: GitlabSource, path: string): Promise<CachedContent<Project | undefined>> {
 	return fromMainGroup(source, path, ({ projects }) => projects.find((project) => project.path === path));
+}
+
+/** Members are cached whole per Main Group, apart from its other lists, as they fail and take time of their own. */
+export async function listMembers(source: GitlabSource, group: string): Promise<CachedContent<Member[]>> {
+	const mainGroup = findMainGroup(source, group);
+	if (!mainGroup) return { error: new Error(`"${group}" is outside the Main Groups of "${source.name}"`) };
+
+	const members = await readSource(source, `${source.name}/members/${mainGroup}`, async (signal) => {
+		const content = await fromMainGroup(source, mainGroup, (mainGroupContent) => mainGroupContent);
+		if (content.error) throw content.error;
+		return gitlabApi.readMembers(source, content.data, signal);
+	});
+	if (members.error) return members;
+	return { data: members.data.filter(({ paths }) => paths.some((path) => path === group || path.startsWith(`${group}/`))), stale: members.stale };
 }
 
 /**
