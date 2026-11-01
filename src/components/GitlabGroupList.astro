@@ -24,6 +24,9 @@ const { data: subgroups, stale } = await listSubgroups(getGitlabSource(source), 
 						<li>
 							<h3>{url ? <a href={url}>{subgroup.name}</a> : subgroup.name}</h3>
 							{subgroup.description && <p>{subgroup.description}</p>}
+							<p>
+								{subgroup.projectCount} {subgroup.projectCount === 1 ? 'Project' : 'Projects'}
+							</p>
 							<a class="source-link" href={subgroup.webUrl}>
 								View in GitLab
 							</a>
@@ -68,6 +71,10 @@ const { data: subgroups, stale } = await listSubgroups(getGitlabSource(source), 
 		margin: 0 0 0.75rem;
 		font-size: 1.125rem;
 		overflow-wrap: anywhere;
+	}
+
+	p {
+		margin: 0 0 0.75rem;
 	}
 
 	/* Stretches the link over its card, so that a click anywhere opens the Group. */

@@ -7,12 +7,14 @@ import Layout from '../layouts/Layout.astro';
 interface Props {
 	source: string;
 	group: string;
+	title: string;
+	description: string;
 }
 
-const { source, group } = Astro.props;
+const { source, group, title, description } = Astro.props;
 ---
 
-<Layout title={group}>
+<Layout title={title} description={description}>
 	<GitlabGroupSummary source={source} group={group} />
 	<GitlabGroupList source={source} group={group} />
 	<GitlabProjectList source={source} group={group} />

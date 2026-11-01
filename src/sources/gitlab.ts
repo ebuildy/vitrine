@@ -1,16 +1,25 @@
-import { readSource } from '../content-cache.ts';
+import { readSource, SOURCE_TIMEOUT_MS } from '../content-cache.ts';
 import type { CachedContent, Loader } from '../content-cache.ts';
 import { findMainGroup } from '../settings.ts';
 import type { GitlabSource } from '../settings.ts';
 import * as gitlabApi from './gitlab-api.ts';
-import type { Commit, Contributor, Group, Issue, MainGroupContent, Project, Readme, Release } from './gitlab-api.ts';
+import type { Commit, Contributor, Group, Issue, MainGroupContent, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
+
+// A card takes several requests, so a page of cards must not send them all at once.
+const CARDS_AT_ONCE = 5;
+
+export type Subgroup = Group & { projectCount: number };
 
 export function getGroup(source: GitlabSource, path: string): Promise<CachedContent<Group | undefined>> {
 	return fromMainGroup(source, path, ({ groups }) => groups.find((group) => group.path === path));
 }
 
-export function listSubgroups(source: GitlabSource, group: string): Promise<CachedContent<Group[]>> {
-	return fromMainGroup(source, group, ({ groups }) => groups.filter(({ path }) => parentOf(path) === group));
+export function listSubgroups(source: GitlabSource, group: string): Promise<CachedContent<Subgroup[]>> {
+	return fromMainGroup(source, group, ({ groups, projects }) =>
+		groups
+			.filter(({ path }) => parentOf(path) === group)
+			.map((subgroup) => ({ ...subgroup, projectCount: projects.filter(({ path }) => path.startsWith(`${subgroup.path}/`)).length })),
+	);
 }
 
 export function listProjects(source: GitlabSource, group: string): Promise<CachedContent<Project[]>> {
@@ -19,6 +28,25 @@ export function listProjects(source: GitlabSource, group: string): Promise<Cache
 
 export function getProject(source: GitlabSource, path: string): Promise<CachedContent<Project | undefined>> {
 	return fromMainGroup(source, path, ({ projects }) => projects.find((project) => project.path === path));
+}
+
+/**
+ * Reads cards in list order and may stop early, as they must not hold a page back: past one Source timeout,
+ * or once a Source fails, the rest stay unread and fill in as Visitors come back. Stale cards do not stop it.
+ */
+export async function readProjectCards(source: GitlabSource, projects: Project[]): Promise<CachedContent<ProjectCard>[]> {
+	const cards: CachedContent<ProjectCard>[] = [];
+	const started = Date.now();
+	for (let start = 0; start < projects.length; start += CARDS_AT_ONCE) {
+		const batch = await Promise.all(
+			projects
+				.slice(start, start + CARDS_AT_ONCE)
+				.map((project) => readSource(source, `${source.name}/project/${project.path}/card`, (signal) => gitlabApi.readProjectCard(source, project, signal))),
+		);
+		cards.push(...batch);
+		if (batch.some(({ error }) => error) || Date.now() - started >= SOURCE_TIMEOUT_MS) break;
+	}
+	return cards;
 }
 
 export function getReadme(source: GitlabSource, path: string): Promise<CachedContent<Readme | undefined>> {

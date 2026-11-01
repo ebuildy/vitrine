@@ -42,6 +42,6 @@ if (subject && !subject.error && !subject.data) return new Response(null, { stat
 			</p>
 		</Layout>
 	) : (
-		<Controller {...match.params} />
+		<Controller {...match.params} title={subject?.data?.name} description={subject?.data?.description} />
 	)
 }

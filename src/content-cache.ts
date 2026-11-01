@@ -1,7 +1,7 @@
 import { getCacheStore } from './cache-stores.ts';
 import type { Entry } from './cache-stores.ts';
 
-const SOURCE_TIMEOUT_MS = 10_000;
+export const SOURCE_TIMEOUT_MS = 10_000;
 const CACHE_STORE_TIMEOUT_MS = 1_000;
 
 export type CachedContent<T> = { data: T; stale: boolean; error?: undefined } | { data?: undefined; stale?: undefined; error: Error };

@@ -6,6 +6,7 @@ const LATEST_COMMITS = 10;
 const LATEST_ISSUES = 10;
 const LATEST_RELEASES = 5;
 const TOP_CONTRIBUTORS = 10;
+const CARD_CONTRIBUTORS = 5;
 
 export interface Group {
 	path: string;
@@ -20,9 +21,18 @@ export interface Project {
 	name: string;
 	description: string;
 	lastActivityAt: string;
+	topics: string[];
 	/** Left out for an empty repository, which GitLab still names a default branch for and answers 404 about. */
 	defaultBranch?: string;
 	webUrl: string;
+}
+
+/** What a Project card adds to the list, which takes several requests per Project. */
+export interface ProjectCard {
+	/** GitLab keeps this from anyone below the Reporter role. */
+	commitCount?: number;
+	latestRelease?: string;
+	contributors: { name: string; avatarUrl?: string }[];
 }
 
 /** Everything a Main Group holds, starting with the Main Group itself. */
@@ -78,6 +88,7 @@ interface GitlabProject {
 	name: string;
 	description: string | null;
 	last_activity_at: string;
+	topics: string[];
 	default_branch: string | null;
 	empty_repo: boolean;
 	web_url: string;
@@ -106,6 +117,7 @@ interface GitlabRelease {
 
 interface GitlabContributor {
 	name: string;
+	email: string;
 	commits: number;
 }
 
@@ -131,6 +143,7 @@ export async function readMainGroup(source: GitlabSource, mainGroup: string, sig
 			name: item.name,
 			description: item.description ?? '',
 			lastActivityAt: item.last_activity_at,
+			topics: item.topics,
 			defaultBranch: item.empty_repo ? undefined : (item.default_branch ?? undefined),
 			webUrl: item.web_url,
 		})),
@@ -168,9 +181,33 @@ export async function listReleases(source: GitlabSource, { id }: Project, signal
 /** Leaves out the email GitLab gives for each contributor. */
 export async function listContributors(source: GitlabSource, { id, defaultBranch }: Project, signal: AbortSignal): Promise<Contributor[]> {
 	if (!defaultBranch) return [];
-	const query = { order_by: 'commits', sort: 'desc', per_page: String(TOP_CONTRIBUTORS) };
-	const contributors = await fetchJson<GitlabContributor[]>(source, `/projects/${id}/repository/contributors`, query, signal);
+	const contributors = await fetchTopContributors(source, id, TOP_CONTRIBUTORS, signal);
 	return contributors.map(({ name, commits }) => ({ name, commits }));
+}
+
+export async function readProjectCard(source: GitlabSource, { id, defaultBranch }: Project, signal: AbortSignal): Promise<ProjectCard> {
+	const [project, releases, contributors] = await Promise.all([
+		fetchJson<{ statistics?: { commit_count: number } }>(source, `/projects/${id}`, { statistics: 'true' }, signal),
+		// GitLab refuses releases on a Project that turned them off.
+		fetchIfAllowed<GitlabRelease[]>(source, `/projects/${id}/releases`, { per_page: '1' }, signal),
+		defaultBranch ? fetchTopContributors(source, id, CARD_CONTRIBUTORS, signal) : [],
+	]);
+	return {
+		commitCount: project.statistics?.commit_count,
+		latestRelease: releases?.[0]?.name,
+		contributors: await Promise.all(contributors.map(async ({ name, email }) => ({ name, avatarUrl: await readAvatarUrl(source, email, signal) }))),
+	};
+}
+
+function fetchTopContributors(source: GitlabSource, id: number, count: number, signal: AbortSignal) {
+	const query = { order_by: 'commits', sort: 'desc', per_page: String(count) };
+	return fetchJson<GitlabContributor[]>(source, `/projects/${id}/repository/contributors`, query, signal);
+}
+
+/** GitLab answers null for an email it cannot match, and refuses anonymous readers when public visibility is restricted. */
+async function readAvatarUrl(source: GitlabSource, email: string, signal: AbortSignal): Promise<string | undefined> {
+	const avatar = await fetchIfAllowed<{ avatar_url: string | null }>(source, '/avatar', { email }, signal);
+	return avatar?.avatar_url ?? undefined;
 }
 
 async function fetchJson<T>(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal): Promise<T> {
@@ -187,12 +224,23 @@ async function fetchAllPages<T>(source: GitlabSource, path: string, query: Recor
 	}
 }
 
+async function fetchIfAllowed<T>(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal): Promise<T | undefined> {
+	const response = await request(source, path, query, signal);
+	if (response.status === 401 || response.status === 403) return undefined;
+	if (!response.ok) throw new Error(`GitLab "${source.name}" answered ${response.status} for ${path}`);
+	return response.json();
+}
+
 async function fetchApi(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal): Promise<Response> {
+	const response = await request(source, path, query, signal);
+	if (!response.ok) throw new Error(`GitLab "${source.name}" answered ${response.status} for ${path}`);
+	return response;
+}
+
+function request(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal): Promise<Response> {
 	// A GitLab can live under a path of its own, which a URL built from a leading slash would lose.
 	const url = new URL(`${source.url.replace(/\/$/, '')}/api/v4${path}`);
 	url.search = new URLSearchParams(query).toString();
 
-	const response = await fetch(url, { headers: source.token ? { 'private-token': source.token } : {}, signal });
-	if (!response.ok) throw new Error(`GitLab "${source.name}" answered ${response.status} for ${path}`);
-	return response;
+	return fetch(url, { headers: source.token ? { 'private-token': source.token } : {}, signal });
 }

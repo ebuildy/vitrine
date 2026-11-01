@@ -14,6 +14,9 @@ export interface FakeGitlabProject {
 	path: string;
 	description?: string | null;
 	last_activity_at?: string;
+	topics?: string[];
+	/** GitLab keeps statistics from anyone below the Reporter role, so leave this out to be such a reader. */
+	commit_count?: number;
 	archived?: boolean;
 	/** Main Groups this Project is shared into from outside, which GitLab lists unless told otherwise. */
 	sharedInto?: string[];
@@ -31,12 +34,16 @@ export interface FakeGitlabProject {
 export interface FakeGitlabOptions {
 	groups: FakeGitlabGroup[];
 	projects?: FakeGitlabProject[];
+	/** Avatar URLs per email, where GitLab answers null for any other. */
+	avatars?: Record<string, string>;
+	/** Whether this GitLab refuses avatars to its reader, as it does anonymous ones when public visibility is restricted. */
+	avatarsRefused?: boolean;
 	/** When set, requests must carry this token. */
 	token?: string;
 }
 
-/** up answers at once, slow after a short wait, down with a 503, and hanging never. down-after-lists only fails requests about one Project. */
-export type FakeGitlabBehaviour = 'up' | 'slow' | 'down' | 'down-after-lists' | 'hanging';
+/** up answers at once, slow after a short wait, down with a 503, and hanging never. The after-lists variants only hit requests about one Project. */
+export type FakeGitlabBehaviour = 'up' | 'slow' | 'down' | 'down-after-lists' | 'hanging' | 'hanging-after-lists';
 
 export interface FakeGitlab {
 	url: string;
@@ -50,7 +57,7 @@ export interface FakeGitlab {
 }
 
 /** Answers the parts of GitLab's v4 API that Vitrine reads. */
-export async function startFakeGitlab({ groups, projects = [], token }: FakeGitlabOptions): Promise<FakeGitlab> {
+export async function startFakeGitlab({ groups, projects = [], avatars = {}, avatarsRefused, token }: FakeGitlabOptions): Promise<FakeGitlab> {
 	const requests: string[] = [];
 	let behaviour: FakeGitlabBehaviour = 'up';
 	let baseUrl = '';
@@ -67,6 +74,7 @@ export async function startFakeGitlab({ groups, projects = [], token }: FakeGitl
 		name: lastSegment(project.path),
 		description: project.description ?? null,
 		last_activity_at: project.last_activity_at ?? '2026-01-01T00:00:00.000Z',
+		topics: project.topics ?? [],
 		default_branch: 'main',
 		empty_repo: project.empty_repo ?? false,
 		web_url: `${baseUrl}/${project.path}`,
@@ -75,7 +83,7 @@ export async function startFakeGitlab({ groups, projects = [], token }: FakeGitl
 	const handle = async (request: IncomingMessage, response: ServerResponse) => {
 		const url = new URL(request.url ?? '/', 'http://fake-gitlab');
 		requests.push(`${url.pathname}${url.search}`);
-		if (behaviour === 'hanging') return;
+		if (behaviour === 'hanging' || (behaviour === 'hanging-after-lists' && url.pathname.startsWith('/api/v4/projects/'))) return;
 		if (behaviour === 'down' || (behaviour === 'down-after-lists' && url.pathname.startsWith('/api/v4/projects/'))) {
 			response.writeHead(503).end();
 			return;
@@ -83,6 +91,12 @@ export async function startFakeGitlab({ groups, projects = [], token }: FakeGitl
 		if (behaviour === 'slow') await new Promise((resolve) => setTimeout(resolve, 200));
 		if (token && request.headers['private-token'] !== token) {
 			response.writeHead(401).end();
+			return;
+		}
+
+		if (url.pathname === '/api/v4/avatar') {
+			if (avatarsRefused) response.writeHead(403).end();
+			else respondWithJson(response, { avatar_url: avatars[url.searchParams.get('email') ?? ''] ?? null });
 			return;
 		}
 
@@ -118,7 +132,12 @@ export async function startFakeGitlab({ groups, projects = [], token }: FakeGitl
 			if (part === undefined) {
 				const branch = projectJson(project).default_branch;
 				const readme = project.readme === undefined ? null : `${baseUrl}/${project.path}/-/blob/${branch}/README.md`;
-				respondWithJson(response, { ...projectJson(project), readme_url: readme });
+				const statistics = url.searchParams.get('statistics') === 'true' && project.commit_count !== undefined;
+				respondWithJson(response, {
+					...projectJson(project),
+					readme_url: readme,
+					...(statistics ? { statistics: { commit_count: project.commit_count } } : {}),
+				});
 			} else if (part?.startsWith('/repository/') && project.empty_repo) {
 				response.writeHead(404).end();
 			} else if (part === '/repository/files/README.md/raw' && project.readme !== undefined) {

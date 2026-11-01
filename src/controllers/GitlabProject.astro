@@ -11,13 +11,15 @@ interface Props {
 	source: string;
 	group: string;
 	project: string;
+	title: string;
+	description: string;
 }
 
-const { source, group, project } = Astro.props;
+const { source, group, project, title, description } = Astro.props;
 const path = `${group}/${project}`;
 ---
 
-<Layout title={project}>
+<Layout title={title} description={description}>
 	<GitlabProjectSummary source={source} project={path} />
 	<div class="columns">
 		<main>

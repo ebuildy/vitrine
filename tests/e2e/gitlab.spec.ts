@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { startFakeGitlab } from '../support/fake-gitlab.ts';
 import type { FakeGitlab } from '../support/fake-gitlab.ts';
 import { startVitrine } from '../support/vitrine.ts';
@@ -38,18 +39,22 @@ test.afterAll(async () => {
 	await gitlab?.stop();
 });
 
+function sectionOf(page: Page, heading: string) {
+	return page.locator('section').filter({ has: page.getByRole('heading', { name: heading, exact: true }) });
+}
+
 test('a Visitor browses from a Main Group through a subgroup to a Project', async ({ page }) => {
 	await page.goto(`${vitrine.url}/gitlab/platform`);
 
 	await expect(page.getByRole('heading', { name: 'The Platform' })).toBeVisible();
 	await expect(page.getByRole('heading', { level: 3 }).getByRole('link', { name: 'backend' })).toBeVisible();
-	await expect(page.locator('section', { hasText: 'Subgroups' }).getByRole('listitem')).toHaveCount(5);
-	await expect(page.locator('section', { hasText: 'Projects' }).getByRole('listitem')).toHaveCount(15);
+	await expect(sectionOf(page, 'Subgroups').getByRole('listitem')).toHaveCount(5);
+	await expect(sectionOf(page, 'Projects').getByRole('listitem')).toHaveCount(15);
 
 	await page.getByRole('link', { name: 'backend' }).click();
 
 	await expect(page).toHaveURL(`${vitrine.url}/gitlab/platform/backend`);
-	await expect(page.locator('section', { hasText: 'Projects' }).getByRole('listitem')).toHaveCount(3);
+	await expect(sectionOf(page, 'Projects').getByRole('listitem')).toHaveCount(3);
 
 	await page.getByRole('link', { name: 'api' }).click();
 

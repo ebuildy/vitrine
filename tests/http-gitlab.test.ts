@@ -10,6 +10,11 @@ const routes = [
 	{ url: '/gitlab/:group+/-/:project', controller: 'gitlab-project' },
 ];
 
+/** What a Visitor reads, with the markup left out. */
+function textOf(html: string) {
+	return html.replace(/<style[^>]*>[\s\S]*?<\/style>/g, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+}
+
 describe.each(cacheStores)('with the $name cache store', ({ empty }) => {
 	describe('Routes to the GitLab Controllers', () => {
 		let gitlab: FakeGitlab;
@@ -26,11 +31,26 @@ describe.each(cacheStores)('with the $name cache store', ({ empty }) => {
 					{ path: 'hidden' },
 				],
 				projects: [
-					{ path: 'platform/backend/api', description: 'The public API', last_activity_at: '2026-10-01T08:00:00.000Z' },
+					{
+						path: 'platform/backend/api',
+						description: 'The public API',
+						last_activity_at: '2026-10-01T08:00:00.000Z',
+						topics: ['golang', 'payments'],
+						commit_count: 1234,
+						releases: [
+							{ name: 'Autumn release', tag_name: 'v2', released_at: '2026-10-01T08:00:00.000Z' },
+							{ name: 'Spring release', tag_name: 'v1', released_at: '2026-03-20T08:00:00.000Z' },
+						],
+						contributors: [
+							{ name: 'Ada Lovelace', email: 'ada@example.com', commits: 40 },
+							{ name: 'Grace Hopper', email: 'grace@example.com', commits: 2 },
+						],
+					},
 					{ path: 'platform/backend/billing/invoices' },
 					{ path: 'platform/backend/legacy', archived: true },
 					{ path: 'hidden/secret', sharedInto: ['platform'] },
 				],
+				avatars: { 'ada@example.com': 'http://gitlab.test/ada.png' },
 				token: 'secret-token',
 			});
 			otherGitlab = await startFakeGitlab({ groups: [{ path: 'tools' }], projects: [{ path: 'tools/cli' }] });
@@ -61,6 +81,24 @@ describe.each(cacheStores)('with the $name cache store', ({ empty }) => {
 			expect(html).toContain(`href="${gitlab.url}/groups/platform"`);
 		});
 
+		test('titles and describes the page after its Group', async () => {
+			const html = await (await fetch(`${vitrine.url}/gitlab/platform`)).text();
+
+			expect(html).toContain('<title>The Platform</title>');
+			expect(html).toContain('<meta name="description" content="Everything we run">');
+		});
+
+		test('titles and describes the page after its Project', async () => {
+			const html = await (await fetch(`${vitrine.url}/gitlab/platform/backend/-/api`)).text();
+
+			expect(html).toContain('<title>api</title>');
+			expect(html).toContain('<meta name="description" content="The public API">');
+		});
+
+		test('leaves the description out of a page whose Group has none', async () => {
+			expect(await (await fetch(`${vitrine.url}/gitlab/platform/backend`)).text()).not.toContain('name="description"');
+		});
+
 		test('links a Group to its direct subgroups only', async () => {
 			const html = await (await fetch(`${vitrine.url}/gitlab/platform`)).text();
 
@@ -77,6 +115,42 @@ describe.each(cacheStores)('with the $name cache store', ({ empty }) => {
 			expect(html).toContain('The public API');
 			expect(html).toContain('2026-10-01');
 			expect(html).toContain(`href="${gitlab.url}/platform/backend/api"`);
+		});
+
+		test('counts the Projects beneath each subgroup, leaving out archived ones', async () => {
+			const text = textOf(await (await fetch(`${vitrine.url}/gitlab/platform`)).text());
+
+			expect(text).toContain('backend 2 Projects');
+			expect(text).toContain('frontend 0 Projects');
+		});
+
+		test('shows the topics, commit count and latest release of a Project card', async () => {
+			const text = textOf(await (await fetch(`${vitrine.url}/gitlab/platform`)).text());
+
+			expect(text).toContain('golang payments');
+			expect(text).toContain('1234 commits');
+			expect(text).toContain('Latest release Autumn release');
+			expect(text).not.toContain('Spring release');
+		});
+
+		test('shows contributors on a Project card as avatars only', async () => {
+			const html = await (await fetch(`${vitrine.url}/gitlab/platform`)).text();
+
+			expect(html).toContain('src="http://gitlab.test/ada.png"');
+			expect(html).toContain('alt="Ada Lovelace"');
+			expect(textOf(html)).not.toContain('Ada Lovelace');
+			expect(html).not.toContain('ada@example.com');
+		});
+
+		test('marks a contributor with no avatar by their initials', async () => {
+			expect(textOf(await (await fetch(`${vitrine.url}/gitlab/platform`)).text())).toContain(' GH ');
+		});
+
+		test('leaves out what a Project card has nothing to show for', async () => {
+			const text = textOf(await (await fetch(`${vitrine.url}/gitlab/platform/backend/billing`)).text());
+
+			expect(text).not.toContain('commits');
+			expect(text).not.toContain('Latest release');
 		});
 
 		test('leaves out archived Projects', async () => {
@@ -297,6 +371,65 @@ describe.each(cacheStores)('a Project page with the $name cache store', ({ empty
 		await open('platform/backend/-/api');
 
 		expect(gitlab.projectListRequests()).toHaveLength(1);
+	});
+});
+
+describe('Project cards when GitLab holds something back', () => {
+	let gitlab: FakeGitlab;
+	let vitrine: RunningVitrine;
+
+	beforeAll(async () => {
+		gitlab = await startFakeGitlab({
+			groups: [{ path: 'platform' }, { path: 'platform/first' }, { path: 'platform/second' }],
+			projects: [
+				{ path: 'platform/first/api', topics: ['golang'], contributors: [{ name: 'Ada Lovelace', email: 'ada@example.com', commits: 1 }] },
+				...Array.from({ length: 12 }, (_, index) => ({ path: `platform/second/project-${index}` })),
+			],
+			avatarsRefused: true,
+		});
+		vitrine = await startVitrine({ sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform'] }], routes });
+	});
+
+	afterAll(async () => {
+		await vitrine?.stop();
+		await gitlab?.stop();
+	});
+
+	afterEach(() => {
+		gitlab.behave('up');
+	});
+
+	const open = async (path: string) => (await fetch(`${vitrine.url}/gitlab/${path}`)).text();
+
+	test('shows initials when GitLab refuses avatars', async () => {
+		const text = textOf(await open('platform/first'));
+
+		expect(text).toContain('AL');
+		expect(text).not.toContain('could not be loaded');
+	});
+
+	test('warns once, keeps the list and stops asking when Project details fail', async () => {
+		await open('platform/first');
+		gitlab.behave('down-after-lists');
+		const requests = gitlab.requests.length;
+
+		const html = await open('platform/second');
+
+		expect(html).toContain('project-11');
+		expect(html.match(/Details of some Projects could not be loaded/g)).toHaveLength(1);
+		// The first five cards, of three requests each, out of twelve.
+		expect(gitlab.requests.length - requests).toBe(15);
+	});
+
+	test('waits for one Source timeout when Project details hang', async () => {
+		await open('platform/first');
+		gitlab.behave('hanging-after-lists');
+
+		const started = Date.now();
+		const html = await open('platform');
+
+		expect(Date.now() - started).toBeLessThan(15_000);
+		expect(html).toContain('project-11');
 	});
 });
 
