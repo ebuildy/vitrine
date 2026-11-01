@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { cacheStores } from './support/cache-stores.ts';
 import { startFakeHarbor } from './support/fake-harbor.ts';
 import type { FakeHarbor } from './support/fake-harbor.ts';
@@ -588,6 +588,51 @@ describe('stopping Vitrine', () => {
 		const vitrine = await startVitrine({ sources: [], routes: [] });
 
 		expect(await vitrine.stop()).toBe(0);
+	});
+
+	describe('with a page reading a Source', () => {
+		let harbor: FakeHarbor;
+		let vitrine: RunningVitrine;
+
+		beforeEach(async () => {
+			harbor = await startFakeHarbor({ projects: { platform: ['platform/api'] } });
+			vitrine = await startVitrine({
+				sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: ['platform'] }],
+				routes: [{ url: '/images', controller: 'harbor-images' }],
+			});
+		});
+
+		afterEach(async () => {
+			await harbor.stop();
+		});
+
+		async function untilHarborIsAsked() {
+			while (harbor.requests.length === 0) await new Promise((resolve) => setTimeout(resolve, 10));
+		}
+
+		test('finishes a request in flight before it exits', async () => {
+			harbor.behave('slow');
+			const inFlight = fetch(`${vitrine.url}/images`);
+			await untilHarborIsAsked();
+
+			const stopped = vitrine.stop();
+			const response = await inFlight;
+
+			expect(response.status).toBe(200);
+			expect(await response.text()).toContain('platform/api');
+			expect(await stopped).toBe(0);
+		});
+
+		test('gives up on a stuck request well before the 10 seconds Docker allows', async () => {
+			harbor.behave('hanging');
+			const stuck = fetch(`${vitrine.url}/images`).catch(() => undefined);
+			await untilHarborIsAsked();
+
+			const start = Date.now();
+			expect(await vitrine.stop()).toBe(0);
+			expect(Date.now() - start).toBeLessThan(8_000);
+			await stuck;
+		});
 	});
 });
 
