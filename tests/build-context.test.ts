@@ -6,11 +6,30 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 const NEEDED_TO_BUILD = ['astro.config.mjs', 'LICENSE', 'package-lock.json', 'package.json', 'start.ts', 'src/settings.ts', 'tsconfig.json'];
 
-const PRIVATE_TO_THE_CHECKOUT = ['settings.yaml', '.env', '.env.production', 'src/settings.yaml', 'src/.env', 'src/pages/.env.local', '.git/config', '.idea/workspace.xml'];
-
-const USELESS_AT_RUNTIME = ['settings.example.yaml', '.env.example', 'demo/settings.yaml', 'demo/content.ts', 'tests/http.test.ts', 'docs/adr/0001.md', 'README.md', 'compose.yaml', 'Dockerfile'];
-
-const LEFT_BY_LOCAL_WORK = ['node_modules/yaml/package.json', 'src/node_modules/yaml/package.json', 'dist/server/entry.mjs', '.test-build/start.ts', '.astro/settings.mjs'];
+const LEFT_OUT = [
+	['settings.yaml', 'may hold real hostnames or secrets'],
+	['.env', 'may hold real hostnames or secrets'],
+	['.env.production', 'may hold real hostnames or secrets'],
+	['src/settings.yaml', 'may hold real hostnames or secrets'],
+	['src/.env', 'may hold real hostnames or secrets'],
+	['src/pages/.env.local', 'may hold real hostnames or secrets'],
+	['.git/config', 'may hold real hostnames or secrets'],
+	['.idea/workspace.xml', 'may hold real hostnames or secrets'],
+	['settings.example.yaml', 'the image does not need'],
+	['.env.example', 'the image does not need'],
+	['demo/settings.yaml', 'the image does not need'],
+	['demo/content.ts', 'the image does not need'],
+	['tests/http.test.ts', 'the image does not need'],
+	['docs/adr/0001.md', 'the image does not need'],
+	['README.md', 'the image does not need'],
+	['compose.yaml', 'the image does not need'],
+	['Dockerfile', 'the image does not need'],
+	['node_modules/yaml/package.json', 'the build produces itself'],
+	['src/node_modules/yaml/package.json', 'the build produces itself'],
+	['dist/server/entry.mjs', 'the build produces itself'],
+	['.test-build/start.ts', 'the build produces itself'],
+	['.astro/settings.mjs', 'the build produces itself'],
+];
 
 describe('the build context of the container image', () => {
 	let checkout: string;
@@ -19,7 +38,7 @@ describe('the build context of the container image', () => {
 	/** Hands a developer's checkout to the real engine and collects what a COPY in the Dockerfile would receive. */
 	beforeAll(() => {
 		checkout = mkdtempSync(join(tmpdir(), 'vitrine-'));
-		for (const path of [...NEEDED_TO_BUILD, ...PRIVATE_TO_THE_CHECKOUT, ...USELESS_AT_RUNTIME, ...LEFT_BY_LOCAL_WORK]) {
+		for (const path of [...NEEDED_TO_BUILD, ...LEFT_OUT.map(([path]) => path)]) {
 			mkdirSync(dirname(join(checkout, path)), { recursive: true });
 			writeFileSync(join(checkout, path), 'planted by the test');
 		}
@@ -43,15 +62,7 @@ describe('the build context of the container image', () => {
 		expect(context).toEqual(expect.arrayContaining(NEEDED_TO_BUILD));
 	});
 
-	test.each(PRIVATE_TO_THE_CHECKOUT)('leaves out %s, which may hold real hostnames or secrets', (path) => {
-		expect(context).not.toContain(path);
-	});
-
-	test.each(USELESS_AT_RUNTIME)('leaves out %s, which the image does not need', (path) => {
-		expect(context).not.toContain(path);
-	});
-
-	test.each(LEFT_BY_LOCAL_WORK)('leaves out %s, which the build produces itself', (path) => {
+	test.each(LEFT_OUT)('leaves out %s, which %s', (path) => {
 		expect(context).not.toContain(path);
 	});
 });
