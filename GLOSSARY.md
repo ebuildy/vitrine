@@ -19,7 +19,7 @@ A person browsing Vitrine. A Visitor may have access to some Sources and not oth
 _Avoid_: User, customer, client
 
 **Administrator**:
-The DevOps person who runs a Vitrine installation, configures it through its Settings and may fork it to change its pages.
+The DevOps person who runs a Vitrine installation, configures it through its Settings and may fork it to change what Settings cannot.
 _Avoid_: Admin, operator, maintainer
 
 **Settings**:
@@ -35,12 +35,16 @@ The state of cached Source content older than its allowed age. Stale content is 
 _Avoid_: Expired, outdated
 
 **Route**:
-An association in Settings between a URL and a Controller.
+An association in Settings between a URL and a Controller, with an optional Template.
 _Avoid_: Path, page, mapping
 
 **Controller**:
 The named unit responsible for one kind of page, chosen by a Route.
 _Avoid_: Handler, view, page type
+
+**Template**:
+Astro markup written in Settings that replaces how a Route's Controller arranges the content of its page, usually by placing Components.
+_Avoid_: Layout, theme, page
 
 **Component**:
 A self-contained UI building block that can be placed on any page and presents its own content, warnings and errors.
