@@ -1,22 +1,27 @@
 ---
 import ImageList from '../components/ImageList.astro';
+import Arrangement from '../layouts/Arrangement.astro';
 import Layout from '../layouts/Layout.astro';
 import { getHarborSources } from '../settings.ts';
+import type { CompiledTemplate } from '../template-compiler.ts';
 
 interface Props {
 	source?: string;
 	project?: string;
+	template?: CompiledTemplate;
 }
 
-const { source, project } = Astro.props;
+const { source, project, template } = Astro.props;
 const sources = getHarborSources().filter(({ name }) => source === undefined || name === source);
 ---
 
 <Layout title="Images">
-	<h1>Images</h1>
-	{
-		sources.map(({ name, projects }) =>
-			(project ? [project] : projects).map((selected) => <ImageList source={name} project={selected} />),
-		)
-	}
+	<Arrangement template={template} source={source} project={project} title="Images">
+		<h1>Images</h1>
+		{
+			sources.map(({ name, projects }) =>
+				(project ? [project] : projects).map((selected) => <ImageList source={name} project={selected} />),
+			)
+		}
+	</Arrangement>
 </Layout>

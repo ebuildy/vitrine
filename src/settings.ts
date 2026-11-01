@@ -3,6 +3,8 @@ import { parse } from 'yaml';
 import { z } from 'zod';
 import { duplicates, routeProblems, routeSchema } from './router.ts';
 import type { Route } from './router.ts';
+import { templateProblems } from './template-checks.ts';
+import { compileTemplate, TemplateError } from './template-compiler.ts';
 
 const harborSourceSchema = z
 	.strictObject({
@@ -78,8 +80,9 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 		);
 	}
 
-	const { sources, routes, cacheStore } = parsed.data;
-	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources), ...cacheStoreProblems(cacheStore, env)];
+	const { sources, cacheStore } = parsed.data;
+	const { routes, problems: compileProblems } = templatesDisabled(env) ? { routes: parsed.data.routes, problems: [] } : compileRoutes(parsed.data.routes, sources);
+	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources), ...cacheStoreProblems(cacheStore, env), ...compileProblems];
 	if (problems.length > 0) throw new SettingsError(path, problems);
 
 	return {
@@ -91,6 +94,28 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 				: { ...source, token: source.tokenEnv ? env[source.tokenEnv] : undefined },
 		),
 	};
+}
+
+/** Any value counts, even `false`, so that a mistyped value never leaves Templates on. */
+function templatesDisabled(env: Record<string, string | undefined>) {
+	return Boolean(env.VITRINE_TEMPLATE_DISABLE);
+}
+
+function compileRoutes(routes: Route[], sources: z.infer<typeof sourceSchema>[]) {
+	const problems: string[] = [];
+	const compiled = routes.map((route) => {
+		if (!route.template) return route;
+		try {
+			const compiledRoute = { ...route, compiled: compileTemplate(route.template) };
+			problems.push(...templateProblems(route, sources));
+			return compiledRoute;
+		} catch (error) {
+			if (!(error instanceof TemplateError)) throw error;
+			problems.push(`Route "${route.url}": the Template does not compile: ${error.message}`);
+			return route;
+		}
+	});
+	return { routes: compiled, problems };
 }
 
 function sourceProblems(sources: z.infer<typeof sourceSchema>[], env: Record<string, string | undefined>) {
@@ -127,6 +152,30 @@ export function getSettings(): Settings {
 	const settings = loaded.get(path) ?? loadSettings(path);
 	loaded.set(path, settings);
 	return settings;
+}
+
+/** Reads and checks Settings once, before anything is served. Throws a SettingsError, and warns about Templates, which run as code. */
+export function prepareSettings() {
+	loadEnvFile();
+	const urls = getSettings()
+		.routes.filter(({ template }) => template)
+		.map(({ url }) => `"${url}"`)
+		.join(', ');
+	if (!urls) return;
+	console.warn(
+		templatesDisabled(process.env)
+			? `VITRINE_TEMPLATE_DISABLE is set, so these Routes ignore their Template: ${urls}`
+			: `The Templates of these Routes run as code on the server, so only people trusted with the server may edit Settings: ${urls}`,
+	);
+}
+
+/** What a Template may print of each Source. It names what to keep, so a secret added to a Source later stays out. */
+export function publicSources(sources: Source[]) {
+	return sources.map((source) =>
+		source.type === 'harbor'
+			? { name: source.name, type: source.type, url: source.url, projects: source.projects }
+			: { name: source.name, type: source.type, url: source.url, mainGroups: source.mainGroups },
+	);
 }
 
 export function getHarborSources(): HarborSource[] {

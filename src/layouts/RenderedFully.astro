@@ -1,0 +1,11 @@
+---
+// Waiting for the whole Template lets a failure replace all of it, so that a broken page shows no half of a Template.
+let html: string | undefined;
+try {
+	html = await Astro.slots.render('default');
+} catch (error) {
+	console.error(`The Template of ${Astro.url.pathname} failed:`, error);
+}
+---
+
+{html === undefined ? <p role="alert">This page could not be shown.</p> : <Fragment set:html={html} />}

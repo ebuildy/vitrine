@@ -78,3 +78,41 @@ routes:
   # Epics need GitLab 18.1 or later on a tier that includes them. Otherwise the Roadmap shows an error.
   - url: /roadmap/:group+
     controller: gitlab-roadmap
+  # A Template rearranges what a Controller shows inside the page, on any Route. It is Astro markup, compiled when
+  # Vitrine starts, so a change needs a restart and no rebuild. The Controller keeps not found, the "could not be
+  # loaded" page, the page title and <head>. A YAML anchor shares one Template between Routes.
+  #
+  # Settings is code once it holds a Template: a Template runs on the server and can read every environment variable,
+  # tokens included. Only let people trusted with the server edit this file, and set VITRINE_TEMPLATE_DISABLE to any
+  # non-empty value, even false, to refuse: Routes then show their Controller's own page and the warning names them.
+  #
+  # A Template can use, with no import:
+  #   - every Component, under its file name in src/components
+  #   - source, group and project: the Route's values, undefined where a Route has none
+  #   - path: the full Project path, on gitlab-project Routes, as project is only its last segment
+  #   - title and description: those of the page, where the Controller has them
+  #   - sources: each Source's name, type, url and projects or mainGroups, with no token or password
+  #   - Astro, as in any Astro file, such as Astro.url
+  #
+  # Frontmatter, {…} expressions, free HTML, scoped <style> and <script> all work. Startup stops, naming the Route, on
+  # a Template that does not compile, an unknown Component, a missing or unknown prop, a Component of the wrong Source
+  # type, and a fixed source that does not exist or a fixed group or project outside every Main Group. Values computed
+  # in {…} are not checked: an error there is logged, and Visitors see a short alert inside the page.
+  #
+  # Limits: `import` does not work, as project files do not exist in the build output. `client:*` islands do not work,
+  # as they need the build. A Template cannot set a status code or redirect, and it cannot place the Controller's own
+  # content: to keep part of it, place the same Components.
+  - url: /overview
+    controller: gitlab-group
+    params:
+      group: platform
+    template: |
+      ---
+      const highlighted = ['platform/backend', 'platform/frontend'];
+      ---
+      <h1 class="overview">{title}</h1>
+      <GitlabProjectList source={source} group={group} />
+      {highlighted.map((path) => <GitlabGroupSummary source={source} group={path} />)}
+      <style>
+        .overview { text-transform: uppercase; }
+      </style>

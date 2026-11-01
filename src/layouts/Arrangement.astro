@@ -1,0 +1,33 @@
+---
+import * as runtime from 'astro/runtime/server/index.js';
+import { componentList } from '../component-list.ts';
+import { getSettings, publicSources } from '../settings.ts';
+import type { CompiledTemplate } from '../template-compiler.ts';
+import RenderedFully from './RenderedFully.astro';
+
+interface Props {
+	template?: CompiledTemplate;
+	title?: string;
+	description?: string;
+	source?: string;
+	group?: string;
+	project?: string;
+	path?: string;
+}
+
+const modules = import.meta.glob<{ default: unknown }>('../components/*.astro', { eager: true });
+const components = Object.fromEntries(Object.keys(componentList).map((name) => [name, modules[`../components/${name}.astro`].default]));
+
+const { template, ...values } = Astro.props;
+const Template = template?.(runtime as never, { ...components, ...values, sources: publicSources(getSettings().sources) });
+---
+
+{
+	Template ? (
+		<RenderedFully>
+			<Template />
+		</RenderedFully>
+	) : (
+		<slot />
+	)
+}

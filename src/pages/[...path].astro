@@ -40,6 +40,7 @@ const Controller = controllers[match.route.controller];
 const { source, group, project } = match.params;
 const subject = await subjectReaders[match.route.controller]?.(match.params);
 if (subject && !subject.error && !subject.data) return new Response(null, { status: 404 });
+Astro.locals.showsTemplate = Boolean(match.route.compiled) && !subject?.error;
 ---
 
 {
@@ -50,6 +51,6 @@ if (subject && !subject.error && !subject.data) return new Response(null, { stat
 			</p>
 		</Layout>
 	) : (
-		<Controller {...match.params} title={subject?.data?.name} description={subject?.data?.description} />
+		<Controller {...match.params} title={subject?.data?.name} description={subject?.data?.description} template={match.route.compiled} />
 	)
 }

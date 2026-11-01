@@ -1,15 +1,20 @@
 ---
 import HarborProjectList from '../components/HarborProjectList.astro';
+import Arrangement from '../layouts/Arrangement.astro';
 import Layout from '../layouts/Layout.astro';
+import type { CompiledTemplate } from '../template-compiler.ts';
 
 interface Props {
 	source: string;
+	template?: CompiledTemplate;
 }
 
-const { source } = Astro.props;
+const { source, template } = Astro.props;
 ---
 
 <Layout title={source}>
-	<h1>{source}</h1>
-	<HarborProjectList source={source} />
+	<Arrangement template={template} source={source} title={source}>
+		<h1>{source}</h1>
+		<HarborProjectList source={source} />
+	</Arrangement>
 </Layout>

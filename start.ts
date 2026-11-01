@@ -1,8 +1,7 @@
-import { getSettings, loadEnvFile, SettingsError } from './src/settings.ts';
+import { prepareSettings, SettingsError } from './src/settings.ts';
 
 try {
-	loadEnvFile();
-	getSettings();
+	prepareSettings();
 } catch (error) {
 	console.error(error instanceof SettingsError ? error.message : error);
 	process.exit(1);

@@ -1,19 +1,25 @@
 ---
 import GitlabGroupIssues from '../components/GitlabGroupIssues.astro';
 import GitlabGroupSummary from '../components/GitlabGroupSummary.astro';
+import Arrangement from '../layouts/Arrangement.astro';
 import Layout from '../layouts/Layout.astro';
+import type { CompiledTemplate } from '../template-compiler.ts';
 
 interface Props {
 	source: string;
 	group: string;
 	title: string;
 	description: string;
+	template?: CompiledTemplate;
 }
 
-const { source, group, title, description } = Astro.props;
+const { source, group, title, description, template } = Astro.props;
+const pageTitle = `${title} Issues`;
 ---
 
-<Layout title={`${title} Issues`} description={description}>
-	<GitlabGroupSummary source={source} group={group} />
-	<GitlabGroupIssues source={source} group={group} />
+<Layout title={pageTitle} description={description}>
+	<Arrangement template={template} source={source} group={group} title={pageTitle} description={description}>
+		<GitlabGroupSummary source={source} group={group} />
+		<GitlabGroupIssues source={source} group={group} />
+	</Arrangement>
 </Layout>

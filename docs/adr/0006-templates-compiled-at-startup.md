@@ -13,8 +13,9 @@ A Route may carry a Template, Astro markup written inline in Settings that repla
 ## Consequences
 
 - Settings is code. A Template can read any environment variable, including Source tokens, and do anything the server process can, so only people trusted with the server may edit Settings. Editing Settings already allowed sending a token elsewhere, through a Source's `url`.
-- Vitrine logs a warning at startup when it compiles Templates. Setting `VITRINE_TEMPLATE_DISABLE` to any non-empty value, even `false`, so that a mistyped value never leaves Templates on, stops them being compiled or run: each Route then shows its Controller's own arrangement, and the warning names the Templates ignored.
-- The Astro compiler and its native binary are needed in production, not only to build.
+- Vitrine logs a warning at startup when it compiles Templates. Setting `VITRINE_TEMPLATE_DISABLE` to any non-empty value, even `false`, so that a mistyped value never leaves Templates on, stops them being compiled or run: each Route then shows its Controller's own Arrangement, and the warning names the Templates ignored.
+- The Astro compiler and its native binary are needed in production, not only to build. The Container image, on `node:24-slim`, compiled and served a Template on both `linux/arm64` and `linux/amd64`.
+- Compiled Templates run through Astro's runtime as the build bundled it, handed in by the page, so Components stay recognised. As the build has no file for a Template, its `<style>` is written inline and its `<script>` goes in the page, both in the body, as `<head>` stays the Layout's.
 - `import` of project files does not work, as they do not exist in the build output, and neither do `client:*` islands, as they need the build. Vitrine puts Components and Route values in a Template's scope instead.
 - Startup cannot fully check code inside `{…}`, so some mistakes only appear when a Visitor opens the page. Such a failure is logged and shown as a short alert inside the Layout, so a Template renders fully before it is sent and is not streamed.
 - A Template cannot set a status code or redirect, as those stay with the page around it.

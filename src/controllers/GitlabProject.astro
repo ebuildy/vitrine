@@ -5,7 +5,9 @@ import GitlabProjectIssues from '../components/GitlabProjectIssues.astro';
 import GitlabProjectSummary from '../components/GitlabProjectSummary.astro';
 import GitlabReadme from '../components/GitlabReadme.astro';
 import GitlabReleaseList from '../components/GitlabReleaseList.astro';
+import Arrangement from '../layouts/Arrangement.astro';
 import Layout from '../layouts/Layout.astro';
+import type { CompiledTemplate } from '../template-compiler.ts';
 
 interface Props {
 	source: string;
@@ -13,25 +15,28 @@ interface Props {
 	project: string;
 	title: string;
 	description: string;
+	template?: CompiledTemplate;
 }
 
-const { source, group, project, title, description } = Astro.props;
+const { source, group, project, title, description, template } = Astro.props;
 const path = `${group}/${project}`;
 ---
 
 <Layout title={title} description={description}>
-	<GitlabProjectSummary source={source} project={path} />
-	<div class="columns">
-		<main>
-			<GitlabReadme source={source} project={path} />
-			<GitlabCommitList source={source} project={path} />
-			<GitlabProjectIssues source={source} project={path} />
-		</main>
-		<aside>
-			<GitlabReleaseList source={source} project={path} />
-			<GitlabContributorList source={source} project={path} />
-		</aside>
-	</div>
+	<Arrangement template={template} source={source} group={group} project={project} path={path} title={title} description={description}>
+		<GitlabProjectSummary source={source} project={path} />
+		<div class="columns">
+			<main>
+				<GitlabReadme source={source} project={path} />
+				<GitlabCommitList source={source} project={path} />
+				<GitlabProjectIssues source={source} project={path} />
+			</main>
+			<aside>
+				<GitlabReleaseList source={source} project={path} />
+				<GitlabContributorList source={source} project={path} />
+			</aside>
+		</div>
+	</Arrangement>
 </Layout>
 
 <style>

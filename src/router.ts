@@ -1,6 +1,7 @@
 import { z } from 'zod';
 // Only types may come from settings.ts: it needs routeSchema as soon as it loads, so importing it here would be a cycle.
 import type { GitlabSource, Settings, Source } from './settings.ts';
+import type { CompiledTemplate } from './template-compiler.ts';
 
 const controllerParamsSchemas = {
 	harbor: z.strictObject({ source: z.string() }),
@@ -15,7 +16,7 @@ const controllerParamsSchemas = {
 
 export type ControllerName = keyof typeof controllerParamsSchemas;
 
-const controllerSourceTypes: Record<ControllerName, Source['type']> = {
+export const controllerSourceTypes: Record<ControllerName, Source['type']> = {
 	harbor: 'harbor',
 	'harbor-images': 'harbor',
 	'gitlab-group': 'gitlab',
@@ -31,9 +32,11 @@ export const routeSchema = z.strictObject({
 		.refine((url) => url === '/' || !url.endsWith('/'), { message: 'must not end with a trailing slash' }),
 	controller: z.enum(Object.keys(controllerParamsSchemas) as [ControllerName, ...ControllerName[]]),
 	params: z.record(z.string(), z.string()).default({}),
+	template: z.string().min(1).optional(),
 });
 
-export type Route = z.infer<typeof routeSchema>;
+/** Settings adds `compiled` to a Route whose Template runs, so a Route never needs to know whether Templates are disabled. */
+export type Route = z.infer<typeof routeSchema> & { compiled?: CompiledTemplate };
 
 export function routeProblems(routes: Route[], sources: Source[]) {
 	const problems = duplicates(routes.map((route) => route.url)).map((url) => `Route "${url}" is declared twice`);
@@ -65,7 +68,7 @@ export function duplicates(values: string[]) {
 	return [...new Set(values.filter((value, index) => values.indexOf(value) !== index))];
 }
 
-function urlParamNames(url: string) {
+export function urlParamNames(url: string) {
 	return url
 		.split('/')
 		.filter((segment) => segment.startsWith(':'))

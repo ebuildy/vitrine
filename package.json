@@ -17,6 +17,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@astrojs/compiler-rs": "^0.5.2",
     "@astrojs/node": "^11.1.9",
     "astro": "^7.4.4",
     "ioredis": "^5.11.1",

@@ -38,8 +38,30 @@ routes:
     controller: harbor-images
     params:
       source: tools-harbor
+  # A Template rearranges a page. See settings.example.yaml for what one can use.
+  - url: /welcome
+    controller: harbor-images
+    template: |
+      ---
+      const harbors = sources.filter(({ type }) => type === 'harbor');
+      ---
+      <h1 class="welcome">Welcome to the demo</h1>
+      <p>A Template in demo/settings.yaml arranges what you see here.</p>
+      {harbors.map(({ name, projects }) => (
+        <section>
+          <h2>{name}</h2>
+          {projects.map((project) => <ImageList source={name} project={project} />)}
+        </section>
+      ))}
+      <style>
+        .welcome { color: teal; }
+      </style>
   - url: /harbor/:source
     controller: harbor
+    template: |
+      <h1>{source}</h1>
+      <HarborProjectList source={source} />
+      <GitlabGroupList source="main-gitlab" group="platform" />
   - url: /harbor/:source/:project
     controller: harbor-images
   - url: /gitlab/:group+
