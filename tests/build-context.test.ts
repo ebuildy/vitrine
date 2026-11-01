@@ -23,7 +23,7 @@ const LEFT_OUT = [
 	['docs/adr/0001.md', 'the image does not need'],
 	['README.md', 'the image does not need'],
 	['compose.yaml', 'the image does not need'],
-	['Dockerfile', 'the image does not need'],
+	['Containerfile', 'the image does not need'],
 	['node_modules/yaml/package.json', 'the build produces itself'],
 	['src/node_modules/yaml/package.json', 'the build produces itself'],
 	['dist/server/entry.mjs', 'the build produces itself'],
@@ -35,7 +35,7 @@ describe('the build context of the container image', () => {
 	let checkout: string;
 	let context: string[];
 
-	/** Hands a developer's checkout to the real engine and collects what a COPY in the Dockerfile would receive. */
+	/** Hands a developer's checkout to the real engine and collects what a COPY in the Containerfile would receive. */
 	beforeAll(() => {
 		checkout = mkdtempSync(join(tmpdir(), 'vitrine-'));
 		for (const path of [...NEEDED_TO_BUILD, ...LEFT_OUT.map(([path]) => path)]) {
