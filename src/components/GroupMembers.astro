@@ -8,12 +8,14 @@ interface Props {
 }
 
 const { source, group } = Astro.props;
-const { data: members, stale } = await listMembers(getGitlabSource(source), group);
+const { data: members, stale, detailsStale, detailsMissing } = await listMembers(getGitlabSource(source), group);
 ---
 
 <section>
 	<h2>Members</h2>
 	{stale && <p role="status">This list is Stale because {source} is down.</p>}
+	{!stale && detailsStale && <p role="status">Details of some Members are Stale because {source} is down.</p>}
+	{detailsMissing && <p role="alert">Details of some Members could not be loaded from {source}.</p>}
 	{
 		!members ? (
 			<p role="alert">Members could not be loaded from {source}.</p>

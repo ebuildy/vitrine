@@ -63,6 +63,7 @@ beforeAll(async () => {
 		sources: [
 			gitlabSource('main-gitlab', gitlab.url),
 			gitlabSource('empty-gitlab', emptyGitlab.url),
+			gitlabSource('stale-details', gitlab.url, 5),
 			...components.flatMap(({ name }) => [gitlabSource(`stale-${name}`, gitlab.url, 5), gitlabSource(`down-${name}`, gitlab.url)]),
 		],
 		routes: [
@@ -129,6 +130,18 @@ test('shows every Project when they span several API pages', async () => {
 
 test('shows every Member when they span several API pages', async () => {
 	expect(await render(GroupMembers, { source: 'main-gitlab', group: 'platform' })).toContain('Person 119');
+});
+
+test('warns when the details of some Members are Stale because the Source cannot give them', async () => {
+	vi.useFakeTimers({ toFake: ['Date'] });
+	await render(GroupMembers, { source: 'stale-details', group: 'platform' });
+
+	vi.advanceTimersByTime(6 * 60_000);
+	gitlab.behave('down-profiles');
+	const html = await render(GroupMembers, { source: 'stale-details', group: 'platform' });
+
+	expect(html).toContain('Details of some Members are Stale');
+	expect(html).not.toContain('This list is Stale');
 });
 
 test('shows an error for a Group outside the Main Groups', async () => {

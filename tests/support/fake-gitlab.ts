@@ -6,6 +6,8 @@ import type { AddressInfo } from 'node:net';
 export interface FakeGitlabMember {
 	id: number;
 	name: string;
+	/** Made from the name when left out. */
+	username?: string;
 	/** GitLab's own value, which is active unless set. */
 	state?: string;
 	avatar_url?: string | null;
@@ -15,6 +17,8 @@ export interface FakeGitlabMember {
 	bot?: boolean;
 	/** The private email, which GitLab only gives a GitLab admin's token: set it to be read with one. */
 	email?: string;
+	/** What GitLab answers for this profile instead of giving it. */
+	profileStatus?: number;
 }
 
 export interface FakeGitlabGroup {
@@ -63,8 +67,11 @@ export interface FakeGitlabOptions {
 	token?: string;
 }
 
-/** up answers at once, slow after a short wait, down with a 503, and hanging never. The after-lists variants only hit requests about one Project. */
-export type FakeGitlabBehaviour = 'up' | 'slow' | 'down' | 'down-after-lists' | 'hanging' | 'hanging-after-lists';
+/**
+ * up answers at once, slow after a short wait, down with a 503, and hanging never.
+ * The after-lists variants only hit requests about one Project, and the profiles variants only Member profiles.
+ */
+export type FakeGitlabBehaviour = 'up' | 'slow' | 'down' | 'down-after-lists' | 'down-profiles' | 'hanging' | 'hanging-after-lists' | 'hanging-profiles';
 
 export interface FakeGitlab {
 	url: string;
@@ -103,8 +110,9 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 		web_url: `${baseUrl}/${project.path}`,
 	});
 	/** GitLab keeps location, public email and whether an account is a bot to its profile. */
-	const memberJson = ({ id, name, state, avatar_url }: FakeGitlabMember) => ({
+	const memberJson = ({ id, name, username, state, avatar_url }: FakeGitlabMember) => ({
 		id,
+		username: username ?? name.toLowerCase().replaceAll(' ', '.'),
 		name,
 		state: state ?? 'active',
 		avatar_url: avatar_url ?? null,
@@ -123,8 +131,10 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 	const handle = async (request: IncomingMessage, response: ServerResponse) => {
 		const url = new URL(request.url ?? '/', 'http://fake-gitlab');
 		requests.push(`${url.pathname}${url.search}`);
-		if (behaviour === 'hanging' || (behaviour === 'hanging-after-lists' && url.pathname.startsWith('/api/v4/projects/'))) return;
-		if (behaviour === 'down' || (behaviour === 'down-after-lists' && url.pathname.startsWith('/api/v4/projects/'))) {
+		const aboutProject = url.pathname.startsWith('/api/v4/projects/');
+		const aboutProfile = url.pathname.startsWith('/api/v4/users/');
+		if (behaviour === 'hanging' || (behaviour === 'hanging-after-lists' && aboutProject) || (behaviour === 'hanging-profiles' && aboutProfile)) return;
+		if (behaviour === 'down' || (behaviour === 'down-after-lists' && aboutProject) || (behaviour === 'down-profiles' && aboutProfile)) {
 			response.writeHead(503).end();
 			return;
 		}
@@ -144,6 +154,7 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 		if (profileMatch) {
 			const member = allMembers().find(({ id }) => id === Number(profileMatch[1]));
 			if (profilesRefused) response.writeHead(403).end();
+			else if (member?.profileStatus) response.writeHead(member.profileStatus).end();
 			else if (member) respondWithJson(response, profileJson(member));
 			else response.writeHead(404).end();
 			return;

@@ -490,6 +490,7 @@ describe('Members when GitLab holds something back', () => {
 	const ada = { id: 1, name: 'Ada Lovelace', avatar_url: 'http://gitlab.test/ada.png' };
 
 	const running: { gitlab: FakeGitlab; vitrine: RunningVitrine }[] = [];
+	const open = async ({ url }: RunningVitrine) => (await fetch(`${url}/gitlab/platform`)).text();
 	const start = async (options: Parameters<typeof startFakeGitlab>[0]) => {
 		const gitlab = await startFakeGitlab(options);
 		const vitrine = await startVitrine({ sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform'] }], routes });
@@ -507,17 +508,80 @@ describe('Members when GitLab holds something back', () => {
 	test('still shows the Member when GitLab refuses their profile', async () => {
 		const { vitrine } = await start({ groups: [{ path: 'platform', members: [ada] }], profilesRefused: true });
 
-		const html = await (await fetch(`${vitrine.url}/gitlab/platform`)).text();
+		const html = await open(vitrine);
 
 		expect(html).toContain('Ada Lovelace');
 		expect(html).not.toContain('could not be loaded');
+	});
+
+	test('keeps the list when profiles fail, and fills in the details once they can be read', async () => {
+		const { gitlab, vitrine } = await start({ groups: [{ path: 'platform', members: [{ ...ada, location: 'London' }] }] });
+		gitlab.behave('down-profiles');
+
+		const first = await open(vitrine);
+
+		expect(first).toContain('Ada Lovelace');
+		expect(first).toContain('src="http://gitlab.test/ada.png"');
+		expect(first).not.toContain('London');
+		expect(first).toContain('Details of some Members could not be loaded');
+		expect(first).not.toContain('>Members could not be loaded');
+
+		gitlab.behave('up');
+		const second = await open(vitrine);
+
+		expect(second).toContain('London');
+		expect(second).not.toContain('Details of some Members');
+		expect(gitlab.requests.filter((request) => request.startsWith('/api/v4/groups/platform/members/all'))).toHaveLength(1);
+	});
+
+	test('keeps the list when GitLab limits the rate of profiles', async () => {
+		const { vitrine } = await start({ groups: [{ path: 'platform', members: [{ ...ada, profileStatus: 429 }] }] });
+
+		const html = await open(vitrine);
+
+		expect(html).toContain('Ada Lovelace');
+		expect(html).toContain('Details of some Members could not be loaded');
+	});
+
+	test('stops reading profiles at the first batch that fails', async () => {
+		const members = Array.from({ length: 25 }, (_, index) => ({ id: index + 1, name: `Member ${index}` }));
+		const { gitlab, vitrine } = await start({ groups: [{ path: 'platform', members }] });
+		gitlab.behave('down-profiles');
+
+		const html = await open(vitrine);
+
+		expect(html).toContain('Member 24');
+		expect(gitlab.requests.filter((request) => request.startsWith('/api/v4/users/'))).toHaveLength(10);
+	});
+
+	test('reads the other profiles past one GitLab cannot find', async () => {
+		const members = Array.from({ length: 12 }, (_, index) => ({ id: index + 1, name: `Member ${index + 10}`, location: `City ${index + 10}` }));
+		const { vitrine } = await start({ groups: [{ path: 'platform', members: [{ ...members[0], profileStatus: 404 }, ...members.slice(1)] }] });
+
+		const html = await open(vitrine);
+
+		expect(html).toContain('Member 10');
+		expect(html).toContain('City 21');
+		expect(html).not.toContain('could not be loaded');
+	});
+
+	test('shows the list after one Source timeout when profiles hang', async () => {
+		const { gitlab, vitrine } = await start({ groups: [{ path: 'platform', members: [ada] }] });
+		gitlab.behave('hanging-profiles');
+
+		const started = Date.now();
+		const html = await open(vitrine);
+
+		expect(Date.now() - started).toBeLessThan(15_000);
+		expect(html).toContain('Ada Lovelace');
+		expect(html).toContain('Details of some Members could not be loaded');
 	});
 
 	test('limits a failure to the Members section', async () => {
 		const { gitlab, vitrine } = await start({ groups: [{ path: 'platform', members: [ada] }], projects: [{ path: 'platform/api' }] });
 		gitlab.behave('down-after-lists');
 
-		const html = await (await fetch(`${vitrine.url}/gitlab/platform`)).text();
+		const html = await open(vitrine);
 
 		expect(html).toContain('href="/gitlab/platform/-/api"');
 		expect(html).toContain('Members could not be loaded');
@@ -528,7 +592,7 @@ describe('Members when GitLab holds something back', () => {
 		gitlab.behave('hanging-after-lists');
 
 		const started = Date.now();
-		const html = await (await fetch(`${vitrine.url}/gitlab/platform`)).text();
+		const html = await open(vitrine);
 
 		expect(Date.now() - started).toBeLessThan(15_000);
 		expect(html).toContain('Members could not be loaded');

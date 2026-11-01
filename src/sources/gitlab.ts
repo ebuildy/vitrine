@@ -3,12 +3,14 @@ import type { CachedContent, Loader } from '../content-cache.ts';
 import { findMainGroup } from '../router.ts';
 import type { GitlabSource } from '../settings.ts';
 import * as gitlabApi from './gitlab-api.ts';
-import type { Commit, Contributor, Group, Issue, MainGroupContent, Member, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
-
-// A card takes several requests, so a page of cards must not send them all at once.
-const CARDS_AT_ONCE = 5;
+import type { Commit, Contributor, Group, Issue, MainGroupContent, Member, MemberProfile, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
 
 export type Subgroup = Group & { projectCount: number };
+
+export type DetailedMember = Member & Partial<MemberProfile>;
+
+/** The list of Members, and how far their profiles could be read. */
+export type MemberList = CachedContent<DetailedMember[]> & { detailsStale?: boolean; detailsMissing?: boolean };
 
 export function getGroup(source: GitlabSource, path: string): Promise<CachedContent<Group | undefined>> {
 	return fromMainGroup(source, path, ({ groups }) => groups.find((group) => group.path === path));
@@ -30,37 +32,37 @@ export function getProject(source: GitlabSource, path: string): Promise<CachedCo
 	return fromMainGroup(source, path, ({ projects }) => projects.find((project) => project.path === path));
 }
 
-/** Members are cached whole per Main Group, apart from its other lists, as they fail and take time of their own. */
-export async function listMembers(source: GitlabSource, group: string): Promise<CachedContent<Member[]>> {
-	const mainGroup = findMainGroup(source, group);
-	if (!mainGroup) return { error: new Error(`"${group}" is outside the Main Groups of "${source.name}"`) };
+/**
+ * The list is cached whole per Main Group, apart from its other lists, as it fails and takes time of its own. Profiles
+ * are cached per Member, as they cost a request each: a Member whose profile is not read yet shows what the list gives.
+ */
+export async function listMembers(source: GitlabSource, group: string): Promise<MemberList> {
+	const list = await inMainGroup(source, group, (mainGroup) =>
+		readSource(source, `${source.name}/members/${mainGroup}`, async (signal) => {
+			const content = await fromMainGroup(source, mainGroup, (mainGroupContent) => mainGroupContent);
+			if (content.error) throw content.error;
+			return gitlabApi.readMembers(source, content.data, signal);
+		}),
+	);
+	if (list.error) return list;
 
-	const members = await readSource(source, `${source.name}/members/${mainGroup}`, async (signal) => {
-		const content = await fromMainGroup(source, mainGroup, (mainGroupContent) => mainGroupContent);
-		if (content.error) throw content.error;
-		return gitlabApi.readMembers(source, content.data, signal);
-	});
-	if (members.error) return members;
-	return { data: members.data.filter(({ paths }) => paths.some((path) => path === group || path.startsWith(`${group}/`))), stale: members.stale };
+	const members = list.data.filter(({ paths }) => paths.some((path) => path === group || path.startsWith(`${group}/`)));
+	const profiles = await readWhileUp(members, gitlabApi.MEMBER_READS_AT_ONCE, (member) =>
+		readSource(source, `${source.name}/member/${member.id}/profile`, (signal) => gitlabApi.readMemberProfile(source, member, signal)),
+	);
+	return {
+		data: members.map((member, index) => ({ ...member, ...profiles[index]?.data })).filter(({ bot }) => !bot),
+		stale: list.stale,
+		detailsStale: profiles.some(({ stale }) => stale),
+		detailsMissing: profiles.length < members.length || profiles.some(({ error }) => error),
+	};
 }
 
-/**
- * Reads cards in list order and may stop early, as they must not hold a page back: past one Source timeout,
- * or once a Source fails, the rest stay unread and fill in as Visitors come back. Stale cards do not stop it.
- */
-export async function readProjectCards(source: GitlabSource, projects: Project[]): Promise<CachedContent<ProjectCard>[]> {
-	const cards: CachedContent<ProjectCard>[] = [];
-	const started = Date.now();
-	for (let start = 0; start < projects.length; start += CARDS_AT_ONCE) {
-		const batch = await Promise.all(
-			projects
-				.slice(start, start + CARDS_AT_ONCE)
-				.map((project) => readSource(source, `${source.name}/project/${project.path}/card`, (signal) => gitlabApi.readProjectCard(source, project, signal))),
-		);
-		cards.push(...batch);
-		if (batch.some(({ error }) => error) || Date.now() - started >= SOURCE_TIMEOUT_MS) break;
-	}
-	return cards;
+/** Reads cards in list order and may stop early, as readWhileUp tells. */
+export function readProjectCards(source: GitlabSource, projects: Project[]): Promise<CachedContent<ProjectCard>[]> {
+	return readWhileUp(projects, gitlabApi.CARDS_AT_ONCE, (project) =>
+		readSource(source, `${source.name}/project/${project.path}/card`, (signal) => gitlabApi.readProjectCard(source, project, signal)),
+	);
 }
 
 export function getReadme(source: GitlabSource, path: string): Promise<CachedContent<Readme | undefined>> {
@@ -92,12 +94,31 @@ async function fromProject<T>(source: GitlabSource, path: string, kind: string, 
 }
 
 /** Lists are cached whole per Main Group, so every page and search reads the same data. */
-async function fromMainGroup<T>(source: GitlabSource, path: string, pick: (content: MainGroupContent) => T): Promise<CachedContent<T>> {
-	const mainGroup = findMainGroup(source, path);
-	if (!mainGroup) return { error: new Error(`"${path}" is outside the Main Groups of "${source.name}"`) };
+function fromMainGroup<T>(source: GitlabSource, path: string, pick: (content: MainGroupContent) => T): Promise<CachedContent<T>> {
+	return inMainGroup(source, path, async (mainGroup) => {
+		const content = await readSource(source, `${source.name}/main-group/${mainGroup}`, (signal) => gitlabApi.readMainGroup(source, mainGroup, signal));
+		return content.error ? content : { data: pick(content.data), stale: content.stale };
+	});
+}
 
-	const content = await readSource(source, `${source.name}/main-group/${mainGroup}`, (signal) => gitlabApi.readMainGroup(source, mainGroup, signal));
-	return content.error ? content : { data: pick(content.data), stale: content.stale };
+async function inMainGroup<T>(source: GitlabSource, path: string, read: (mainGroup: string) => Promise<CachedContent<T>>): Promise<CachedContent<T>> {
+	const mainGroup = findMainGroup(source, path);
+	return mainGroup ? read(mainGroup) : { error: new Error(`"${path}" is outside the Main Groups of "${source.name}"`) };
+}
+
+/**
+ * Reads in list order and may stop early, as details must not hold a page back: past one Source timeout, or once
+ * a Source fails, the rest stay unread and fill in as Visitors come back. Stale details do not stop it.
+ */
+async function readWhileUp<T, R>(items: T[], atOnce: number, read: (item: T) => Promise<CachedContent<R>>): Promise<CachedContent<R>[]> {
+	const results: CachedContent<R>[] = [];
+	const started = Date.now();
+	for (let start = 0; start < items.length; start += atOnce) {
+		const batch = await Promise.all(items.slice(start, start + atOnce).map(read));
+		results.push(...batch);
+		if (batch.some(({ error }) => error) || Date.now() - started >= SOURCE_TIMEOUT_MS) break;
+	}
+	return results;
 }
 
 function parentOf(path: string) {
