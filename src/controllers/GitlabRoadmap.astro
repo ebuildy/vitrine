@@ -1,0 +1,21 @@
+---
+import GitlabEpics from '../components/GitlabEpics.astro';
+import GitlabGroupSummary from '../components/GitlabGroupSummary.astro';
+import GroupRoadmap from '../components/GroupRoadmap.astro';
+import Layout from '../layouts/Layout.astro';
+
+interface Props {
+	source: string;
+	group: string;
+	title: string;
+	description: string;
+}
+
+const { source, group, title, description } = Astro.props;
+---
+
+<Layout title={`${title} Roadmap`} description={description}>
+	<GitlabGroupSummary source={source} group={group} />
+	<GroupRoadmap source={source} group={group} />
+	<GitlabEpics source={source} group={group} />
+</Layout>

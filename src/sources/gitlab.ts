@@ -3,7 +3,9 @@ import type { CachedContent, Loader } from '../content-cache.ts';
 import { findMainGroup, isAtOrBeneath } from '../router.ts';
 import type { GitlabSource } from '../settings.ts';
 import * as gitlabApi from './gitlab-api.ts';
-import type { Commit, Contributor, DetailedMember, Group, Issue, MainGroupContent, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
+import type { Commit, Contributor, DetailedMember, Epic, Group, Issue, MainGroupContent, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
+
+export { EpicsUnavailableError } from './gitlab-api.ts';
 
 export type Subgroup = Group & { projectCount: number };
 
@@ -12,6 +14,11 @@ export type MemberList = CachedContent<DetailedMember[]> & { detailsStale?: bool
 
 export function getGroup(source: GitlabSource, path: string): Promise<CachedContent<Group | undefined>> {
 	return fromMainGroup(source, path, ({ groups }) => groups.find((group) => group.path === path));
+}
+
+/** Reads a Group only if it is a Main Group, for what exists once per Main Group. */
+export function getMainGroup(source: GitlabSource, path: string): Promise<CachedContent<Group | undefined>> {
+	return ifMainGroup(source, path, () => getGroup(source, path));
 }
 
 export function listSubgroups(source: GitlabSource, group: string): Promise<CachedContent<Subgroup[]>> {
@@ -60,6 +67,11 @@ export async function listMembers(source: GitlabSource, group: string, deep: boo
 	};
 }
 
+/** Lists the Epics of a Main Group, cached apart from its other lists, as a GitLab without Epics must not stop browsing. */
+export function listEpics(source: GitlabSource, path: string): Promise<CachedContent<Epic[] | undefined>> {
+	return ifMainGroup(source, path, () => readSource(source, `${source.name}/epics/${path}`, (signal) => gitlabApi.readEpics(source, path, signal)));
+}
+
 /** Reads cards in list order and may stop early, as readWhileUp tells. */
 export function readProjectCards(source: GitlabSource, projects: Project[]): Promise<CachedContent<ProjectCard>[]> {
 	return readWhileUp(projects, gitlabApi.CARDS_AT_ONCE, (project) =>
@@ -101,6 +113,11 @@ function fromMainGroup<T>(source: GitlabSource, path: string, pick: (content: Ma
 		const content = await readSource(source, `${source.name}/main-group/${mainGroup}`, (signal) => gitlabApi.readMainGroup(source, mainGroup, signal));
 		return content.error ? content : { data: pick(content.data), stale: content.stale };
 	});
+}
+
+/** What exists once per Main Group is not there for any other Group, which is no failure. */
+async function ifMainGroup<T>(source: GitlabSource, path: string, read: () => Promise<CachedContent<T>>): Promise<CachedContent<T | undefined>> {
+	return source.mainGroups.includes(path) ? read() : { data: undefined, stale: false };
 }
 
 async function inMainGroup<T>(source: GitlabSource, path: string, read: (mainGroup: string) => Promise<CachedContent<T>>): Promise<CachedContent<T>> {

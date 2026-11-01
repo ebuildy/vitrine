@@ -46,3 +46,5 @@ routes:
     controller: gitlab-group
   - url: /gitlab/:group+/-/:project
     controller: gitlab-project
+  - url: /roadmap/:group+
+    controller: gitlab-roadmap

@@ -71,3 +71,7 @@ routes:
   # Like GitLab, a "-" ends the Group path, as in /gitlab/platform/backend/-/api.
   - url: /gitlab/:group+/-/:project
     controller: gitlab-project
+  # Shows the open Epics of a Main Group and of everything beneath it on a timeline. Any other Group is not found.
+  # Epics need GitLab 18.1 or later on a tier that includes them. Otherwise the Roadmap shows an error.
+  - url: /roadmap/:group+
+    controller: gitlab-roadmap

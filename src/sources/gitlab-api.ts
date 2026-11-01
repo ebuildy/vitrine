@@ -1,3 +1,4 @@
+import { ContentUnavailableError } from '../content-cache.ts';
 import type { GitlabSource } from '../settings.ts';
 
 const PAGE_SIZE = 100;
@@ -100,6 +101,18 @@ export interface MemberProfile {
 
 export type DetailedMember = Member & MemberProfile;
 
+export interface Epic {
+	title: string;
+	webUrl: string;
+	startDate?: string;
+	dueDate?: string;
+	description?: string;
+	assignees: { name: string; avatarUrl?: string }[];
+	weight?: number;
+	/** The Issues beneath the Epic, at any depth. */
+	issues: { all: number; closed: number };
+}
+
 interface GitlabGroup {
 	full_path: string;
 	name: string;
@@ -162,6 +175,32 @@ interface GitlabProfile {
 	bot?: boolean;
 }
 
+/** The fields of every widget asked for, as each widget answers only its own. */
+interface GitlabEpicWidget {
+	startDate?: string | null;
+	dueDate?: string | null;
+	description?: string | null;
+	assignees?: { nodes: { name: string; avatarUrl: string | null }[] };
+	weight?: number | null;
+	rolledUpWeight?: number | null;
+	rolledUpCountsByType?: { workItemType: { name: string }; countsByState: { all: number; closed: number } }[];
+}
+
+interface GitlabEpic {
+	title: string;
+	confidential: boolean;
+	webUrl: string;
+	widgets: GitlabEpicWidget[];
+}
+
+interface GitlabEpicsPage {
+	workItemTypes: { nodes: { name: string }[] };
+	workItems: {
+		pageInfo: { hasNextPage: boolean; endCursor: string | null };
+		nodes: GitlabEpic[];
+	};
+}
+
 export async function readMainGroup(source: GitlabSource, mainGroup: string, signal: AbortSignal): Promise<MainGroupContent> {
 	const path = `/groups/${encodeURIComponent(mainGroup)}`;
 	const [group, subgroups, projects] = await Promise.all([
@@ -189,6 +228,72 @@ export async function readMainGroup(source: GitlabSource, mainGroup: string, sig
 			webUrl: item.web_url,
 		})),
 	};
+}
+
+// Epics are work items since GitLab 18.1, and the REST and GraphQL Epic APIs are deprecated in their favour.
+const EPICS_QUERY = `query Epics($fullPath: ID!, $types: [IssueType!], $state: IssuableState, $confidential: Boolean, $includeDescendants: Boolean, $first: Int, $after: String) {
+	group(fullPath: $fullPath) {
+		workItemTypes { nodes { name } }
+		workItems(types: $types, state: $state, confidential: $confidential, includeDescendants: $includeDescendants, first: $first, after: $after) {
+			pageInfo { hasNextPage endCursor }
+			nodes {
+				title
+				confidential
+				webUrl
+				widgets(onlyTypes: [START_AND_DUE_DATE, DESCRIPTION, ASSIGNEES, WEIGHT, HIERARCHY]) {
+					... on WorkItemWidgetStartAndDueDate { startDate dueDate }
+					... on WorkItemWidgetDescription { description }
+					... on WorkItemWidgetAssignees { assignees { nodes { name avatarUrl } } }
+					... on WorkItemWidgetWeight { weight rolledUpWeight }
+					... on WorkItemWidgetHierarchy { rolledUpCountsByType { workItemType { name } countsByState { all closed } } }
+				}
+			}
+		}
+	}
+}`;
+
+/** A GitLab without Epics, which no retry would change, unlike a Source that is down. */
+export class EpicsUnavailableError extends ContentUnavailableError {}
+
+export async function readEpics(source: GitlabSource, mainGroup: string, signal: AbortSignal): Promise<Epic[]> {
+	const epics: Epic[] = [];
+	let after: string | null = null;
+	do {
+		const { workItemTypes, workItems } = await readEpicsPage(source, mainGroup, after, signal);
+		const { pageInfo, nodes } = workItems;
+		// A tier without Epics answers an empty list, and only lacks the type. Types can be renamed, so listed Epics settle it.
+		if (nodes.length === 0 && !after && !workItemTypes.nodes.some(({ name }) => name === 'Epic')) {
+			throw new EpicsUnavailableError(`GitLab "${source.name}" has no Epics for "${mainGroup}"`);
+		}
+		// Checked again, as a confidential Epic must not reach the cache whatever the filter did.
+		for (const epic of nodes) {
+			if (!epic.confidential) epics.push(toEpic(source, epic));
+		}
+		after = pageInfo.hasNextPage ? pageInfo.endCursor : null;
+	} while (after);
+	return epics;
+}
+
+function toEpic(source: GitlabSource, { title, webUrl, widgets }: GitlabEpic): Epic {
+	const { startDate, dueDate, description, assignees, weight, rolledUpWeight, rolledUpCountsByType }: GitlabEpicWidget = Object.assign({}, ...widgets);
+	return {
+		title,
+		webUrl,
+		startDate: startDate ?? undefined,
+		dueDate: dueDate ?? undefined,
+		description: description ?? undefined,
+		// Unlike the REST API, GraphQL answers an avatar uploaded to GitLab with a path.
+		assignees: (assignees?.nodes ?? []).map(({ name, avatarUrl }) => ({ name, avatarUrl: avatarUrl ? new URL(avatarUrl, source.url).href : undefined })),
+		weight: weight ?? rolledUpWeight ?? undefined,
+		issues: rolledUpCountsByType?.find(({ workItemType }) => workItemType.name === 'Issue')?.countsByState ?? { all: 0, closed: 0 },
+	};
+}
+
+async function readEpicsPage(source: GitlabSource, mainGroup: string, after: string | null, signal: AbortSignal): Promise<GitlabEpicsPage> {
+	const variables = { fullPath: mainGroup, types: ['EPIC'], state: 'opened', confidential: false, includeDescendants: true, first: PAGE_SIZE, after };
+	const { group } = await fetchGraphql<{ group: GitlabEpicsPage | null }>(source, EPICS_QUERY, variables, signal);
+	if (!group) throw new Error(`GitLab "${source.name}" holds no Group "${mainGroup}" for this reader`);
+	return group;
 }
 
 /** GitLab has no list of everyone beneath a Group, so each Group and Project takes a request. */
@@ -297,6 +402,22 @@ async function inBatches<T, R>(items: T[], size: number, read: (item: T) => Prom
 	return results;
 }
 
+async function fetchGraphql<T>(source: GitlabSource, query: string, variables: Record<string, unknown>, signal: AbortSignal): Promise<T> {
+	const path = '/api/graphql';
+	const response = await fetch(`${baseUrl(source)}${path}`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json', ...(source.token ? { authorization: `Bearer ${source.token}` } : {}) },
+		body: JSON.stringify({ query, variables }),
+		signal,
+	});
+	assertOk(source, path, response);
+
+	const { data, errors } = await response.json();
+	// GitLab answers 200 for a query it could not run.
+	if (errors?.length) throw answerError(source, path, `"${errors[0].message}"`);
+	return data;
+}
+
 async function fetchJson<T>(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal): Promise<T> {
 	const response = await fetchApi(source, path, query, signal);
 	return response.json();
@@ -314,20 +435,32 @@ async function fetchAllPages<T>(source: GitlabSource, path: string, query: Recor
 async function fetchIfAllowed<T>(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal, refusals = [401, 403]): Promise<T | undefined> {
 	const response = await request(source, path, query, signal);
 	if (refusals.includes(response.status)) return undefined;
-	if (!response.ok) throw new Error(`GitLab "${source.name}" answered ${response.status} for ${path}`);
+	assertOk(source, path, response);
 	return response.json();
 }
 
 async function fetchApi(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal): Promise<Response> {
 	const response = await request(source, path, query, signal);
-	if (!response.ok) throw new Error(`GitLab "${source.name}" answered ${response.status} for ${path}`);
+	assertOk(source, path, response);
 	return response;
 }
 
+function assertOk(source: GitlabSource, path: string, response: Response) {
+	if (!response.ok) throw answerError(source, path, response.status);
+}
+
+function answerError(source: GitlabSource, path: string, answer: number | string) {
+	return new Error(`GitLab "${source.name}" answered ${answer} for ${path}`);
+}
+
 function request(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal): Promise<Response> {
-	// A GitLab can live under a path of its own, which a URL built from a leading slash would lose.
-	const url = new URL(`${source.url.replace(/\/$/, '')}/api/v4${path}`);
+	const url = new URL(`${baseUrl(source)}/api/v4${path}`);
 	url.search = new URLSearchParams(query).toString();
 
 	return fetch(url, { headers: source.token ? { 'private-token': source.token } : {}, signal });
+}
+
+/** A GitLab can live under a path of its own, which a URL built from a leading slash would lose. */
+function baseUrl(source: GitlabSource) {
+	return source.url.replace(/\/$/, '');
 }

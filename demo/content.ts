@@ -22,6 +22,8 @@ const linus: FakeGitlabMember = { id: 3, name: 'Linus Pauling', avatar_url: avat
 const margaret: FakeGitlabMember = { id: 4, name: 'Margaret Hamilton', location: 'Boston', public_email: 'margaret@example.com' };
 const alan: FakeGitlabMember = { id: 5, name: 'Alan Turing', avatar_url: avatar('Alan Turing', 120), location: 'Manchester' };
 const edsger: FakeGitlabMember = { id: 6, name: 'Edsger Dijkstra', avatar_url: avatar('Edsger Dijkstra', 340) };
+
+const assignee = ({ name, avatar_url }: FakeGitlabMember) => ({ name, avatarUrl: avatar_url ?? undefined });
 // Both left out of the Members list: one is not a person, the other no longer works here.
 const renovate: FakeGitlabMember = { id: 7, name: 'Renovate', username: 'project_12_bot_renovate', bot: true };
 const blocked: FakeGitlabMember = { id: 8, name: 'Former Colleague', state: 'blocked' };
@@ -111,12 +113,58 @@ const api: FakeGitlabProject = {
 
 export const gitlabContent: Omit<FakeGitlabOptions, 'token' | 'port'> = {
 	groups: [
-		{ path: 'platform', name: 'Platform', description: 'Everything the platform team runs', members: [ada, grace, blocked] },
-		{ path: 'platform/backend', name: 'Backend', description: 'Services behind the public API', members: [alan] },
-		{ path: 'platform/backend/billing', name: 'Billing', description: 'Invoices and payouts', members: [edsger] },
-		{ path: 'platform/frontend', name: 'Frontend', description: 'What customers see', notMember: true, members: [linus] },
+		{
+			path: 'platform',
+			name: 'Platform',
+			description: 'Everything the platform team runs',
+			members: [ada, grace, blocked],
+			epics: [
+				{
+					title: 'Public API v3',
+					startDate: '2026-09-01',
+					dueDate: '2027-02-26',
+					description: 'A **versioned** API, with [the old one](https://example.com/api/v2) kept for a year.',
+					assignees: [assignee(ada), assignee(alan)],
+					rolledUpWeight: 34,
+					issues: { all: 16, closed: 11 },
+				},
+				{
+					title: 'Move to the new data centre',
+					startDate: '2026-11-02',
+					dueDate: '2027-04-30',
+					description: 'Every service moves, one team at a time, with no downtime.',
+					assignees: [assignee(grace)],
+					weight: 55,
+					issues: { all: 24, closed: 3 },
+				},
+				{ title: 'Developer portal', startDate: '2027-01-11', dueDate: '2027-03-19', description: 'Docs and API keys in one place.', issues: { all: 4, closed: 0 } },
+				// One date is enough for the Gantt.
+				{ title: 'Pass the security audit', dueDate: '2026-12-15', assignees: [assignee(grace), assignee(ada)], weight: 8, issues: { all: 1, closed: 1 } },
+				// Nothing but a title, so the rest stays blank.
+				{ title: 'Replace the build farm' },
+				// All left out: Vitrine shows open Epics that are not confidential.
+				{ title: 'Respond to the signing key leak', confidential: true, startDate: '2026-10-20', dueDate: '2026-11-30' },
+				{ title: 'Migrate to Go modules', state: 'closed', startDate: '2026-03-02', dueDate: '2026-06-30' },
+			],
+		},
+		{
+			path: 'platform/backend',
+			name: 'Backend',
+			description: 'Services behind the public API',
+			members: [alan],
+			epics: [{ title: 'Idempotent webhooks', startDate: '2026-10-05', dueDate: '2026-12-18' }],
+		},
+		{
+			path: 'platform/backend/billing',
+			name: 'Billing',
+			description: 'Invoices and payouts',
+			members: [edsger],
+			epics: [{ title: 'Usage-based invoices', startDate: '2026-12-01', dueDate: '2027-01-29' }, { title: 'Refunds in the portal' }],
+		},
+		{ path: 'platform/frontend', name: 'Frontend', description: 'What customers see', notMember: true, members: [linus], epics: [{ title: 'Storefront redesign', startDate: '2026-11-16', dueDate: '2027-02-05' }] },
 		{ path: 'data', name: 'Data' },
-		{ path: 'data/analytics', name: 'Analytics', description: 'Dashboards and pipelines', members: [margaret], invitedGroups: ['platform/frontend'] },
+		// A tier without Epics, so its Roadmap shows an error.
+		{ path: 'data/analytics', name: 'Analytics', description: 'Dashboards and pipelines', members: [margaret], invitedGroups: ['platform/frontend'], epicsUnavailable: true },
 	],
 	projects: [
 		api,
