@@ -1,7 +1,7 @@
 ---
 import GitlabCommitList from '../components/GitlabCommitList.astro';
 import GitlabContributorList from '../components/GitlabContributorList.astro';
-import GitlabIssueList from '../components/GitlabIssueList.astro';
+import GitlabProjectIssues from '../components/GitlabProjectIssues.astro';
 import GitlabProjectSummary from '../components/GitlabProjectSummary.astro';
 import GitlabReadme from '../components/GitlabReadme.astro';
 import GitlabReleaseList from '../components/GitlabReleaseList.astro';
@@ -25,7 +25,7 @@ const path = `${group}/${project}`;
 		<main>
 			<GitlabReadme source={source} project={path} />
 			<GitlabCommitList source={source} project={path} />
-			<GitlabIssueList source={source} project={path} />
+			<GitlabProjectIssues source={source} project={path} />
 		</main>
 		<aside>
 			<GitlabReleaseList source={source} project={path} />

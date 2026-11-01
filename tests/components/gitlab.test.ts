@@ -4,7 +4,7 @@ import GitlabCommitList from '../../src/components/GitlabCommitList.astro';
 import GitlabContributorList from '../../src/components/GitlabContributorList.astro';
 import GitlabGroupList from '../../src/components/GitlabGroupList.astro';
 import GitlabGroupSummary from '../../src/components/GitlabGroupSummary.astro';
-import GitlabIssueList from '../../src/components/GitlabIssueList.astro';
+import GitlabProjectIssues from '../../src/components/GitlabProjectIssues.astro';
 import GitlabProjectList from '../../src/components/GitlabProjectList.astro';
 import GitlabProjectSummary from '../../src/components/GitlabProjectSummary.astro';
 import GitlabReadme from '../../src/components/GitlabReadme.astro';
@@ -41,7 +41,7 @@ const components = [
 	{ name: 'GitlabProjectSummary', component: GitlabProjectSummary, ...onProject, shown: 'View in GitLab', error: 'This Project could not be loaded', none: undefined },
 	{ name: 'GitlabReadme', component: GitlabReadme, ...onProject, shown: 'Hello', error: 'The README could not be loaded', none: 'No README found.' },
 	{ name: 'GitlabCommitList', component: GitlabCommitList, ...onProject, shown: 'Add login', error: 'Commits could not be loaded', none: 'No commits found.' },
-	{ name: 'GitlabIssueList', component: GitlabIssueList, ...onProject, shown: 'Fix login', error: 'Issues could not be loaded', none: 'No open Issues.' },
+	{ name: 'GitlabProjectIssues', component: GitlabProjectIssues, ...onProject, shown: 'Fix login', error: 'Issues could not be loaded', none: 'No open Issues.' },
 	{ name: 'GitlabReleaseList', component: GitlabReleaseList, ...onProject, shown: 'Spring', error: 'Releases could not be loaded', none: 'No releases found.' },
 	{ name: 'GitlabContributorList', component: GitlabContributorList, ...onProject, shown: 'Ada', error: 'Contributors could not be loaded', none: 'No contributors found.' },
 ];
