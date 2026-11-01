@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import { duplicates, routeProblems, routeSchema } from './router.ts';
@@ -112,6 +112,12 @@ function sourceProblems(sources: z.infer<typeof sourceSchema>[], env: Record<str
 
 function cacheStoreProblems(cacheStore: z.infer<typeof cacheStoreSchema>, env: Record<string, string | undefined>) {
 	return cacheStore.type === 'redis' && !env[cacheStore.urlEnv] ? [`The Redis cache store needs the environment variable ${cacheStore.urlEnv}`] : [];
+}
+
+/** Reads the secrets kept out of the environment for local work. A variable the environment already sets wins. */
+export function loadEnvFile() {
+	const path = process.env.VITRINE_ENV_FILE ?? '.env';
+	if (existsSync(path)) process.loadEnvFile(path);
 }
 
 const loaded = new Map<string, Settings>();

@@ -67,6 +67,8 @@ export interface FakeGitlabOptions {
 	profilesRefused?: boolean;
 	/** When set, requests must carry this token. */
 	token?: string;
+	/** Any free port when left out. */
+	port?: number;
 }
 
 /**
@@ -90,7 +92,7 @@ export interface FakeGitlab {
 }
 
 /** Answers the parts of GitLab's v4 API that Vitrine reads. */
-export async function startFakeGitlab({ groups, projects = [], avatars = {}, avatarsRefused, profilesRefused, token }: FakeGitlabOptions): Promise<FakeGitlab> {
+export async function startFakeGitlab({ groups, projects = [], avatars = {}, avatarsRefused, profilesRefused, token, port: requestedPort = 0 }: FakeGitlabOptions): Promise<FakeGitlab> {
 	const requests: string[] = [];
 	let behaviour: FakeGitlabBehaviour = 'up';
 	let baseUrl = '';
@@ -236,7 +238,7 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 	};
 
 	const server = createServer(handle);
-	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+	await new Promise<void>((resolve) => server.listen(requestedPort, '127.0.0.1', resolve));
 	const { port } = server.address() as AddressInfo;
 	baseUrl = `http://127.0.0.1:${port}`;
 	return {

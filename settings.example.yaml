@@ -1,5 +1,6 @@
 # Copy this file to settings.yaml, then replace the values with your own.
 # settings.yaml is ignored by git: never commit real hostnames.
+# Environment variables named below can also live in a .env file, see .env.example.
 
 sources:
   - name: main-harbor

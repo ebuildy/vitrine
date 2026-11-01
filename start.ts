@@ -1,6 +1,7 @@
-import { getSettings, SettingsError } from './src/settings.ts';
+import { getSettings, loadEnvFile, SettingsError } from './src/settings.ts';
 
 try {
+	loadEnvFile();
 	getSettings();
 } catch (error) {
 	console.error(error instanceof SettingsError ? error.message : error);

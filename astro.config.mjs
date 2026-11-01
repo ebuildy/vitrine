@@ -1,7 +1,7 @@
 // @ts-check
 import node from '@astrojs/node';
 import { defineConfig } from 'astro/config';
-import { getSettings } from './src/settings.ts';
+import { getSettings, loadEnvFile } from './src/settings.ts';
 
 // https://astro.build/config
 export default defineConfig({
@@ -13,6 +13,7 @@ export default defineConfig({
 			name: 'vitrine-settings',
 			hooks: {
 				'astro:server:setup': () => {
+					loadEnvFile();
 					getSettings();
 				},
 			},
