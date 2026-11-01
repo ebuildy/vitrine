@@ -1,0 +1,141 @@
+---
+import { layOutRoadmap } from '../roadmap.ts';
+import { getGitlabSource } from '../settings.ts';
+import { EpicsUnavailableError } from '../sources/gitlab-api.ts';
+import { listEpics } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	/** A Main Group, as there is one Roadmap per Main Group. */
+	group: string;
+}
+
+const { source, group } = Astro.props;
+const { data: epics, stale, error } = await listEpics(getGitlabSource(source), group);
+const { bars, months, unscheduled } = layOutRoadmap(epics ?? []);
+---
+
+<section>
+	<h2>Roadmap</h2>
+	{stale && <p role="status">This Roadmap is Stale because {source} is down.</p>}
+	{error && (error instanceof EpicsUnavailableError ? <p role="alert">Epics are not available on {source}: they need a GitLab tier that includes them.</p> : <p role="alert">Epics could not be loaded from {source}.</p>)}
+	{epics?.length === 0 && <p>No open Epics.</p>}
+	{
+		bars.length > 0 && (
+			<div class="gantt">
+				<div class="row" aria-hidden="true">
+					<div class="track months">
+						{months.map(({ label, offset }) => (
+							<span style={`left: ${offset}%`}>{label}</span>
+						))}
+					</div>
+				</div>
+				<ul>
+					{bars.map(({ epic, dates, offset, length }) => (
+						<li class="row">
+							<div class="label">
+								<a href={epic.webUrl}>{epic.title}</a>
+								<p>{dates}</p>
+							</div>
+							<div class="track">
+								<span class="bar" style={`left: ${offset}%; width: ${length}%`} />
+							</div>
+						</li>
+					))}
+				</ul>
+			</div>
+		)
+	}
+	{
+		unscheduled.length > 0 && (
+			<>
+				<h3>Unscheduled</h3>
+				<ul>
+					{unscheduled.map(({ title, webUrl }) => (
+						<li>
+							<a href={webUrl}>{title}</a>
+						</li>
+					))}
+				</ul>
+			</>
+		)
+	}
+</section>
+
+<style>
+	section {
+		padding: 1rem;
+	}
+
+	h2 {
+		margin: 0 0 0.75rem;
+	}
+
+	h3 {
+		margin: 1.5rem 0 0.5rem;
+	}
+
+	ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	li {
+		padding: 0.25rem 0;
+		overflow-wrap: anywhere;
+	}
+
+	.row {
+		display: grid;
+		grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+		gap: 1rem;
+		align-items: center;
+	}
+
+	.label p {
+		margin: 0;
+		font-size: 0.875rem;
+	}
+
+	.track {
+		position: relative;
+		grid-column: 2;
+		height: 1.25rem;
+		border-radius: 0.25rem;
+		background: #8882;
+	}
+
+	.months {
+		background: none;
+	}
+
+	.months span {
+		position: absolute;
+		font-size: 0.75rem;
+		border-left: 1px solid #8888;
+		padding-left: 0.25rem;
+	}
+
+	.bar {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		/* A bar of one day must stay visible on a long timeline. */
+		min-width: 0.25rem;
+		border-radius: 0.25rem;
+		background: currentColor;
+		opacity: 0.6;
+	}
+
+	@media (max-width: 48rem) {
+		.row {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 0.25rem;
+		}
+
+		.track {
+			grid-column: 1;
+		}
+	}
+</style>

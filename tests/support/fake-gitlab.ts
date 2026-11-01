@@ -2,6 +2,18 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+const GRAPHQL_MAX_PAGE_SIZE = 100;
+
+interface EpicsVariables {
+	fullPath: string;
+	types: string[];
+	state: string;
+	confidential?: boolean;
+	includeDescendants?: boolean;
+	first: number;
+	after?: string | null;
+}
+
 /** A Member of a Group or Project, as their GitLab profile holds them. */
 export interface FakeGitlabMember {
 	id: number;
@@ -21,6 +33,16 @@ export interface FakeGitlabMember {
 	profileStatus?: number;
 }
 
+/** An Epic of a Group. */
+export interface FakeGitlabEpic {
+	title: string;
+	/** GitLab's own value, which is opened unless set. */
+	state?: 'opened' | 'closed';
+	confidential?: boolean;
+	startDate?: string;
+	dueDate?: string;
+}
+
 export interface FakeGitlabGroup {
 	path: string;
 	name?: string;
@@ -31,6 +53,11 @@ export interface FakeGitlabGroup {
 	members?: FakeGitlabMember[];
 	/** Groups invited into this one, whose direct members GitLab adds only when asked for all of them. */
 	invitedGroups?: string[];
+	epics?: FakeGitlabEpic[];
+	/** A tier without Epics, where GitLab lists none and answers no error, and only its work item types tell. */
+	epicsUnavailable?: boolean;
+	/** What this GitLab calls Epics in its work item types, as these became configurable in GitLab 19.0. */
+	epicTypeName?: string;
 }
 
 export interface FakeGitlabProject {
@@ -65,6 +92,10 @@ export interface FakeGitlabOptions {
 	avatarsRefused?: boolean;
 	/** Whether this GitLab refuses Member profiles to its reader. */
 	profilesRefused?: boolean;
+	/** Whether this GitLab leaves the confidential filter of its GraphQL API unapplied. */
+	confidentialFilterIgnored?: boolean;
+	/** What GitLab's GraphQL API answers instead of data, with a 200 as ever. */
+	graphqlError?: string;
 	/** When set, requests must carry this token. */
 	token?: string;
 	/** Any free port when left out. */
@@ -73,8 +104,8 @@ export interface FakeGitlabOptions {
 
 /**
  * up answers at once, slow after a short wait, down with a 503, and hanging never.
- * The after-lists variants only hit requests about one Project or the members of a Group, and the profiles variants
- * only Member profiles.
+ * The after-lists variants only hit requests about one Project, the members of a Group or Epics, and the profiles
+ * variants only Member profiles.
  */
 export type FakeGitlabBehaviour = 'up' | 'slow' | 'down' | 'down-after-lists' | 'down-profiles' | 'hanging' | 'hanging-after-lists' | 'hanging-profiles';
 
@@ -86,13 +117,25 @@ export interface FakeGitlab {
 	projectListRequests: () => string[];
 	/** The requests that read anything about Members. */
 	memberRequests: () => string[];
+	/** The requests to the GraphQL API, which only Epics are read through. */
+	graphqlRequests: () => string[];
 	/** Changes how the following requests are answered. */
 	behave: (behaviour: FakeGitlabBehaviour) => void;
 	stop: () => Promise<void>;
 }
 
-/** Answers the parts of GitLab's v4 API that Vitrine reads. */
-export async function startFakeGitlab({ groups, projects = [], avatars = {}, avatarsRefused, profilesRefused, token, port: requestedPort = 0 }: FakeGitlabOptions): Promise<FakeGitlab> {
+/** Answers the parts of GitLab's v4 and GraphQL APIs that Vitrine reads. */
+export async function startFakeGitlab({
+	groups,
+	projects = [],
+	avatars = {},
+	avatarsRefused,
+	profilesRefused,
+	confidentialFilterIgnored,
+	graphqlError,
+	token,
+	port: requestedPort = 0,
+}: FakeGitlabOptions): Promise<FakeGitlab> {
 	const requests: string[] = [];
 	let behaviour: FakeGitlabBehaviour = 'up';
 	let baseUrl = '';
@@ -133,10 +176,38 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 	const groupsHolding = (path: string) => groups.filter((group) => path === group.path || path.startsWith(`${group.path}/`));
 	const allMembers = () => [...groups, ...projects].flatMap(({ members = [] }) => members);
 
+	/** Answers what readEpics asks in variables, as GitLab would answer the query. */
+	const epicsJson = ({ fullPath, types, state, confidential, includeDescendants, first, after }: EpicsVariables) => {
+		const group = groups.find(({ path }) => path === fullPath);
+		if (!group) return { group: null };
+
+		const held = groups.filter(({ path, epicsUnavailable }) => !epicsUnavailable && (path === group.path || (includeDescendants && path.startsWith(`${group.path}/`))));
+		const listed = held
+			.flatMap(({ path, epics = [] }) => epics.map((epic, index) => ({ ...epic, webUrl: `${baseUrl}/groups/${path}/-/work_items/${index + 1}` })))
+			.filter((epic) => types.includes('EPIC') && (epic.state ?? 'opened') === state && (confidential !== false || confidentialFilterIgnored || !epic.confidential));
+		const start = Number(after ?? 0);
+		const end = start + Math.min(first, GRAPHQL_MAX_PAGE_SIZE);
+		return {
+			group: {
+				workItemTypes: { nodes: [...(group.epicsUnavailable ? [] : [{ name: group.epicTypeName ?? 'Epic' }]), { name: 'Issue' }, { name: 'Task' }] },
+				workItems: {
+					pageInfo: { hasNextPage: end < listed.length, endCursor: listed.length > 0 ? String(end) : null },
+					nodes: listed.slice(start, end).map(({ title, confidential, webUrl, startDate, dueDate }) => ({
+						title,
+						confidential: confidential ?? false,
+						webUrl,
+						widgets: [{ startDate: startDate ?? null, dueDate: dueDate ?? null }],
+					})),
+				},
+			},
+		};
+	};
+
 	const handle = async (request: IncomingMessage, response: ServerResponse) => {
 		const url = new URL(request.url ?? '/', 'http://fake-gitlab');
 		requests.push(`${url.pathname}${url.search}`);
-		const aboutProject = url.pathname.startsWith('/api/v4/projects/') || /^\/api\/v4\/groups\/[^/]+\/members/.test(url.pathname);
+		const graphql = url.pathname === '/api/graphql';
+		const aboutProject = graphql || url.pathname.startsWith('/api/v4/projects/') || /^\/api\/v4\/groups\/[^/]+\/members/.test(url.pathname);
 		const aboutProfile = url.pathname.startsWith('/api/v4/users/');
 		if (behaviour === 'hanging' || (behaviour === 'hanging-after-lists' && aboutProject) || (behaviour === 'hanging-profiles' && aboutProfile)) return;
 		if (behaviour === 'down' || (behaviour === 'down-after-lists' && aboutProject) || (behaviour === 'down-profiles' && aboutProfile)) {
@@ -144,8 +215,15 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 			return;
 		}
 		if (behaviour === 'slow') await new Promise((resolve) => setTimeout(resolve, 200));
-		if (token && request.headers['private-token'] !== token) {
+		if (token && (graphql ? request.headers.authorization !== `Bearer ${token}` : request.headers['private-token'] !== token)) {
 			response.writeHead(401).end();
+			return;
+		}
+
+		if (graphql) {
+			if (request.method !== 'POST') response.writeHead(405).end();
+			else if (graphqlError) respondWithJson(response, { errors: [{ message: graphqlError }] });
+			else respondWithJson(response, { data: epicsJson((await readJson(request)).variables) });
 			return;
 		}
 
@@ -246,6 +324,7 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 		requests,
 		projectListRequests: () => requests.filter((request) => /\/groups\/[^/]+\/projects\?/.test(request)),
 		memberRequests: () => requests.filter((request) => /\/members|\/users\//.test(request)),
+		graphqlRequests: () => requests.filter((request) => request === '/api/graphql'),
 		behave: (next) => {
 			behaviour = next;
 		},
@@ -262,6 +341,12 @@ function sortedContributors({ contributors = [] }: FakeGitlabProject, url: URL) 
 	if (url.searchParams.get('order_by') !== 'commits') return contributors;
 	const direction = url.searchParams.get('sort') === 'desc' ? -1 : 1;
 	return contributors.toSorted((a, b) => direction * (a.commits - b.commits));
+}
+
+async function readJson(request: IncomingMessage) {
+	let body = '';
+	for await (const chunk of request) body += chunk;
+	return JSON.parse(body);
 }
 
 function respondWithJson(response: ServerResponse, body: unknown) {

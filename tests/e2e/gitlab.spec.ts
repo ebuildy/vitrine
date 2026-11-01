@@ -13,7 +13,19 @@ const subgroups = ['backend', 'frontend', 'data', 'infra', 'tools'];
 
 test.beforeAll(async () => {
 	gitlab = await startFakeGitlab({
-		groups: [{ path: 'platform', name: 'The Platform' }, ...subgroups.map((name) => ({ path: `platform/${name}` }))],
+		groups: [
+			{
+				path: 'platform',
+				name: 'The Platform',
+				epics: [
+					{ title: 'Later work', startDate: '2026-03-01', dueDate: '2026-03-31' },
+					{ title: 'Early work', startDate: '2026-01-01', dueDate: '2026-01-31' },
+					{ title: 'Undated work' },
+					{ title: 'Leaked plans', confidential: true },
+				],
+			},
+			...subgroups.map((name) => ({ path: `platform/${name}` })),
+		],
 		projects: subgroups.flatMap((subgroup) =>
 			['api', 'worker', 'docs'].map((name) => ({
 				path: `platform/${subgroup}/${name}`,
@@ -30,6 +42,7 @@ test.beforeAll(async () => {
 		routes: [
 			{ url: '/gitlab/:group+', controller: 'gitlab-group' },
 			{ url: '/gitlab/:group+/-/:project', controller: 'gitlab-project' },
+			{ url: '/roadmap/:group+', controller: 'gitlab-roadmap' },
 		],
 	});
 });
@@ -90,4 +103,39 @@ test('a Visitor sees the sidebar beside the main content', async ({ page }) => {
 	const aside = await page.getByRole('complementary').boundingBox();
 
 	expect(aside?.x).toBeGreaterThan((main?.x ?? 0) + (main?.width ?? 0) - 1);
+});
+
+test('a Visitor reads the Roadmap of a Main Group and opens an Epic in GitLab', async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 800 });
+	await page.goto(`${vitrine.url}/roadmap/platform`);
+
+	const roadmap = sectionOf(page, 'Roadmap');
+	const rows = roadmap.locator('.gantt li');
+	await expect(rows.getByRole('link')).toHaveText(['Early work', 'Later work']);
+	await expect(roadmap.getByText('Leaked plans')).toHaveCount(0);
+
+	// January to March 2026 holds 90 days: Early work takes the first 31, and Later work the last 31 of them.
+	const track = await rows.nth(0).locator('.track').boundingBox();
+	const early = await rows.nth(0).locator('.bar').boundingBox();
+	const later = await rows.nth(1).locator('.bar').boundingBox();
+	const days = (track?.width ?? 0) / 90;
+	expect(early?.x).toBeCloseTo(track?.x ?? 0, 0);
+	expect(early?.width).toBeCloseTo(31 * days, 0);
+	expect(later?.x).toBeCloseTo((track?.x ?? 0) + 59 * days, 0);
+	expect(later?.width).toBeCloseTo(31 * days, 0);
+	await expect(roadmap.getByText('2026-02', { exact: true })).toBeVisible();
+
+	await expect(roadmap.locator('h3 + ul').getByRole('link')).toHaveText(['Undated work']);
+
+	await rows.getByRole('link', { name: 'Later work' }).click();
+
+	await expect(page).toHaveURL(`${gitlab.url}/groups/platform/-/work_items/1`);
+});
+
+test('a Visitor reads the Roadmap on a phone without scrolling sideways', async ({ page }) => {
+	await page.setViewportSize({ width: 375, height: 700 });
+	await page.goto(`${vitrine.url}/roadmap/platform`);
+
+	await expect(sectionOf(page, 'Roadmap').locator('.bar').first()).toBeVisible();
+	expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 });

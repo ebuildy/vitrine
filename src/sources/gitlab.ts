@@ -3,7 +3,7 @@ import type { CachedContent, Loader } from '../content-cache.ts';
 import { findMainGroup, isAtOrBeneath } from '../router.ts';
 import type { GitlabSource } from '../settings.ts';
 import * as gitlabApi from './gitlab-api.ts';
-import type { Commit, Contributor, DetailedMember, Group, Issue, MainGroupContent, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
+import type { Commit, Contributor, DetailedMember, Epic, Group, Issue, MainGroupContent, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
 
 export type Subgroup = Group & { projectCount: number };
 
@@ -12,6 +12,11 @@ export type MemberList = CachedContent<DetailedMember[]> & { detailsStale?: bool
 
 export function getGroup(source: GitlabSource, path: string): Promise<CachedContent<Group | undefined>> {
 	return fromMainGroup(source, path, ({ groups }) => groups.find((group) => group.path === path));
+}
+
+/** Reads a Group only if it is a Main Group, for what exists once per Main Group. */
+export async function getMainGroup(source: GitlabSource, path: string): Promise<CachedContent<Group | undefined>> {
+	return source.mainGroups.includes(path) ? getGroup(source, path) : { data: undefined, stale: false };
 }
 
 export function listSubgroups(source: GitlabSource, group: string): Promise<CachedContent<Subgroup[]>> {
@@ -58,6 +63,12 @@ export async function listMembers(source: GitlabSource, group: string, deep: boo
 		detailsStale: profiles.some(({ stale }) => stale),
 		detailsMissing: profiles.length < members.length || profiles.some(({ error }) => error),
 	};
+}
+
+/** Lists the Epics of a Main Group, cached apart from its other lists, as a GitLab without Epics must not stop browsing. */
+export async function listEpics(source: GitlabSource, mainGroup: string): Promise<CachedContent<Epic[]>> {
+	if (!source.mainGroups.includes(mainGroup)) return { error: new Error(`"${mainGroup}" is not a Main Group of "${source.name}"`) };
+	return readSource(source, `${source.name}/epics/${mainGroup}`, (signal) => gitlabApi.readEpics(source, mainGroup, signal));
 }
 
 /** Reads cards in list order and may stop early, as readWhileUp tells. */

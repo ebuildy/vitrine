@@ -493,6 +493,154 @@ describe.each(cacheStores)('the Members of a Group with the $name cache store', 
 	});
 });
 
+describe.each(cacheStores)('the Roadmap of a Main Group with the $name cache store', ({ empty }) => {
+	let gitlab: FakeGitlab;
+	let vitrine: RunningVitrine;
+
+	beforeAll(async () => {
+		gitlab = await startFakeGitlab({
+			groups: [
+				{
+					path: 'platform',
+					name: 'The Platform',
+					description: 'Everything we run',
+					epics: [
+						{ title: 'Faster checkout', startDate: '2026-01-10', dueDate: '2026-03-20' },
+						{ title: 'Better search' },
+						{ title: 'Rotate the leaked key', confidential: true, startDate: '2026-01-10', dueDate: '2026-03-20' },
+					],
+				},
+				{ path: 'platform/backend', epics: [{ title: 'Split the monolith', dueDate: '2026-06-30' }] },
+				{ path: 'data', epics: [{ title: 'Weekly numbers' }] },
+				{ path: 'hidden', epics: [{ title: 'Outside every Main Group' }] },
+			],
+			token: 'secret-token',
+		});
+		vitrine = await startVitrine(
+			{
+				sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform', 'data'], tokenEnv: 'GITLAB_TOKEN' }],
+				routes: [...routes, { url: '/roadmap/:group+', controller: 'gitlab-roadmap' }, { url: '/plans', controller: 'gitlab-roadmap', params: { group: 'data' } }],
+				cacheStore: await empty(),
+			},
+			{ GITLAB_TOKEN: 'secret-token' },
+		);
+	});
+
+	afterAll(async () => {
+		await vitrine?.stop();
+		await gitlab?.stop();
+	});
+
+	test('shows the Epics of a Main Group, and those beneath it, with what the token can read', async () => {
+		const text = textOf(await (await fetch(`${vitrine.url}/roadmap/platform`)).text());
+
+		expect(text).toContain('The Platform');
+		expect(text).toContain('Faster checkout');
+		expect(text).toContain('2026-01-10 to 2026-03-20');
+		expect(text).toContain('Split the monolith');
+		expect(text).toContain('Unscheduled Better search');
+	});
+
+	test('never shows a confidential Epic', async () => {
+		expect(await (await fetch(`${vitrine.url}/roadmap/platform`)).text()).not.toContain('Rotate the leaked key');
+	});
+
+	test('titles and describes the page after its Main Group', async () => {
+		const html = await (await fetch(`${vitrine.url}/roadmap/platform`)).text();
+
+		expect(html).toContain('<title>The Platform Roadmap</title>');
+		expect(html).toContain('<meta name="description" content="Everything we run">');
+	});
+
+	test('takes the Main Group from the Route', async () => {
+		expect(await (await fetch(`${vitrine.url}/plans`)).text()).toContain('Weekly numbers');
+	});
+
+	test('reads Epics once per Main Group while they are fresh', async () => {
+		await fetch(`${vitrine.url}/roadmap/platform`);
+		await fetch(`${vitrine.url}/plans`);
+		const before = gitlab.graphqlRequests().length;
+
+		await fetch(`${vitrine.url}/roadmap/platform`);
+		await fetch(`${vitrine.url}/plans`);
+
+		expect(gitlab.graphqlRequests().length).toBe(before);
+	});
+
+	test('keeps the Epics of each Main Group apart', async () => {
+		const html = await (await fetch(`${vitrine.url}/plans`)).text();
+
+		expect(html).toContain('Weekly numbers');
+		expect(html).not.toContain('Faster checkout');
+	});
+
+	test('leaves browsing a Group without Epics to read', async () => {
+		const before = gitlab.graphqlRequests().length;
+
+		await fetch(`${vitrine.url}/gitlab/data`);
+
+		expect(gitlab.graphqlRequests().length).toBe(before);
+	});
+
+	test.each([
+		['a Group beneath a Main Group', '/roadmap/platform/backend'],
+		['a Group that does not exist beneath a Main Group', '/roadmap/platform/missing'],
+		['a Group outside the Main Groups', '/roadmap/hidden'],
+	])('returns not found for %s, as a Roadmap belongs to a Main Group', async (_, url) => {
+		expect((await fetch(`${vitrine.url}${url}`)).status).toBe(404);
+	});
+});
+
+describe('a Roadmap whose Epics cannot be read', () => {
+	let gitlab: FakeGitlab;
+	let vitrine: RunningVitrine;
+
+	beforeAll(async () => {
+		gitlab = await startFakeGitlab({ groups: [{ path: 'platform', name: 'The Platform', epics: [{ title: 'Faster checkout' }] }, { path: 'free', name: 'Free', epicsUnavailable: true }] });
+		vitrine = await startVitrine({
+			sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform', 'free'], allowedAgeMinutes: 0 }],
+			routes: [...routes, { url: '/roadmap/:group+', controller: 'gitlab-roadmap' }],
+		});
+	});
+
+	afterAll(async () => {
+		await vitrine?.stop();
+		await gitlab?.stop();
+	});
+
+	afterEach(() => {
+		gitlab.behave('up');
+	});
+
+	test('keeps the rest of the page when the Source fails on Epics alone', async () => {
+		gitlab.behave('down-after-lists');
+
+		const response = await fetch(`${vitrine.url}/roadmap/platform`);
+		const html = await response.text();
+
+		expect(response.status).toBe(200);
+		expect(html).toContain('The Platform');
+		expect(html).toContain('Epics could not be loaded from main-gitlab');
+	});
+
+	test('says why on a GitLab tier without Epics, and keeps browsing working', async () => {
+		const roadmap = await (await fetch(`${vitrine.url}/roadmap/free`)).text();
+		const group = await fetch(`${vitrine.url}/gitlab/free`);
+
+		expect(roadmap).toContain('Epics are not available on main-gitlab');
+		expect(group.status).toBe(200);
+		expect(await group.text()).not.toContain('role="alert"');
+	});
+
+	test('shows one error when the Main Group itself cannot be read', async () => {
+		gitlab.behave('down');
+
+		const html = await (await fetch(`${vitrine.url}/roadmap/platform`)).text();
+
+		expect(html.match(/role="alert"/g)).toHaveLength(1);
+	});
+});
+
 describe('Members when GitLab holds something back', () => {
 	const ada = { id: 1, name: 'Ada Lovelace', avatar_url: 'http://gitlab.test/ada.png' };
 
@@ -850,6 +998,8 @@ describe('invalid GitLab Settings stop startup', () => {
 		['an unset token', { sources: [{ ...source, tokenEnv: 'VITRINE_UNSET' }], routes: [] }, 'VITRINE_UNSET'],
 		['a Group Route with no way to its Projects', { sources: [source], routes: [routes[0]] }, 'needs a gitlab-project Route'],
 		['a Group Route with no group', { sources: [source], routes: [{ url: '/gitlab', controller: 'gitlab-group' }] }, 'group'],
+		['a Roadmap Route with no group', { sources: [source], routes: [{ url: '/roadmap', controller: 'gitlab-roadmap' }] }, 'group'],
+		['a Roadmap Route on an unknown Source', { sources: [source], routes: [{ url: '/roadmap', controller: 'gitlab-roadmap', params: { source: 'nope', group: 'platform' } }] }, 'unknown Source'],
 		['a Route taking two lists of segments', { sources: [source], routes: [{ url: '/:group+/:project+', controller: 'gitlab-project' }] }, ':name+'],
 		['a Harbor Controller on a GitLab Source', { sources: [source], routes: [{ url: '/harbor', controller: 'harbor', params: { source: 'main-gitlab' } }] }, 'unknown Source'],
 	])('with %s', async (_, settings, expectedError) => {
