@@ -5,6 +5,8 @@ import type { GitlabSource } from '../settings.ts';
 import * as gitlabApi from './gitlab-api.ts';
 import type { Commit, Contributor, DetailedMember, Epic, Group, Issue, MainGroupContent, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
 
+export { EpicsUnavailableError } from './gitlab-api.ts';
+
 export type Subgroup = Group & { projectCount: number };
 
 /** The list of Members, and how far their profiles could be read. */
