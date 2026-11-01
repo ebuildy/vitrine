@@ -111,12 +111,41 @@ const api: FakeGitlabProject = {
 
 export const gitlabContent: Omit<FakeGitlabOptions, 'token' | 'port'> = {
 	groups: [
-		{ path: 'platform', name: 'Platform', description: 'Everything the platform team runs', members: [ada, grace, blocked] },
-		{ path: 'platform/backend', name: 'Backend', description: 'Services behind the public API', members: [alan] },
-		{ path: 'platform/backend/billing', name: 'Billing', description: 'Invoices and payouts', members: [edsger] },
-		{ path: 'platform/frontend', name: 'Frontend', description: 'What customers see', notMember: true, members: [linus] },
+		{
+			path: 'platform',
+			name: 'Platform',
+			description: 'Everything the platform team runs',
+			members: [ada, grace, blocked],
+			epics: [
+				{ title: 'Public API v3', startDate: '2026-09-01', dueDate: '2027-02-26' },
+				{ title: 'Move to the new data centre', startDate: '2026-11-02', dueDate: '2027-04-30' },
+				{ title: 'Developer portal', startDate: '2027-01-11', dueDate: '2027-03-19' },
+				// One date is enough for the Gantt.
+				{ title: 'Pass the security audit', dueDate: '2026-12-15' },
+				{ title: 'Replace the build farm' },
+				// All left out: Vitrine shows open Epics that are not confidential.
+				{ title: 'Respond to the signing key leak', confidential: true, startDate: '2026-10-20', dueDate: '2026-11-30' },
+				{ title: 'Migrate to Go modules', state: 'closed', startDate: '2026-03-02', dueDate: '2026-06-30' },
+			],
+		},
+		{
+			path: 'platform/backend',
+			name: 'Backend',
+			description: 'Services behind the public API',
+			members: [alan],
+			epics: [{ title: 'Idempotent webhooks', startDate: '2026-10-05', dueDate: '2026-12-18' }],
+		},
+		{
+			path: 'platform/backend/billing',
+			name: 'Billing',
+			description: 'Invoices and payouts',
+			members: [edsger],
+			epics: [{ title: 'Usage-based invoices', startDate: '2026-12-01', dueDate: '2027-01-29' }, { title: 'Refunds in the portal' }],
+		},
+		{ path: 'platform/frontend', name: 'Frontend', description: 'What customers see', notMember: true, members: [linus], epics: [{ title: 'Storefront redesign', startDate: '2026-11-16', dueDate: '2027-02-05' }] },
 		{ path: 'data', name: 'Data' },
-		{ path: 'data/analytics', name: 'Analytics', description: 'Dashboards and pipelines', members: [margaret], invitedGroups: ['platform/frontend'] },
+		// A tier without Epics, so its Roadmap shows an error.
+		{ path: 'data/analytics', name: 'Analytics', description: 'Dashboards and pipelines', members: [margaret], invitedGroups: ['platform/frontend'], epicsUnavailable: true },
 	],
 	projects: [
 		api,
