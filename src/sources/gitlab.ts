@@ -1,6 +1,6 @@
 import { readSource, SOURCE_TIMEOUT_MS } from '../content-cache.ts';
 import type { CachedContent, Loader } from '../content-cache.ts';
-import { findMainGroup } from '../settings.ts';
+import { findMainGroup } from '../router.ts';
 import type { GitlabSource } from '../settings.ts';
 import * as gitlabApi from './gitlab-api.ts';
 import type { Commit, Contributor, Group, Issue, MainGroupContent, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
