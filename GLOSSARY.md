@@ -64,6 +64,10 @@ _Avoid_: Repository, repo, Harbor project
 A person belonging to a Main Group or anything beneath it.
 _Avoid_: User, staff, employee
 
+**Issue**:
+A GitLab issue of a Project, open and not confidential.
+_Avoid_: Ticket, work item
+
 **Epic**:
 A GitLab epic of a Main Group or anything beneath it. GitLab's API calls it a work item of type Epic.
 _Avoid_: Work item, initiative

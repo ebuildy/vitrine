@@ -97,7 +97,7 @@ export interface FakeGitlabOptions {
 	avatarsRefused?: boolean;
 	/** Whether this GitLab refuses Member profiles to its reader. */
 	profilesRefused?: boolean;
-	/** Whether this GitLab leaves the confidential filter of its GraphQL API unapplied. */
+	/** Whether this GitLab leaves the confidential filter of its APIs unapplied. */
 	confidentialFilterIgnored?: boolean;
 	/** What GitLab's GraphQL API answers instead of data, with a 200 as ever. */
 	graphqlError?: string;
@@ -109,7 +109,7 @@ export interface FakeGitlabOptions {
 
 /**
  * up answers at once, slow after a short wait, down with a 503, and hanging never.
- * The after-lists variants only hit requests about one Project, the members of a Group or Epics, and the profiles
+ * The after-lists variants only hit requests about one Project, the members or Issues of a Group or Epics, and the profiles
  * variants only Member profiles.
  */
 export type FakeGitlabBehaviour = 'up' | 'slow' | 'down' | 'down-after-lists' | 'down-profiles' | 'hanging' | 'hanging-after-lists' | 'hanging-profiles';
@@ -181,6 +181,18 @@ export async function startFakeGitlab({
 	const groupsHolding = (path: string) => groups.filter((group) => path === group.path || path.startsWith(`${group.path}/`));
 	const allMembers = () => [...groups, ...projects].flatMap(({ members = [] }) => members);
 
+	/** GitLab names the Project of an Issue only in its references. */
+	const issuesJson = (held: FakeGitlabProject[], url: URL) =>
+		held.flatMap(({ path, issues = [] }) =>
+			issues
+				.filter(
+					({ state, confidential }) =>
+						(url.searchParams.get('state') !== 'opened' || state === 'opened') &&
+						(confidentialFilterIgnored || url.searchParams.get('confidential') !== 'false' || !confidential),
+				)
+				.map((issue, index) => ({ ...issue, references: { full: `${path}#${index + 1}` } })),
+		);
+
 	/** Answers what readEpics asks in variables, as GitLab would answer the query. */
 	const epicsJson = ({ fullPath, types, state, confidential, includeDescendants, first, after }: EpicsVariables) => {
 		const group = groups.find(({ path }) => path === fullPath);
@@ -223,7 +235,7 @@ export async function startFakeGitlab({
 		const url = new URL(request.url ?? '/', 'http://fake-gitlab');
 		requests.push(`${url.pathname}${url.search}`);
 		const graphql = url.pathname === '/api/graphql';
-		const afterLists = graphql || url.pathname.startsWith('/api/v4/projects/') || /^\/api\/v4\/groups\/[^/]+\/members/.test(url.pathname);
+		const afterLists = graphql || url.pathname.startsWith('/api/v4/projects/') || /^\/api\/v4\/groups\/[^/]+\/(members|issues)/.test(url.pathname);
 		const aboutProfile = url.pathname.startsWith('/api/v4/users/');
 		if (behaviour === 'hanging' || (behaviour === 'hanging-after-lists' && afterLists) || (behaviour === 'hanging-profiles' && aboutProfile)) return;
 		if (behaviour === 'down' || (behaviour === 'down-after-lists' && afterLists) || (behaviour === 'down-profiles' && aboutProfile)) {
@@ -259,7 +271,7 @@ export async function startFakeGitlab({
 			return;
 		}
 
-		const groupMatch = url.pathname.match(/^\/api\/v4\/groups\/([^/]+)(\/descendant_groups|\/projects|\/members|\/members\/all)?$/);
+		const groupMatch = url.pathname.match(/^\/api\/v4\/groups\/([^/]+)(\/descendant_groups|\/projects|\/issues|\/members|\/members\/all)?$/);
 		const groupPath = groupMatch && decodeURIComponent(groupMatch[1]);
 		const group = groups.find(({ path }) => path === groupPath);
 		if (groupMatch && group) {
@@ -278,6 +290,9 @@ export async function startFakeGitlab({
 						(url.searchParams.get('archived') !== 'false' || !project.archived),
 				);
 				respondWithPage(response, url, listed.map(projectJson));
+			} else if (groupMatch[2] === '/issues') {
+				// GitLab leaves out the Issues of archived Projects unless told otherwise.
+				respondWithPage(response, url, issuesJson(projects.filter(({ path, archived }) => path.startsWith(`${group.path}/`) && !archived), url));
 			} else if (groupMatch[2] === '/members') {
 				respondWithPage(response, url, (group.members ?? []).map(memberJson));
 			} else if (groupMatch[2] === '/members/all') {
@@ -315,12 +330,7 @@ export async function startFakeGitlab({
 			} else if (part === '/repository/contributors') {
 				respondWithPage(response, url, sortedContributors(project, url));
 			} else if (part === '/issues') {
-				const issues = (project.issues ?? []).filter(
-					({ state, confidential }) =>
-						(url.searchParams.get('state') !== 'opened' || state === 'opened') &&
-						(url.searchParams.get('confidential') !== 'false' || !confidential),
-				);
-				respondWithPage(response, url, issues);
+				respondWithPage(response, url, issuesJson([project], url));
 			} else if (part === '/releases') {
 				respondWithPage(response, url, project.releases ?? []);
 			} else {

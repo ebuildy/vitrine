@@ -641,6 +641,122 @@ describe('a Roadmap whose Epics cannot be read', () => {
 	});
 });
 
+describe.each(cacheStores)('the Issues of a Group with the $name cache store', ({ empty }) => {
+	const issue = (title: string, extra: Record<string, unknown> = {}) => ({
+		title,
+		state: 'opened',
+		confidential: false,
+		web_url: `http://gitlab.test/issues/${title}`,
+		assignees: [],
+		labels: [],
+		...extra,
+	});
+	let gitlab: FakeGitlab;
+	let vitrine: RunningVitrine;
+
+	beforeAll(async () => {
+		gitlab = await startFakeGitlab({
+			groups: [{ path: 'platform', name: 'The Platform', description: 'Everything we run' }, { path: 'platform/backend' }, { path: 'platform/frontend' }, { path: 'hidden' }],
+			projects: [
+				{ path: 'platform/backend/api', issues: [issue('Fix the login', { assignees: [{ name: 'Grace Hopper' }] }), issue('Closed work', { state: 'closed' }), issue('Private matter', { confidential: true })] },
+				{ path: 'platform/backend/legacy', archived: true, issues: [issue('Archived work')] },
+				{ path: 'platform/frontend/web', issues: [issue('Align the header')] },
+				{ path: 'platform/frontend/busy', issues: Array.from({ length: 120 }, (_, index) => issue(`Busy number ${index}`)) },
+			],
+		});
+		vitrine = await startVitrine({
+			sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform'] }],
+			routes: [...routes, { url: '/issues/:group+', controller: 'gitlab-issues' }],
+			cacheStore: await empty(),
+		});
+	});
+
+	afterAll(async () => {
+		await vitrine?.stop();
+		await gitlab?.stop();
+	});
+
+	test('shows the open Issues of every Project beneath a Main Group, with their assignees and links', async () => {
+		const html = await (await fetch(`${vitrine.url}/issues/platform`)).text();
+
+		expect(html).toContain('<title>The Platform Issues</title>');
+		expect(html).toContain('href="http://gitlab.test/issues/Fix the login"');
+		expect(textOf(html)).toContain('Assigned to Grace Hopper');
+		expect(html).toContain('href="http://gitlab.test/issues/Align the header"');
+	});
+
+	test('shows every Issue when they span several API pages', async () => {
+		expect(await (await fetch(`${vitrine.url}/issues/platform`)).text()).toContain('Busy number 119');
+	});
+
+	test('shows a Group beneath a Main Group only the Issues at or beneath it', async () => {
+		const html = await (await fetch(`${vitrine.url}/issues/platform/backend`)).text();
+
+		expect(html).toContain('Fix the login');
+		expect(html).not.toContain('Align the header');
+	});
+
+	test('names the Project of each Issue', async () => {
+		expect(textOf(await (await fetch(`${vitrine.url}/issues/platform`)).text())).toContain('In platform/backend/api');
+	});
+
+	test('leaves out closed and confidential Issues, and those of archived Projects', async () => {
+		const html = await (await fetch(`${vitrine.url}/issues/platform`)).text();
+
+		expect(html).not.toContain('Closed work');
+		expect(html).not.toContain('Private matter');
+		expect(html).not.toContain('Archived work');
+	});
+
+	test('reads one list per Main Group, whichever Group is opened', async () => {
+		await fetch(`${vitrine.url}/issues/platform/backend`);
+		await fetch(`${vitrine.url}/issues/platform/frontend`);
+
+		expect(gitlab.requests.filter((request) => /\/groups\/platform\/issues/.test(request))).not.toEqual([]);
+		expect(gitlab.requests.filter((request) => /\/groups\/platform%2F[^/]+\/issues/.test(request))).toEqual([]);
+	});
+
+	test.each([
+		['a Group that does not exist beneath a Main Group', '/issues/platform/missing'],
+		['a Group outside the Main Groups', '/issues/hidden'],
+	])('returns not found for %s', async (_, url) => {
+		expect((await fetch(`${vitrine.url}${url}`)).status).toBe(404);
+	});
+});
+
+describe('confidential Issues when GitLab leaves its filter unapplied', () => {
+	let gitlab: FakeGitlab;
+	let vitrine: RunningVitrine;
+
+	beforeAll(async () => {
+		const issue = (title: string, confidential: boolean) => ({ title, state: 'opened', confidential, web_url: 'http://gitlab.test/i', assignees: [], labels: [] });
+		gitlab = await startFakeGitlab({
+			groups: [{ path: 'platform' }],
+			projects: [{ path: 'platform/api', issues: [issue('Public work', false), issue('Private matter', true)] }],
+			confidentialFilterIgnored: true,
+		});
+		vitrine = await startVitrine({
+			sources: [{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform'] }],
+			routes: [...routes, { url: '/issues/:group+', controller: 'gitlab-issues' }],
+		});
+	});
+
+	afterAll(async () => {
+		await vitrine?.stop();
+		await gitlab?.stop();
+	});
+
+	test.each([
+		['a Group', '/issues/platform'],
+		['a Project', '/gitlab/platform/-/api'],
+	])('never shows them on the page of %s', async (_, url) => {
+		const html = await (await fetch(`${vitrine.url}${url}`)).text();
+
+		expect(html).toContain('Public work');
+		expect(html).not.toContain('Private matter');
+	});
+});
+
 describe('Members when GitLab holds something back', () => {
 	const ada = { id: 1, name: 'Ada Lovelace', avatar_url: 'http://gitlab.test/ada.png' };
 
@@ -999,6 +1115,7 @@ describe('invalid GitLab Settings stop startup', () => {
 		['a Group Route with no way to its Projects', { sources: [source], routes: [routes[0]] }, 'needs a gitlab-project Route'],
 		['a Group Route with no group', { sources: [source], routes: [{ url: '/gitlab', controller: 'gitlab-group' }] }, 'group'],
 		['a Roadmap Route with no group', { sources: [source], routes: [{ url: '/roadmap', controller: 'gitlab-roadmap' }] }, 'group'],
+		['an Issues Route with no group', { sources: [source], routes: [{ url: '/issues', controller: 'gitlab-issues' }] }, 'group'],
 		['a Roadmap Route on an unknown Source', { sources: [source], routes: [{ url: '/roadmap', controller: 'gitlab-roadmap', params: { source: 'nope', group: 'platform' } }] }, 'unknown Source'],
 		['a Route taking two lists of segments', { sources: [source], routes: [{ url: '/:group+/:project+', controller: 'gitlab-project' }] }, ':name+'],
 		['a Harbor Controller on a GitLab Source', { sources: [source], routes: [{ url: '/harbor', controller: 'harbor', params: { source: 'main-gitlab' } }] }, 'unknown Source'],

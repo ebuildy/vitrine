@@ -10,7 +10,7 @@ cp .env.example .env
 npm run demo
 ```
 
-Open the URL Astro prints. `/`, `/images`, `/images/tools`, `/harbor/main-harbor`, `/gitlab/data/analytics` and `/roadmap/platform` all show content, and `/roadmap/data/analytics` shows the error of a GitLab tier without Epics. Links to GitLab itself lead to the fake one, which answers 404.
+Open the URL Astro prints. `/`, `/images`, `/images/tools`, `/harbor/main-harbor`, `/gitlab/data/analytics`, `/issues/platform` and `/roadmap/platform` all show content, and `/roadmap/data/analytics` shows the error of a GitLab tier without Epics. Links to GitLab itself lead to the fake one, which answers 404.
 
 ## Secrets
 
