@@ -5,8 +5,9 @@ import GitlabProject from '../controllers/GitlabProject.astro';
 import Harbor from '../controllers/Harbor.astro';
 import HarborImages from '../controllers/HarborImages.astro';
 import Layout from '../layouts/Layout.astro';
-import { getGitlabSource, matchRoute } from '../settings.ts';
-import type { ControllerName } from '../settings.ts';
+import { matchRoute } from '../router.ts';
+import type { ControllerName } from '../router.ts';
+import { getGitlabSource, getSettings } from '../settings.ts';
 import { getGroup, getProject } from '../sources/gitlab.ts';
 
 const controllers: Record<ControllerName, AstroComponentFactory> = {
@@ -17,7 +18,7 @@ const controllers: Record<ControllerName, AstroComponentFactory> = {
 };
 
 const url = `/${Astro.params.path ?? ''}`;
-const match = matchRoute(url);
+const match = matchRoute(getSettings(), url);
 if (!match) return new Response(null, { status: 404 });
 
 const Controller = controllers[match.route.controller];

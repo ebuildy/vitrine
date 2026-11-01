@@ -1,6 +1,7 @@
 ---
 import { formatDate } from '../format.ts';
-import { getGitlabSource, gitlabProjectUrl } from '../settings.ts';
+import { gitlabProjectUrl } from '../router.ts';
+import { getGitlabSource, getSettings } from '../settings.ts';
 import { listProjects, readProjectCards } from '../sources/gitlab.ts';
 
 interface Props {
@@ -36,7 +37,7 @@ function initialsOf(name: string) {
 			{projects.length > 0 ? (
 				<ul>
 					{projects.map((project, index) => {
-						const url = gitlabProjectUrl(source, project.path);
+						const url = gitlabProjectUrl(getSettings().routes, source, project.path);
 						const card = cards[index]?.data;
 						return (
 							<li>

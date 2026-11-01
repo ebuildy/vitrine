@@ -1,5 +1,6 @@
 ---
-import { getGitlabSource, gitlabGroupUrl } from '../settings.ts';
+import { gitlabGroupUrl } from '../router.ts';
+import { getGitlabSource, getSettings } from '../settings.ts';
 import { listSubgroups } from '../sources/gitlab.ts';
 
 interface Props {
@@ -19,7 +20,7 @@ const { data: subgroups, stale } = await listSubgroups(getGitlabSource(source), 
 			<h2>Subgroups</h2>
 			<ul>
 				{subgroups.map((subgroup) => {
-					const url = gitlabGroupUrl(source, subgroup.path);
+					const url = gitlabGroupUrl(getSettings().routes, source, subgroup.path);
 					return (
 						<li>
 							<h3>{url ? <a href={url}>{subgroup.name}</a> : subgroup.name}</h3>
