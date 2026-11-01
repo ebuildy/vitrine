@@ -18,7 +18,15 @@ test.beforeAll(async () => {
 				path: 'platform',
 				name: 'The Platform',
 				epics: [
-					{ title: 'Later work', startDate: '2026-03-01', dueDate: '2026-03-31' },
+					{
+						title: 'Later work',
+						startDate: '2026-03-01',
+						dueDate: '2026-03-31',
+						description: 'The **second** phase',
+						assignees: [{ name: 'Ada Lovelace', avatarUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' }],
+						weight: 5,
+						issues: { all: 4, closed: 1 },
+					},
 					{ title: 'Early work', startDate: '2026-01-01', dueDate: '2026-01-31' },
 					{ title: 'Undated work' },
 					{ title: 'Leaked plans', confidential: true },
@@ -130,6 +138,18 @@ test('a Visitor reads the Roadmap of a Main Group and opens an Epic in GitLab', 
 	await rows.getByRole('link', { name: 'Later work' }).click();
 
 	await expect(page).toHaveURL(`${gitlab.url}/groups/platform/-/work_items/1`);
+});
+
+test('a Visitor reads the details of each Epic beneath the Roadmap', async ({ page }) => {
+	await page.goto(`${vitrine.url}/roadmap/platform`);
+
+	const epic = sectionOf(page, 'Epics').getByRole('listitem').filter({ hasText: 'Later work' });
+	await expect(epic.getByText('phase')).toBeVisible();
+	await expect(epic.getByAltText('Ada Lovelace')).toBeVisible();
+	await expect(epic.getByRole('progressbar')).toHaveAttribute('value', '1');
+	await expect(epic.getByText('25%')).toBeVisible();
+	await expect(epic.getByText('4 Issues')).toBeVisible();
+	await expect(epic.getByText('Weight 5')).toBeVisible();
 });
 
 test('a Visitor reads the Roadmap on a phone without scrolling sideways', async ({ page }) => {

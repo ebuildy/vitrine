@@ -9,6 +9,7 @@ import GitlabProjectList from '../../src/components/GitlabProjectList.astro';
 import GitlabProjectSummary from '../../src/components/GitlabProjectSummary.astro';
 import GitlabReadme from '../../src/components/GitlabReadme.astro';
 import GitlabReleaseList from '../../src/components/GitlabReleaseList.astro';
+import GitlabEpics from '../../src/components/GitlabEpics.astro';
 import GroupMembers from '../../src/components/GroupMembers.astro';
 import GroupRoadmap from '../../src/components/GroupRoadmap.astro';
 import { startFakeGitlab } from '../support/fake-gitlab.ts';
@@ -36,6 +37,7 @@ const components = [
 	{ name: 'GitlabProjectList', component: GitlabProjectList, ...onGroup, shown: 'api', error: 'Projects could not be loaded', none: undefined },
 	{ name: 'GroupMembers', component: GroupMembers, ...onGroup, shown: 'Ada Lovelace', error: 'Members could not be loaded', none: 'No Members found.' },
 	{ name: 'GroupRoadmap', component: GroupRoadmap, ...onGroup, shown: 'Faster checkout', error: 'Epics could not be loaded', none: 'No open Epics.' },
+	{ name: 'GitlabEpics', component: GitlabEpics, ...onGroup, shown: 'Faster checkout', error: 'Epics could not be loaded', none: 'No open Epics.' },
 	{ name: 'GitlabProjectSummary', component: GitlabProjectSummary, ...onProject, shown: 'View in GitLab', error: 'This Project could not be loaded', none: undefined },
 	{ name: 'GitlabReadme', component: GitlabReadme, ...onProject, shown: 'Hello', error: 'The README could not be loaded', none: 'No README found.' },
 	{ name: 'GitlabCommitList', component: GitlabCommitList, ...onProject, shown: 'Add login', error: 'Commits could not be loaded', none: 'No commits found.' },

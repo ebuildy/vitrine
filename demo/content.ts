@@ -22,6 +22,8 @@ const linus: FakeGitlabMember = { id: 3, name: 'Linus Pauling', avatar_url: avat
 const margaret: FakeGitlabMember = { id: 4, name: 'Margaret Hamilton', location: 'Boston', public_email: 'margaret@example.com' };
 const alan: FakeGitlabMember = { id: 5, name: 'Alan Turing', avatar_url: avatar('Alan Turing', 120), location: 'Manchester' };
 const edsger: FakeGitlabMember = { id: 6, name: 'Edsger Dijkstra', avatar_url: avatar('Edsger Dijkstra', 340) };
+
+const assignee = ({ name, avatar_url }: FakeGitlabMember) => ({ name, avatarUrl: avatar_url ?? undefined });
 // Both left out of the Members list: one is not a person, the other no longer works here.
 const renovate: FakeGitlabMember = { id: 7, name: 'Renovate', username: 'project_12_bot_renovate', bot: true };
 const blocked: FakeGitlabMember = { id: 8, name: 'Former Colleague', state: 'blocked' };
@@ -117,11 +119,28 @@ export const gitlabContent: Omit<FakeGitlabOptions, 'token' | 'port'> = {
 			description: 'Everything the platform team runs',
 			members: [ada, grace, blocked],
 			epics: [
-				{ title: 'Public API v3', startDate: '2026-09-01', dueDate: '2027-02-26' },
-				{ title: 'Move to the new data centre', startDate: '2026-11-02', dueDate: '2027-04-30' },
-				{ title: 'Developer portal', startDate: '2027-01-11', dueDate: '2027-03-19' },
+				{
+					title: 'Public API v3',
+					startDate: '2026-09-01',
+					dueDate: '2027-02-26',
+					description: 'A **versioned** API, with [the old one](https://example.com/api/v2) kept for a year.',
+					assignees: [assignee(ada), assignee(alan)],
+					rolledUpWeight: 34,
+					issues: { all: 16, closed: 11 },
+				},
+				{
+					title: 'Move to the new data centre',
+					startDate: '2026-11-02',
+					dueDate: '2027-04-30',
+					description: 'Every service moves, one team at a time, with no downtime.',
+					assignees: [assignee(grace)],
+					weight: 55,
+					issues: { all: 24, closed: 3 },
+				},
+				{ title: 'Developer portal', startDate: '2027-01-11', dueDate: '2027-03-19', description: 'Docs and API keys in one place.', issues: { all: 4, closed: 0 } },
 				// One date is enough for the Gantt.
-				{ title: 'Pass the security audit', dueDate: '2026-12-15' },
+				{ title: 'Pass the security audit', dueDate: '2026-12-15', assignees: [assignee(grace), assignee(ada)], weight: 8, issues: { all: 1, closed: 1 } },
+				// Nothing but a title, so the rest stays blank.
 				{ title: 'Replace the build farm' },
 				// All left out: Vitrine shows open Epics that are not confidential.
 				{ title: 'Respond to the signing key leak', confidential: true, startDate: '2026-10-20', dueDate: '2026-11-30' },

@@ -106,6 +106,11 @@ export interface Epic {
 	webUrl: string;
 	startDate?: string;
 	dueDate?: string;
+	description?: string;
+	assignees: { name: string; avatarUrl?: string }[];
+	weight?: number;
+	/** The Issues beneath the Epic, at any depth. */
+	issues: { all: number; closed: number };
 }
 
 interface GitlabGroup {
@@ -170,11 +175,29 @@ interface GitlabProfile {
 	bot?: boolean;
 }
 
+/** The fields of every widget asked for, as each widget answers only its own. */
+interface GitlabEpicWidget {
+	startDate?: string | null;
+	dueDate?: string | null;
+	description?: string | null;
+	assignees?: { nodes: { name: string; avatarUrl: string | null }[] };
+	weight?: number | null;
+	rolledUpWeight?: number | null;
+	rolledUpCountsByType?: { workItemType: { name: string }; countsByState: { all: number; closed: number } }[];
+}
+
+interface GitlabEpic {
+	title: string;
+	confidential: boolean;
+	webUrl: string;
+	widgets: GitlabEpicWidget[];
+}
+
 interface GitlabEpicsPage {
 	workItemTypes: { nodes: { name: string }[] };
 	workItems: {
 		pageInfo: { hasNextPage: boolean; endCursor: string | null };
-		nodes: { title: string; confidential: boolean; webUrl: string; widgets: { startDate: string | null; dueDate: string | null }[] }[];
+		nodes: GitlabEpic[];
 	};
 }
 
@@ -217,7 +240,13 @@ const EPICS_QUERY = `query Epics($fullPath: ID!, $types: [IssueType!], $state: I
 				title
 				confidential
 				webUrl
-				widgets(onlyTypes: [START_AND_DUE_DATE]) { ... on WorkItemWidgetStartAndDueDate { startDate dueDate } }
+				widgets(onlyTypes: [START_AND_DUE_DATE, DESCRIPTION, ASSIGNEES, WEIGHT, HIERARCHY]) {
+					... on WorkItemWidgetStartAndDueDate { startDate dueDate }
+					... on WorkItemWidgetDescription { description }
+					... on WorkItemWidgetAssignees { assignees { nodes { name avatarUrl } } }
+					... on WorkItemWidgetWeight { weight rolledUpWeight }
+					... on WorkItemWidgetHierarchy { rolledUpCountsByType { workItemType { name } countsByState { all closed } } }
+				}
 			}
 		}
 	}
@@ -237,12 +266,27 @@ export async function readEpics(source: GitlabSource, mainGroup: string, signal:
 			throw new EpicsUnavailableError(`GitLab "${source.name}" has no Epics for "${mainGroup}"`);
 		}
 		// Checked again, as a confidential Epic must not reach the cache whatever the filter did.
-		for (const { title, confidential, webUrl, widgets } of nodes) {
-			if (!confidential) epics.push({ title, webUrl, startDate: widgets[0]?.startDate ?? undefined, dueDate: widgets[0]?.dueDate ?? undefined });
+		for (const epic of nodes) {
+			if (!epic.confidential) epics.push(toEpic(source, epic));
 		}
 		after = pageInfo.hasNextPage ? pageInfo.endCursor : null;
 	} while (after);
 	return epics;
+}
+
+function toEpic(source: GitlabSource, { title, webUrl, widgets }: GitlabEpic): Epic {
+	const { startDate, dueDate, description, assignees, weight, rolledUpWeight, rolledUpCountsByType }: GitlabEpicWidget = Object.assign({}, ...widgets);
+	return {
+		title,
+		webUrl,
+		startDate: startDate ?? undefined,
+		dueDate: dueDate ?? undefined,
+		description: description ?? undefined,
+		// Unlike the REST API, GraphQL answers an avatar uploaded to GitLab with a path.
+		assignees: (assignees?.nodes ?? []).map(({ name, avatarUrl }) => ({ name, avatarUrl: avatarUrl ? new URL(avatarUrl, source.url).href : undefined })),
+		weight: weight ?? rolledUpWeight ?? undefined,
+		issues: rolledUpCountsByType?.find(({ workItemType }) => workItemType.name === 'Issue')?.countsByState ?? { all: 0, closed: 0 },
+	};
 }
 
 async function readEpicsPage(source: GitlabSource, mainGroup: string, after: string | null, signal: AbortSignal): Promise<GitlabEpicsPage> {

@@ -1,0 +1,148 @@
+---
+import { renderMarkdown } from '../markdown.ts';
+import { getGitlabSource } from '../settings.ts';
+import { EpicsUnavailableError, listEpics } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	/** A Main Group, as Epics are read per Main Group. */
+	group: string;
+}
+
+const { source, group } = Astro.props;
+const { data: epics, stale, error } = await listEpics(getGitlabSource(source), group);
+
+/** An Epic can belong to a Group beneath the Main Group, whose uploads a description points to. */
+function renderDescription(description: string, webUrl: string) {
+	const base = `${webUrl.split('/-/')[0]}/-/`;
+	return renderMarkdown(description, { linkBase: base, imageBase: base });
+}
+---
+
+<section>
+	<h2>Epics</h2>
+	{stale && <p role="status">This list is Stale because {source} is down.</p>}
+	{error instanceof EpicsUnavailableError && <p role="alert">Epics are not available on {source}: they need a GitLab tier that includes them.</p>}
+	{error && !(error instanceof EpicsUnavailableError) && <p role="alert">Epics could not be loaded from {source}.</p>}
+	{!error && !epics && <p role="alert">{group} is not a Main Group of {source}, so it has no Epics to show.</p>}
+	{epics?.length === 0 && <p>No open Epics.</p>}
+	{
+		epics && epics.length > 0 && (
+			<ul>
+				{epics.map(({ title, webUrl, description, assignees, weight, issues }) => (
+					<li class="epic">
+						<h3>
+							<a href={webUrl}>{title}</a>
+						</h3>
+						{description && <div class="description" set:html={renderDescription(description, webUrl)} />}
+						{issues.all > 0 && (
+							<p class="progress">
+								<progress value={issues.closed} max={issues.all} aria-label={`Issues closed in ${title}`} />
+								<span>{Math.round((issues.closed / issues.all) * 100)}%</span>
+							</p>
+						)}
+						<div class="details">
+							<span>{issues.all === 1 ? '1 Issue' : `${issues.all} Issues`}</span>
+							{weight !== undefined && <span>Weight {weight}</span>}
+							{assignees.length > 0 && (
+								<span class="assignees">
+									{assignees.map(({ name, avatarUrl }) =>
+										avatarUrl ? <img src={avatarUrl} alt={name} title={name} width="24" height="24" loading="lazy" /> : <span class="avatar" role="img" aria-label={name} title={name} />,
+									)}
+								</span>
+							)}
+						</div>
+					</li>
+				))}
+			</ul>
+		)
+	}
+</section>
+
+<style>
+	section {
+		padding: 1rem;
+	}
+
+	h2 {
+		margin: 0 0 0.75rem;
+	}
+
+	ul {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+		gap: 1rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	li {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		min-width: 0;
+		padding: 1rem;
+		border: 1px solid #8884;
+		border-radius: 0.5rem;
+	}
+
+	h3 {
+		margin: 0;
+		font-size: 1.125rem;
+		overflow-wrap: anywhere;
+	}
+
+	/* A description can run to pages, and GitLab holds the whole of it behind the title. */
+	.description {
+		max-height: 6rem;
+		overflow: hidden;
+		overflow-wrap: anywhere;
+		font-size: 0.875rem;
+	}
+
+	.description :global(p) {
+		margin: 0 0 0.25rem;
+	}
+
+	.description :global(img) {
+		max-width: 100%;
+	}
+
+	.progress {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: auto 0 0;
+		font-size: 0.875rem;
+	}
+
+	progress {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.details {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+		font-size: 0.875rem;
+	}
+
+	.assignees {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem;
+		margin-left: auto;
+	}
+
+	img,
+	.avatar {
+		flex: none;
+		width: 1.5rem;
+		height: 1.5rem;
+		border-radius: 50%;
+		background: #8884;
+	}
+</style>

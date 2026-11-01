@@ -39,6 +39,13 @@ export interface FakeGitlabEpic {
 	confidential?: boolean;
 	startDate?: string;
 	dueDate?: string;
+	description?: string;
+	/** An avatar is a path on GitLab, unlike in its REST API, for one uploaded to GitLab. */
+	assignees?: { name: string; avatarUrl?: string }[];
+	weight?: number;
+	rolledUpWeight?: number;
+	/** The Issues beneath the Epic, at any depth. */
+	issues?: { all: number; closed: number };
 }
 
 export interface FakeGitlabGroup {
@@ -190,11 +197,22 @@ export async function startFakeGitlab({
 				workItemTypes: { nodes: [...(group.epicsUnavailable ? [] : [{ name: group.epicTypeName ?? 'Epic' }]), { name: 'Issue' }, { name: 'Task' }] },
 				workItems: {
 					pageInfo: { hasNextPage: end < listed.length, endCursor: listed.length > 0 ? String(end) : null },
-					nodes: listed.slice(start, end).map(({ title, confidential, webUrl, startDate, dueDate }) => ({
+					nodes: listed.slice(start, end).map(({ title, confidential, webUrl, startDate, dueDate, description, assignees = [], weight, rolledUpWeight, issues }) => ({
 						title,
 						confidential: confidential ?? false,
 						webUrl,
-						widgets: [{ startDate: startDate ?? null, dueDate: dueDate ?? null }],
+						widgets: [
+							{ startDate: startDate ?? null, dueDate: dueDate ?? null },
+							{ description: description ?? null },
+							{ assignees: { nodes: assignees.map(({ name, avatarUrl }) => ({ name, avatarUrl: avatarUrl ?? null })) } },
+							{ weight: weight ?? null, rolledUpWeight: rolledUpWeight ?? null },
+							{
+								rolledUpCountsByType: [
+									{ workItemType: { name: 'Epic' }, countsByState: { all: 0, closed: 0 } },
+									{ workItemType: { name: 'Issue' }, countsByState: issues ?? { all: 0, closed: 0 } },
+								],
+							},
+						],
 					})),
 				},
 			},
