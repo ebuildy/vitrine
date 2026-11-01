@@ -92,7 +92,12 @@ function showsProjects({ url, controller }: Route) {
 
 /** The Main Group that holds a Group or Project path, which is that path itself for a Main Group. */
 export function findMainGroup({ mainGroups }: GitlabSource, path: string): string | undefined {
-	return mainGroups.find((mainGroup) => path === mainGroup || path.startsWith(`${mainGroup}/`));
+	return mainGroups.find((mainGroup) => isAtOrBeneath(path, mainGroup));
+}
+
+/** Whether a Group or Project path is that Group itself or lies anywhere beneath it. */
+export function isAtOrBeneath(path: string, group: string): boolean {
+	return path === group || path.startsWith(`${group}/`);
 }
 
 /** Finds the first Route matching a URL, skipping any that names an unknown Source or a Group outside every Main Group. */

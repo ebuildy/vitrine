@@ -2,12 +2,35 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+/** A Member of a Group or Project, as their GitLab profile holds them. */
+export interface FakeGitlabMember {
+	id: number;
+	name: string;
+	/** Made from the name when left out. */
+	username?: string;
+	/** GitLab's own value, which is active unless set. */
+	state?: string;
+	avatar_url?: string | null;
+	/** Left out, GitLab answers null. */
+	location?: string | null;
+	public_email?: string | null;
+	bot?: boolean;
+	/** The private email, which GitLab only gives a GitLab admin's token: set it to be read with one. */
+	email?: string;
+	/** What GitLab answers for this profile instead of giving it. */
+	profileStatus?: number;
+}
+
 export interface FakeGitlabGroup {
 	path: string;
 	name?: string;
 	description?: string;
 	/** GitLab leaves such a group out unless asked for everything the reader can see. */
 	notMember?: boolean;
+	/** Direct members. GitLab adds those of the ancestor groups only when asked for all of them. */
+	members?: FakeGitlabMember[];
+	/** Groups invited into this one, whose direct members GitLab adds only when asked for all of them. */
+	invitedGroups?: string[];
 }
 
 export interface FakeGitlabProject {
@@ -29,6 +52,8 @@ export interface FakeGitlabProject {
 	issues?: Record<string, unknown>[];
 	releases?: Record<string, unknown>[];
 	contributors?: { name: string; email: string; commits: number }[];
+	/** Direct members. */
+	members?: FakeGitlabMember[];
 }
 
 export interface FakeGitlabOptions {
@@ -38,12 +63,18 @@ export interface FakeGitlabOptions {
 	avatars?: Record<string, string>;
 	/** Whether this GitLab refuses avatars to its reader, as it does anonymous ones when public visibility is restricted. */
 	avatarsRefused?: boolean;
+	/** Whether this GitLab refuses Member profiles to its reader. */
+	profilesRefused?: boolean;
 	/** When set, requests must carry this token. */
 	token?: string;
 }
 
-/** up answers at once, slow after a short wait, down with a 503, and hanging never. The after-lists variants only hit requests about one Project. */
-export type FakeGitlabBehaviour = 'up' | 'slow' | 'down' | 'down-after-lists' | 'hanging' | 'hanging-after-lists';
+/**
+ * up answers at once, slow after a short wait, down with a 503, and hanging never.
+ * The after-lists variants only hit requests about one Project or the members of a Group, and the profiles variants
+ * only Member profiles.
+ */
+export type FakeGitlabBehaviour = 'up' | 'slow' | 'down' | 'down-after-lists' | 'down-profiles' | 'hanging' | 'hanging-after-lists' | 'hanging-profiles';
 
 export interface FakeGitlab {
 	url: string;
@@ -51,13 +82,15 @@ export interface FakeGitlab {
 	requests: string[];
 	/** The requests that list the Projects of a Main Group, of which a load makes one per page. */
 	projectListRequests: () => string[];
+	/** The requests that read anything about Members. */
+	memberRequests: () => string[];
 	/** Changes how the following requests are answered. */
 	behave: (behaviour: FakeGitlabBehaviour) => void;
 	stop: () => Promise<void>;
 }
 
 /** Answers the parts of GitLab's v4 API that Vitrine reads. */
-export async function startFakeGitlab({ groups, projects = [], avatars = {}, avatarsRefused, token }: FakeGitlabOptions): Promise<FakeGitlab> {
+export async function startFakeGitlab({ groups, projects = [], avatars = {}, avatarsRefused, profilesRefused, token }: FakeGitlabOptions): Promise<FakeGitlab> {
 	const requests: string[] = [];
 	let behaviour: FakeGitlabBehaviour = 'up';
 	let baseUrl = '';
@@ -79,12 +112,32 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 		empty_repo: project.empty_repo ?? false,
 		web_url: `${baseUrl}/${project.path}`,
 	});
+	/** GitLab keeps location, public email and whether an account is a bot to its profile. */
+	const memberJson = ({ id, name, username, state, avatar_url }: FakeGitlabMember) => ({
+		id,
+		username: username ?? name.toLowerCase().replaceAll(' ', '.'),
+		name,
+		state: state ?? 'active',
+		avatar_url: avatar_url ?? null,
+		web_url: `${baseUrl}/users/${id}`,
+	});
+	const profileJson = (member: FakeGitlabMember) => ({
+		...memberJson(member),
+		location: member.location ?? null,
+		public_email: member.public_email ?? null,
+		bot: member.bot ?? false,
+		...(member.email ? { email: member.email } : {}),
+	});
+	const groupsHolding = (path: string) => groups.filter((group) => path === group.path || path.startsWith(`${group.path}/`));
+	const allMembers = () => [...groups, ...projects].flatMap(({ members = [] }) => members);
 
 	const handle = async (request: IncomingMessage, response: ServerResponse) => {
 		const url = new URL(request.url ?? '/', 'http://fake-gitlab');
 		requests.push(`${url.pathname}${url.search}`);
-		if (behaviour === 'hanging' || (behaviour === 'hanging-after-lists' && url.pathname.startsWith('/api/v4/projects/'))) return;
-		if (behaviour === 'down' || (behaviour === 'down-after-lists' && url.pathname.startsWith('/api/v4/projects/'))) {
+		const aboutProject = url.pathname.startsWith('/api/v4/projects/') || /^\/api\/v4\/groups\/[^/]+\/members/.test(url.pathname);
+		const aboutProfile = url.pathname.startsWith('/api/v4/users/');
+		if (behaviour === 'hanging' || (behaviour === 'hanging-after-lists' && aboutProject) || (behaviour === 'hanging-profiles' && aboutProfile)) return;
+		if (behaviour === 'down' || (behaviour === 'down-after-lists' && aboutProject) || (behaviour === 'down-profiles' && aboutProfile)) {
 			response.writeHead(503).end();
 			return;
 		}
@@ -100,7 +153,17 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 			return;
 		}
 
-		const groupMatch = url.pathname.match(/^\/api\/v4\/groups\/([^/]+)(\/descendant_groups|\/projects)?$/);
+		const profileMatch = url.pathname.match(/^\/api\/v4\/users\/(\d+)$/);
+		if (profileMatch) {
+			const member = allMembers().find(({ id }) => id === Number(profileMatch[1]));
+			if (profilesRefused) response.writeHead(403).end();
+			else if (member?.profileStatus) response.writeHead(member.profileStatus).end();
+			else if (member) respondWithJson(response, profileJson(member));
+			else response.writeHead(404).end();
+			return;
+		}
+
+		const groupMatch = url.pathname.match(/^\/api\/v4\/groups\/([^/]+)(\/descendant_groups|\/projects|\/members|\/members\/all)?$/);
 		const groupPath = groupMatch && decodeURIComponent(groupMatch[1]);
 		const group = groups.find(({ path }) => path === groupPath);
 		if (groupMatch && group) {
@@ -119,6 +182,13 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 						(url.searchParams.get('archived') !== 'false' || !project.archived),
 				);
 				respondWithPage(response, url, listed.map(projectJson));
+			} else if (groupMatch[2] === '/members') {
+				respondWithPage(response, url, (group.members ?? []).map(memberJson));
+			} else if (groupMatch[2] === '/members/all') {
+				const holding = groupsHolding(group.path);
+				const invited = groups.filter(({ path }) => holding.some(({ invitedGroups = [] }) => invitedGroups.includes(path)));
+				const all = [...holding, ...invited].flatMap(({ members = [] }) => members);
+				respondWithPage(response, url, [...new Map(all.map((member) => [member.id, member])).values()].map(memberJson));
 			} else {
 				respondWithJson(response, groupJson(group));
 			}
@@ -138,6 +208,8 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 					readme_url: readme,
 					...(statistics ? { statistics: { commit_count: project.commit_count } } : {}),
 				});
+			} else if (part === '/members') {
+				respondWithPage(response, url, (project.members ?? []).map(memberJson));
 			} else if (part?.startsWith('/repository/') && project.empty_repo) {
 				response.writeHead(404).end();
 			} else if (part === '/repository/files/README.md/raw' && project.readme !== undefined) {
@@ -171,6 +243,7 @@ export async function startFakeGitlab({ groups, projects = [], avatars = {}, ava
 		url: baseUrl,
 		requests,
 		projectListRequests: () => requests.filter((request) => /\/groups\/[^/]+\/projects\?/.test(request)),
+		memberRequests: () => requests.filter((request) => /\/members|\/users\//.test(request)),
 		behave: (next) => {
 			behaviour = next;
 		},

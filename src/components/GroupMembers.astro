@@ -1,0 +1,96 @@
+---
+import { getGitlabSource } from '../settings.ts';
+import { listMembers } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	group: string;
+	/** Also lists the Members of every Group and Project beneath the Main Group, at a request each. */
+	deep?: boolean;
+}
+
+const { source, group, deep = false } = Astro.props;
+const { data: members, stale, detailsStale, detailsMissing } = await listMembers(getGitlabSource(source), group, deep);
+---
+
+<section>
+	<h2>Members</h2>
+	{stale && <p role="status">This list is Stale because {source} is down.</p>}
+	{!stale && detailsStale && <p role="status">Details of some Members are Stale because {source} is down.</p>}
+	{detailsMissing && <p role="alert">Details of some Members could not be loaded from {source}.</p>}
+	{
+		!members ? (
+			<p role="alert">Members could not be loaded from {source}.</p>
+		) : members.length > 0 ? (
+			<ul>
+				{members.map(({ name, avatarUrl, location, email }) => (
+					<li>
+						{avatarUrl ? <img src={avatarUrl} alt="" width="40" height="40" loading="lazy" /> : <span class="avatar" />}
+						<div>
+							<h3>{name}</h3>
+							{location && <p>{location}</p>}
+							{email && (
+								<p>
+									<a href={`mailto:${email}`}>{email}</a>
+								</p>
+							)}
+						</div>
+					</li>
+				))}
+			</ul>
+		) : (
+			<p>No Members found.</p>
+		)
+	}
+</section>
+
+<style>
+	section {
+		padding: 1rem;
+	}
+
+	h2 {
+		margin: 0 0 0.75rem;
+	}
+
+	ul {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+		gap: 1rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	li {
+		display: flex;
+		gap: 0.75rem;
+		padding: 1rem;
+		border: 1px solid #8884;
+		border-radius: 0.5rem;
+	}
+
+	li > div {
+		min-width: 0;
+	}
+
+	img,
+	.avatar {
+		flex: none;
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 50%;
+		background: #8884;
+	}
+
+	h3 {
+		margin: 0 0 0.25rem;
+		font-size: 1.125rem;
+		overflow-wrap: anywhere;
+	}
+
+	p {
+		margin: 0 0 0.25rem;
+		overflow-wrap: anywhere;
+	}
+</style>

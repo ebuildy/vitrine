@@ -7,6 +7,12 @@ const LATEST_ISSUES = 10;
 const LATEST_RELEASES = 5;
 const TOP_CONTRIBUTORS = 10;
 const CARD_CONTRIBUTORS = 5;
+// A card takes several requests, so a page of cards must not send them all at once.
+export const CARDS_AT_ONCE = 5;
+// Members take a request per Group, Project and Member, which must not all go at once.
+export const MEMBER_READS_AT_ONCE = 10;
+// What GitLab starts the usernames of access token bots and service accounts with. A renamed service account no longer matches.
+const BOT_USERNAMES = /^(?:(?:project|group)_\d+_bot|service_account_)/;
 
 export interface Group {
 	path: string;
@@ -75,6 +81,25 @@ export interface Contributor {
 	commits: number;
 }
 
+/** A Member as GitLab's member lists give them. */
+export interface Member {
+	id: number;
+	username: string;
+	name: string;
+	avatarUrl?: string;
+	/** Each Group and Project the person is a member of, so that a Group can select its own from the Main Group's list. */
+	paths: string[];
+}
+
+/** What a profile adds to a Member, which takes a request per Member. */
+export interface MemberProfile {
+	location?: string;
+	email?: string;
+	bot?: boolean;
+}
+
+export type DetailedMember = Member & MemberProfile;
+
 interface GitlabGroup {
 	full_path: string;
 	name: string;
@@ -121,6 +146,22 @@ interface GitlabContributor {
 	commits: number;
 }
 
+interface GitlabMember {
+	id: number;
+	username: string;
+	name: string;
+	state: string;
+	avatar_url: string | null;
+}
+
+/** Leaves out the private email, which GitLab adds to a profile read with a GitLab admin's token. */
+interface GitlabProfile {
+	location: string | null;
+	public_email: string | null;
+	/** GitLab's example of a profile read with a GitLab admin's token leaves this out. */
+	bot?: boolean;
+}
+
 export async function readMainGroup(source: GitlabSource, mainGroup: string, signal: AbortSignal): Promise<MainGroupContent> {
 	const path = `/groups/${encodeURIComponent(mainGroup)}`;
 	const [group, subgroups, projects] = await Promise.all([
@@ -148,6 +189,44 @@ export async function readMainGroup(source: GitlabSource, mainGroup: string, sig
 			webUrl: item.web_url,
 		})),
 	};
+}
+
+/** GitLab has no list of everyone beneath a Group, so each Group and Project takes a request. */
+export async function readMembers(source: GitlabSource, { groups, projects }: { groups: Pick<Group, 'path'>[]; projects: Project[] }, signal: AbortSignal): Promise<Member[]> {
+	const lists = await inBatches(
+		[
+			// Only a Group's full list holds who it inherits, which a Project's would repeat.
+			...groups.map(({ path }) => ({ path, url: `/groups/${encodeURIComponent(path)}/members/all` })),
+			...projects.map(({ id, path }) => ({ path, url: `/projects/${id}/members` })),
+		],
+		MEMBER_READS_AT_ONCE,
+		async ({ path, url }) => ({ path, accounts: await fetchAllPages<GitlabMember>(source, url, {}, signal) }),
+	);
+
+	const members = new Map<number, Member>();
+	for (const { path, accounts } of lists) {
+		for (const { id, username, name, state, avatar_url } of accounts) {
+			if (state !== 'active') continue;
+			const member = members.get(id) ?? { id, username, name, avatarUrl: avatar_url ?? undefined, paths: [] };
+			member.paths.push(path);
+			members.set(id, member);
+		}
+	}
+	return [...members.values()].toSorted((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * GitLab keeps location, email and whether an account is a bot to a Member's profile. Nothing comes back for a profile
+ * it holds back or cannot find, which no retry would change, so such an account never stops the profiles after it.
+ */
+export async function readMemberProfile(source: GitlabSource, { id }: Member, signal: AbortSignal): Promise<MemberProfile | undefined> {
+	const profile = await fetchIfAllowed<GitlabProfile>(source, `/users/${id}`, {}, signal, [401, 403, 404]);
+	return profile && { location: profile.location || undefined, email: profile.public_email || undefined, bot: profile.bot };
+}
+
+/** A profile settles it. Member lists say nothing about bots, so without one only the username can tell. */
+export function isBot({ username, bot }: DetailedMember): boolean {
+	return bot ?? BOT_USERNAMES.test(username);
 }
 
 /** Only a Markdown README can be rendered, and GitLab names whichever README it finds. */
@@ -210,6 +289,14 @@ async function readAvatarUrl(source: GitlabSource, email: string, signal: AbortS
 	return avatar?.avatar_url ?? undefined;
 }
 
+async function inBatches<T, R>(items: T[], size: number, read: (item: T) => Promise<R>): Promise<R[]> {
+	const results: R[] = [];
+	for (let start = 0; start < items.length; start += size) {
+		results.push(...(await Promise.all(items.slice(start, start + size).map(read))));
+	}
+	return results;
+}
+
 async function fetchJson<T>(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal): Promise<T> {
 	const response = await fetchApi(source, path, query, signal);
 	return response.json();
@@ -224,9 +311,9 @@ async function fetchAllPages<T>(source: GitlabSource, path: string, query: Recor
 	}
 }
 
-async function fetchIfAllowed<T>(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal): Promise<T | undefined> {
+async function fetchIfAllowed<T>(source: GitlabSource, path: string, query: Record<string, string>, signal: AbortSignal, refusals = [401, 403]): Promise<T | undefined> {
 	const response = await request(source, path, query, signal);
-	if (response.status === 401 || response.status === 403) return undefined;
+	if (refusals.includes(response.status)) return undefined;
 	if (!response.ok) throw new Error(`GitLab "${source.name}" answered ${response.status} for ${path}`);
 	return response.json();
 }
