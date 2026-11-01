@@ -58,6 +58,10 @@ routes:
       </style>
   - url: /harbor/:source
     controller: harbor
+    template: |
+      <h1>{source}</h1>
+      <HarborProjectList source={source} />
+      <GitlabGroupList source="main-gitlab" group="platform" />
   - url: /harbor/:source/:project
     controller: harbor-images
   - url: /gitlab/:group+
