@@ -42,7 +42,7 @@ afterEach(() => {
 	harbor.behave('up');
 });
 
-async function render(props: { source: string }) {
+async function render(props: { source: string; maxItems?: number; projects?: string[] }) {
 	const container = await AstroContainer.create();
 	return container.renderToString(HarborProjectList, { props });
 }
@@ -51,6 +51,20 @@ async function render(props: { source: string }) {
 function textOf(html: string) {
 	return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 }
+
+test('shows at most maxItems Harbor projects', async () => {
+	const html = await render({ source: 'main-harbor', maxItems: 1 });
+
+	expect(html).toContain('href="/registry/main-harbor/platform"');
+	expect(html).not.toContain('href="/registry/main-harbor/data"');
+});
+
+test('shows only the Harbor projects it is given', async () => {
+	const html = await render({ source: 'main-harbor', projects: ['data'] });
+
+	expect(html).toContain('href="/registry/main-harbor/data"');
+	expect(html).not.toContain('href="/registry/main-harbor/platform"');
+});
 
 test('links each Harbor project of the Source to its Images', async () => {
 	const html = await render({ source: 'main-harbor' });

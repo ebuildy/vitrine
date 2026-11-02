@@ -50,6 +50,10 @@ _Avoid_: Handler, view, page type
 What a page shows and in what order, which its Controller decides unless a Template replaces it.
 _Avoid_: Layout, view, content
 
+**Navigation page**:
+The page of a Route to the navigation Controller, which places Components showing the latest content of every Source and leads to the rest of Vitrine. An Administrator may declare several, each with its own Arrangement and maximum of items.
+_Avoid_: Dashboard, home page, landing page
+
 **Template**:
 Astro markup written in Settings that replaces the Arrangement of a Route's Controller, usually by placing Components.
 _Avoid_: Layout, theme, page
@@ -83,6 +87,10 @@ _Avoid_: Ticket, work item
 **Epic**:
 A GitLab epic of a Main Group or anything beneath it. GitLab's API calls it a work item of type Epic.
 _Avoid_: Work item, initiative
+
+**Release**:
+A GitLab release of a Project.
+_Avoid_: Version, tag
 
 **Roadmap**:
 The Epics of a Main Group laid out on a timeline.

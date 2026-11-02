@@ -6,10 +6,14 @@ import { listProjects } from '../sources/harbor.ts';
 
 interface Props {
 	source: string;
+	/** Left out, it shows every Harbor project the Source reports. */
+	projects?: string[];
+	maxItems?: number;
 }
 
-const { source } = Astro.props;
-const { data: projects, stale } = await listProjects(getHarborSource(source));
+const { source, projects: selected, maxItems } = Astro.props;
+const { data: reported, stale } = await listProjects(getHarborSource(source));
+const projects = selected ? reported?.filter(({ name }) => selected.includes(name)) : reported;
 ---
 
 {stale && <p role="status">This list is Stale because {source} is down.</p>}
@@ -18,7 +22,7 @@ const { data: projects, stale } = await listProjects(getHarborSource(source));
 		<p role="alert">Harbor projects could not be loaded because {source} is down.</p>
 	) : projects.length > 0 ? (
 		<ul>
-			{projects.map((project) => {
+			{projects.slice(0, maxItems).map((project) => {
 				const url = harborImagesUrl(getSettings().routes, source, project.name);
 				return (
 					<li>
@@ -51,7 +55,8 @@ const { data: projects, stale } = await listProjects(getHarborSource(source));
 <style>
 	ul {
 		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		/* Four columns across the page, and fewer in a narrower place. */
+		grid-template-columns: repeat(auto-fill, minmax(max(25% - 1rem, 12rem), 1fr));
 		gap: 1rem;
 		margin: 0;
 		padding: 1rem;

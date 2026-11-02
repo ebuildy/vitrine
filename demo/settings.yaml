@@ -29,9 +29,12 @@ cacheStore:
 
 routes:
   - url: /
-    controller: gitlab-group
+    controller: navigation
+  - url: /overview
+    controller: navigation
     params:
-      group: platform
+      arrangement: columns
+      maxItems: 3
   - url: /images
     controller: harbor-images
   - url: /images/tools
