@@ -37,10 +37,36 @@ const cacheStoreSchema = z.discriminatedUnion('type', [
 	z.strictObject({ type: z.literal('redis'), urlEnv: z.string().min(1) }),
 ]);
 
+/** A page-relative address would point somewhere else on every page, and a Container image serves no files of its own. */
+const addressSchema = z.string().regex(/^(https?:\/\/|\/)/i, 'must start with http://, https:// or /');
+
+const brandingSchema = z.strictObject({
+	siteName: z.string().min(1).default('Vitrine'),
+	logo: addressSchema.optional(),
+});
+
+const navigationItemSchema = z.strictObject({
+	label: z.string().min(1),
+	url: addressSchema,
+});
+
+// The characters of a CSS colour, so that a stray `;` or `}` fails at startup and not as a page with no colours.
+const colourSchema = z.string().regex(/^[#\w\s(),.%/-]+$/, 'must be a CSS colour, like "#0a7" or rgb(0 120 200)');
+
+const themeSchema = z.strictObject({
+	primary: colourSchema.optional(),
+	background: colourSchema.optional(),
+	text: colourSchema.optional(),
+	border: colourSchema.optional(),
+});
+
 const settingsSchema = z.strictObject({
 	sources: z.array(sourceSchema),
 	routes: z.array(routeSchema),
 	cacheStore: cacheStoreSchema.default({ type: 'memory' }),
+	branding: brandingSchema.prefault({}),
+	navigation: z.array(navigationItemSchema).default([]),
+	theme: themeSchema.default({}),
 });
 
 export type HarborSource = z.infer<typeof harborSourceSchema> & { password?: string };
@@ -53,6 +79,9 @@ export interface Settings {
 	sources: Source[];
 	routes: Route[];
 	cacheStore: CacheStoreSettings;
+	branding: z.infer<typeof brandingSchema>;
+	navigation: z.infer<typeof navigationItemSchema>[];
+	theme: z.infer<typeof themeSchema>;
 }
 
 export class SettingsError extends Error {
@@ -80,13 +109,16 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 		);
 	}
 
-	const { sources, cacheStore } = parsed.data;
+	const { sources, cacheStore, branding, navigation, theme } = parsed.data;
 	const { routes, problems: compileProblems } = templatesDisabled(env) ? { routes: parsed.data.routes, problems: [] } : compileRoutes(parsed.data.routes, sources);
 	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources), ...cacheStoreProblems(cacheStore, env), ...compileProblems];
 	if (problems.length > 0) throw new SettingsError(path, problems);
 
 	return {
 		routes,
+		branding,
+		navigation,
+		theme,
 		cacheStore: cacheStore.type === 'redis' ? { ...cacheStore, url: env[cacheStore.urlEnv] as string } : cacheStore,
 		sources: sources.map((source) =>
 			source.type === 'harbor'

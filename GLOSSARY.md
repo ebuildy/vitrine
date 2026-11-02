@@ -23,7 +23,7 @@ The DevOps person who runs a Vitrine installation, configures it through its Set
 _Avoid_: Admin, operator, maintainer
 
 **Settings**:
-The file an Administrator edits to configure an installation, including its Sources, Main Groups and cache store.
+The file an Administrator edits to configure an installation, including its Sources, Main Groups, cache store, Branding, Menu and Theme.
 _Avoid_: Config, configuration, options
 
 **Container image**:
@@ -53,6 +53,18 @@ _Avoid_: Layout, view, content
 **Template**:
 Astro markup written in Settings that replaces the Arrangement of a Route's Controller, usually by placing Components.
 _Avoid_: Layout, theme, page
+
+**Branding**:
+The site name and logo that give an installation its organisation's identity, set in Settings.
+_Avoid_: Logo, identity, white label
+
+**Menu**:
+The links at the top of every page, set under `navigation` in Settings.
+_Avoid_: Navigation bar, navbar, links
+
+**Theme**:
+The colours of an installation, set in Settings, which Components use through CSS variables.
+_Avoid_: Palette, skin, Template
 
 **Component**:
 A self-contained UI building block that can be placed on any page and presents its own content, warnings and errors.

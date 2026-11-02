@@ -48,6 +48,29 @@ cacheStore:
   # The name of the environment variable holding the connection URL, never the URL itself.
   # urlEnv: REDIS_URL
 
+# The site name and logo at the top of every page. Defaults to the name Vitrine and no logo.
+branding:
+  siteName: Acme Portal
+  # Starts with http://, https:// or /. The Container image serves no files of its own, so host the logo elsewhere.
+  logo: https://cdn.example.com/logo.svg
+
+# The Menu at the top of every page, in this order. A url starts with http://, https:// or /.
+navigation:
+  - label: Images
+    url: /images
+  - label: Handbook
+    url: https://docs.example.com/
+
+# Any CSS colour. Quote a hex colour, as YAML reads # as a comment. Each one you leave out keeps its default.
+# Components use them as the CSS variables --color-primary, --color-background, --color-text and --color-border,
+# and a Template can do the same.
+theme:
+  # Links, card highlights and Roadmap bars.
+  primary: '#00795c'
+  background: '#ffffff'
+  text: '#1e1e3c'
+  border: '#c8d0d8'
+
 routes:
   # Shows the Images of every selected Harbor project of every Source.
   - url: /images

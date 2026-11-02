@@ -27,6 +27,22 @@ sources:
 cacheStore:
   type: memory
 
+branding:
+  siteName: Vitrine demo
+
+navigation:
+  - label: Platform
+    url: /
+  - label: Images
+    url: /images
+  - label: Roadmap
+    url: /roadmap/platform
+  - label: Issues
+    url: /issues/platform
+
+theme:
+  primary: '#00795c'
+
 routes:
   - url: /
     controller: gitlab-group
