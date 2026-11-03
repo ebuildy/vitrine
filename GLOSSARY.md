@@ -38,6 +38,10 @@ _Avoid_: Public, visible, exposed, approved
 The state of cached Source content older than its allowed age. Stale content is shown only when the Source is down, with a warning.
 _Avoid_: Expired, outdated
 
+**Warm-up**:
+A crawl of Vitrine's own pages, following their links to one another, so that the cache holds the content of every page before a Visitor asks for it. It loads only what is missing or older than its allowed age.
+_Avoid_: Preload, prefetch, crawl job
+
 **Route**:
 An association in Settings between a URL and a Controller, with an optional Template.
 _Avoid_: Path, page, mapping

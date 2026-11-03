@@ -10,7 +10,7 @@ You configure it with one Settings file, change its look with a Theme and Templa
 - [Controllers](docs/administrator/controllers.md): the kinds of page a Route can show, and their params.
 - [Components](docs/administrator/components.md): what a Template or a page of a fork places on a page, and their props.
 - [Templates](docs/administrator/templates.md): rearranging a page from Settings.
-- [Cache stores](docs/administrator/cache-stores.md): memory, local files or Redis.
+- [Cache stores](docs/administrator/cache-stores.md): memory, local files or Redis, warm-ups and `/sitemap.xml`.
 - [Security](docs/administrator/security.md): **read before you deploy**. Token permissions are the real boundary around private projects, and an installation exposed to the internet shows Member emails, Issue assignments and vulnerability counts to anyone.
 - [`GLOSSARY.md`](GLOSSARY.md): the words these documents use, and [`docs/adr`](docs/adr): the decisions behind them.
 
@@ -40,6 +40,16 @@ Startup checks Settings before serving anything, and stops with a list of proble
 | `VITRINE_TEMPLATE_DISABLE` | Any non-empty value, even `false`, stops Templates from being compiled or run. |
 | `HOST`, `PORT` | Where the server listens. The Container image sets `0.0.0.0` and `8080`. |
 | Those Settings name | Each `tokenEnv`, `passwordEnv` and `urlEnv` in Settings names a variable holding a secret. Startup stops when one is not set. |
+
+### Cache warm-up
+
+A warm-up crawls Vitrine's pages so that the cache holds their content before the first Visitor comes, as [Cache stores](docs/administrator/cache-stores.md#warm-up) explains. `warmUp` in Settings runs one inside the server. To run one from outside, such as from a Kubernetes CronJob, run the Container image's `warm-up.ts` against a running Vitrine:
+
+```sh
+docker run --rm ghcr.io/ebuildy/vitrine:edge node warm-up.ts https://vitrine.example.com --concurrency 4
+```
+
+It exits with 1 when a page failed, so that the CronJob shows it, and with 2 on wrong arguments.
 
 ## Run from source
 

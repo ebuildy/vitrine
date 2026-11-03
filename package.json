@@ -13,6 +13,7 @@
     "astro": "astro",
     "start": "node start.ts",
     "demo": "node demo/start.ts",
+    "warm-up": "node warm-up.ts",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:report": "vite preview --outDir vitest-report",

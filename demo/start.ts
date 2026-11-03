@@ -2,12 +2,8 @@ import { spawn } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadEnvFile } from '../src/settings.ts';
-import { startFakeGitlab } from '../tests/support/fake-gitlab.ts';
-import { startFakeHarbor } from '../tests/support/fake-harbor.ts';
-import { startFakeNexus } from '../tests/support/fake-nexus.ts';
-import { freePort } from '../tests/support/free-port.ts';
-import { gitlabContent, mainHarborContent, nexusContent, toolsHarborContent } from './content.ts';
 import { withSourceUrls } from './settings.ts';
+import { startDemoSources } from './sources.ts';
 
 // Beside demo/settings.yaml, so that files it names resolve the same. Git ignores it.
 // One file per run: Vitrine reads its Settings at the first request, by which time another demo in this worktree could have rewritten a shared file.
@@ -21,13 +17,8 @@ if (!GITLAB_TOKEN || !HARBOR_PASSWORD) {
 	process.exit(1);
 }
 
-// Every fake listens on a free port, so demos in several worktrees run side by side. GitLab's content links back to it, so it needs its port first.
-const gitlabPort = await freePort();
-const gitlab = await startFakeGitlab({ ...gitlabContent(`http://127.0.0.1:${gitlabPort}`), token: GITLAB_TOKEN, port: gitlabPort });
-const mainHarbor = await startFakeHarbor({ ...mainHarborContent, credentials: { username: 'robot$vitrine', password: HARBOR_PASSWORD } });
-const toolsHarbor = await startFakeHarbor(toolsHarborContent);
-const nexus = await startFakeNexus(nexusContent);
-const urls = { 'main-gitlab': gitlab.url, 'main-harbor': mainHarbor.url, 'tools-harbor': toolsHarbor.url, 'main-nexus': nexus.url };
+// Every fake listens on a free port, so demos in several worktrees run side by side.
+const { urls } = await startDemoSources({ gitlabToken: GITLAB_TOKEN, harborPassword: HARBOR_PASSWORD });
 writeFileSync(SETTINGS, withSourceUrls(readFileSync('demo/settings.yaml', 'utf8'), urls));
 process.on('exit', () => rmSync(SETTINGS, { force: true }));
 for (const [name, url] of Object.entries(urls)) console.log(`Fake Source ${name} on ${url}`);

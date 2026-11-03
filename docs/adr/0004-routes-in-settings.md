@@ -5,7 +5,7 @@ Vitrine uses one catch-all Astro page that reads Routes from Settings and hands 
 ## Consequences
 
 - A new kind of Controller still requires a fork.
-- Pages a fork adds under `src/pages/` take priority over Routes, because Astro prefers fixed paths over a catch-all.
+- Pages a fork adds under `src/pages/` take priority over Routes, because Astro prefers fixed paths over a catch-all. Vitrine's own, such as `/sitemap.xml`, stop startup when a Route takes their URL, as the Route would never be served.
 - A Route URL may hold `:source` and `:project` segments, so one Route serves every Source. An unknown Source is not found. A Harbor project in a URL is not limited to those selected in Settings, because the harbor Controller lists what the Source reports, so the Source's token is the boundary on those Routes.
 - A `:name+` segment takes one URL segment or more, because GitLab Groups nest, and a Route URL holds at most one. It stops at a `-` segment, which GitLab keeps out of Group paths, as in `/gitlab/:group+/-/:project`.
 - A Group in a URL is limited to the Main Groups in Settings, and it only ever selects from their cached lists, so a URL never decides what is asked of GitLab. A Group outside them is not found.

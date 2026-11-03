@@ -7,6 +7,7 @@ import { duplicates, routeProblems, routeSchema } from './router.ts';
 import type { Route } from './router.ts';
 import { templateProblems } from './template-checks.ts';
 import { compileTemplate, TemplateError } from './template-compiler.ts';
+import { DEFAULT_CONCURRENCY } from './warm-up.ts';
 
 const harborSourceSchema = z
 	.strictObject({
@@ -132,6 +133,15 @@ const themeSchema = z.strictObject({
 	css: z.array(cssItemSchema).default([]),
 });
 
+const warmUpSchema = z.strictObject({
+	// Crawls every page once the server answers, so that the first Visitor does not wait on a Source.
+	atStart: z.boolean().default(false),
+	// Crawls again on this interval, counted from the start of the server.
+	everyMinutes: z.number().positive().optional(),
+	// How many pages a warm-up requests at once, so that it does not flood the Sources.
+	concurrency: z.number().int().positive().default(DEFAULT_CONCURRENCY),
+});
+
 /** A stylesheet the browser loads, or CSS the page carries, read from a file when Settings name one. */
 export type Stylesheet = { href: string } | { code: string };
 
@@ -143,6 +153,7 @@ export const settingsSchema = z.strictObject({
 	branding: brandingSchema.prefault({}),
 	navigation: z.array(navigationItemSchema).default([]),
 	theme: themeSchema.prefault({}),
+	warmUp: warmUpSchema.prefault({}),
 });
 
 export type HarborSource = z.infer<typeof harborSourceSchema> & { password?: string };
@@ -159,6 +170,7 @@ export interface Settings {
 	branding: z.infer<typeof brandingSchema>;
 	navigation: z.infer<typeof navigationItemSchema>[];
 	theme: Omit<z.infer<typeof themeSchema>, 'css'> & { css: Stylesheet[] };
+	warmUp: z.infer<typeof warmUpSchema>;
 }
 
 export class SettingsError extends Error {
@@ -186,7 +198,7 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 		);
 	}
 
-	const { sources, cacheStore, branding, navigation, theme } = parsed.data;
+	const { sources, cacheStore, branding, navigation, theme, warmUp } = parsed.data;
 	const { routes, problems: compileProblems } = templatesDisabled(env) ? { routes: parsed.data.routes, problems: [] } : compileRoutes(parsed.data.routes, sources);
 	const { stylesheets, problems: cssProblems } = readStylesheets(theme.css, dirname(path));
 	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources), ...cacheStoreProblems(cacheStore, env), ...compileProblems, ...cssProblems];
@@ -196,6 +208,7 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 		routes,
 		branding,
 		navigation,
+		warmUp,
 		theme: { ...theme, css: stylesheets },
 		cacheStore: cacheStore.type === 'redis' ? { ...cacheStore, url: env[cacheStore.urlEnv] as string } : cacheStore,
 		sources: sources.map((source) =>

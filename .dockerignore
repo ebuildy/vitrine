@@ -7,6 +7,7 @@
 !package.json
 !src
 !start.ts
+!warm-up.ts
 !tsconfig.json
 
 # Last match wins: these stay out even inside an allowed directory.

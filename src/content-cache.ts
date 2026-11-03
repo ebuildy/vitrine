@@ -52,7 +52,7 @@ async function readStoreThenSource<T>(key: string, allowedAgeMs: number, loader:
 	return result;
 }
 
-async function readEntry(key: string): Promise<Entry | undefined> {
+export async function readEntry(key: string): Promise<Entry | undefined> {
 	try {
 		return await withTimeout(CACHE_STORE_TIMEOUT_MS, () => getCacheStore().get(key));
 	} catch (error) {
@@ -61,7 +61,7 @@ async function readEntry(key: string): Promise<Entry | undefined> {
 	}
 }
 
-async function writeEntry(key: string, entry: Entry): Promise<void> {
+export async function writeEntry(key: string, entry: Entry): Promise<void> {
 	try {
 		await withTimeout(CACHE_STORE_TIMEOUT_MS, () => getCacheStore().set(key, entry));
 	} catch (error) {
