@@ -10,6 +10,8 @@ Manage the background server with `astro dev stop`, `astro dev status`, and `ast
 
 Commit with `git commit -s`, amends included: the sign-off respects the DCO.
 
+Typecheck with `npm run check`, as CI does: it runs `astro sync` first, which bare `tsc` needs in a fresh worktree.
+
 `npm test` needs the Redis from `compose.yaml`: run `docker compose up -d --wait` first. It also needs a Docker engine with BuildKit, for `docker build --output`.
 
 `npm test` and `npm run test:e2e` also write an HTML report, to `vitest-report/` and `playwright-report/` (with traces of failed tests), and never open a browser. `npm run test:report` and `npm run test:e2e:report` serve them, each on a free port.
@@ -36,7 +38,7 @@ Keep it current: every change an Administrator would notice ships with its docum
 - What Visitors see, or what credentials read: `docs/administrator/security.md`
 - Deployment, the Container image or an environment variable: `README.md`
 
-`tests/documentation.test.ts` goes red on a missing option, Controller, param, Component or prop. A description that no longer matches the code passes it, so reread the section of whatever you changed.
+`tests/documentation.test.ts` goes red on a missing option, Controller, param, Component or prop, and on a word `GLOSSARY.md` says to avoid. A description that no longer matches the code passes it, so reread the section of whatever you changed.
 
 ## Documentation
 

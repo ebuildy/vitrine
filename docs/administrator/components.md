@@ -1,6 +1,6 @@
 # Components
 
-A Component is a self-contained building block of a page. It reads its own content from one Source, through the cache, and shows its own warnings and errors: a note when its content is Stale because the Source is down, and an alert when it could not be loaded at all. One Component failing never stops the rest of the page.
+A Component is a self-contained part of a page. It reads its own content from one Source, through the cache, and shows its own warnings and errors: a note when its content is Stale because the Source is down, and an alert when it could not be loaded at all. One Component failing never stops the rest of the page.
 
 Every Component is in `src/components`, and you use one in two ways.
 
