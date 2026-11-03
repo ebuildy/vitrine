@@ -7,7 +7,8 @@ const navigationArrangementSchema = z.enum(['grid', 'columns', 'list']);
 
 export type NavigationArrangement = z.infer<typeof navigationArrangementSchema>;
 
-const controllerParamsSchemas = {
+/** Exported so tests can check that each Controller and its params are documented. */
+export const controllerParamsSchemas = {
 	navigation: z.strictObject({
 		arrangement: navigationArrangementSchema.optional(),
 		maxItems: z

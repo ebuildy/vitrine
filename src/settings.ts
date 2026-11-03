@@ -135,7 +135,8 @@ const themeSchema = z.strictObject({
 /** A stylesheet the browser loads, or CSS the page carries, read from a file when Settings name one. */
 export type Stylesheet = { href: string } | { code: string };
 
-const settingsSchema = z.strictObject({
+/** Exported so tests can check that the example Settings file shows every option. */
+export const settingsSchema = z.strictObject({
 	sources: z.array(sourceSchema),
 	routes: z.array(routeSchema),
 	cacheStore: cacheStoreSchema.default({ type: 'memory' }),
