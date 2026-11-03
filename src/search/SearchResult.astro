@@ -1,7 +1,5 @@
 ---
-import type { Source } from '../settings.ts';
-import gitlabIcon from './icons/gitlab.svg?url';
-import harborIcon from './icons/harbor.svg?url';
+import { SOURCE_LOOKS } from '../source-looks.ts';
 import EpicResult from './results/EpicResult.astro';
 import GroupResult from './results/GroupResult.astro';
 import ImageResult from './results/ImageResult.astro';
@@ -14,18 +12,9 @@ interface Props {
 	result: SearchResult;
 }
 
-/** The colour and logo of each kind of Source, so a Visitor tells them apart at a glance. A Nexus Source would be green. */
-const SOURCE_LOOKS: Record<Source['type'], { colour: string; icon: string }> = {
-	// GitLab's tanuki, from app/assets/images/logo.svg of gitlab-org/gitlab.
-	gitlab: { colour: '#fc6d26', icon: gitlabIcon },
-	// Harbor's icon, from projects/harbor/icon/color of the CNCF artwork repository.
-	harbor: { colour: '#1d6fd1', icon: harborIcon },
-};
-
 const TYPE_NAMES = { group: 'Group', project: 'Project', issue: 'Issue', member: 'Member', epic: 'Epic', image: 'Image' } as const;
 
 const { result } = Astro.props;
-// Part of the build, so a Visitor's browser never asks a Source for it.
 const { colour, icon } = SOURCE_LOOKS[result.sourceType];
 ---
 
