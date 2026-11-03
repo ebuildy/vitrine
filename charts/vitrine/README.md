@@ -82,6 +82,22 @@ valkey:
 
 Everything else under `valkey` goes to the [Valkey chart](https://github.com/valkey-io/valkey-helm), such as `valkey.resources` or `valkey.auth`. With `valkey.auth.enabled`, put the password in the URL, `redis://default:<password>@vitrine-valkey:6379`, from a Secret through `valueFrom`. [Cache stores](../../docs/administrator/cache-stores.md) explains each store and warm-ups.
 
+## Warm-up
+
+`settings.warmUp` runs a warm-up inside each pod, so that the cache holds every page before a Visitor asks for it, as [Cache stores](../../docs/administrator/cache-stores.md#warm-up) explains:
+
+```yaml
+settings:
+  warmUp:
+    atStart: true
+    everyMinutes: 60
+    concurrency: 4
+```
+
+Each pod crawls itself, never the Service. With a `memory` or `files` cache store, each replica fills its own cache, and asks the Sources for the same content. With a `redis` cache store, a replica whose warm-up runs after another's finds the content fresh and costs the Sources nothing, though replicas that start together all ask. A pod that restarts with a `memory` or `files` cache store starts cold, which `atStart` covers.
+
+A warm-up runs once the server answers, without delaying readiness: the first pages a Visitor asks for may still wait on a Source. A NetworkPolicy needs no rule for it, as the pod requests its own address.
+
 ## Exposure
 
 The Service sends `service.port` to the container's port 8080. Two ways to reach it from outside, both off by default:
