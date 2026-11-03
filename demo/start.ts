@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadEnvFile } from '../src/settings.ts';
 import { startFakeGitlab } from '../tests/support/fake-gitlab.ts';
@@ -9,7 +9,8 @@ import { gitlabContent, mainHarborContent, toolsHarborContent } from './content.
 import { withSourceUrls } from './settings.ts';
 
 // Beside demo/settings.yaml, so that files it names resolve the same. Git ignores it.
-const SETTINGS = 'demo/.settings.yaml';
+// One file per run: Vitrine reads its Settings at the first request, by which time another demo in this worktree could have rewritten a shared file.
+const SETTINGS = `demo/.settings-${process.pid}.yaml`;
 
 // Each fake asks for the secret Vitrine reads, so a demo that shows content proves .env reached Vitrine.
 loadEnvFile();
@@ -26,6 +27,7 @@ const mainHarbor = await startFakeHarbor({ ...mainHarborContent, credentials: { 
 const toolsHarbor = await startFakeHarbor(toolsHarborContent);
 const urls = { 'main-gitlab': gitlab.url, 'main-harbor': mainHarbor.url, 'tools-harbor': toolsHarbor.url };
 writeFileSync(SETTINGS, withSourceUrls(readFileSync('demo/settings.yaml', 'utf8'), urls));
+process.on('exit', () => rmSync(SETTINGS, { force: true }));
 for (const [name, url] of Object.entries(urls)) console.log(`Fake Source ${name} on ${url}`);
 
 // Without --ignore-lock, Astro moves itself to the background under an AI agent, and the fakes would end with this process.

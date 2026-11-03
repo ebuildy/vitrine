@@ -1,5 +1,5 @@
 # The Settings of `npm run demo`. Secrets come from .env.
-# The fake Sources listen on free ports: demo/start.ts writes these Settings to demo/.settings.yaml with each url replaced.
+# The fake Sources listen on free ports: demo/start.ts writes these Settings to demo/.settings-<pid>.yaml with each url replaced.
 
 sources:
   - name: main-harbor

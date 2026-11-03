@@ -32,4 +32,4 @@ test-results/
 playwright-report/
 
 # the demo Settings, at the ports of this run
-/demo/.settings.yaml
+/demo/.settings-*.yaml
