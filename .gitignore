@@ -30,3 +30,6 @@ pnpm-debug.log*
 test-results/
 .test-build/
 playwright-report/
+
+# the demo Settings, at the ports of this run
+/demo/.settings-*.yaml

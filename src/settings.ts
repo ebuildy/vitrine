@@ -35,7 +35,8 @@ const sourceSchema = z.discriminatedUnion('type', [harborSourceSchema, gitlabSou
 const cacheStoreSchema = z.discriminatedUnion('type', [
 	z.strictObject({ type: z.literal('memory') }),
 	z.strictObject({ type: z.literal('files'), directory: z.string().min(1) }),
-	z.strictObject({ type: z.literal('redis'), urlEnv: z.string().min(1) }),
+	// Installations sharing one Redis each keep their own content under their own prefix.
+	z.strictObject({ type: z.literal('redis'), urlEnv: z.string().min(1), keyPrefix: z.string().min(1).default('vitrine:') }),
 ]);
 
 /** A page-relative address would point somewhere else on every page, and a Container image serves no files of its own. */

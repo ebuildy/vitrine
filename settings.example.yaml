@@ -47,6 +47,8 @@ cacheStore:
   # type: redis
   # The name of the environment variable holding the connection URL, never the URL itself.
   # urlEnv: REDIS_URL
+  # Installations sharing one Redis each need their own prefix for their keys. Defaults to vitrine:
+  # keyPrefix: vitrine:
 
 # The site name and logo at the top of every page. Defaults to the name Vitrine and no logo.
 branding:

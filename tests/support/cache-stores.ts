@@ -1,9 +1,9 @@
-import { Redis } from 'ioredis';
+import { randomUUID } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// A database of its own, as every test empties it. compose.yaml provides the server.
+// compose.yaml provides the server, which every worktree shares.
 export const REDIS_URL = 'redis://127.0.0.1:6379/15';
 process.env.VITRINE_TEST_REDIS_URL = REDIS_URL;
 
@@ -28,11 +28,7 @@ export const cacheStores: TestCacheStore[] = [
 	{
 		name: 'Redis',
 		survivesRestart: true,
-		empty: async () => {
-			const redis = new Redis(REDIS_URL, { maxRetriesPerRequest: 0 });
-			await redis.flushdb();
-			redis.disconnect();
-			return { type: 'redis', urlEnv: 'VITRINE_TEST_REDIS_URL' };
-		},
+		// A prefix no other test, nor another worktree's run, has written under. The server evicts old keys.
+		empty: async () => ({ type: 'redis', urlEnv: 'VITRINE_TEST_REDIS_URL', keyPrefix: `vitrine-test:${randomUUID()}:` }),
 	},
 ];

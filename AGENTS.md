@@ -14,6 +14,14 @@ Commit with `git commit -s`, amends included: the sign-off respects the DCO.
 
 To see a page with content, run `npm run demo`: it serves fake Sources to `astro dev` in the foreground, with `demo/settings.yaml` instead of `settings.yaml`. Seed data lives in `demo/content.ts`.
 
+### Several worktrees at once
+
+`npm run dev`, `npm run demo` and `npm test` run side by side in several worktrees:
+
+- Each `astro dev` takes the next free port from 4321 and prints the URL it serves on. Its `--background` lock lives in its own worktree, so `astro dev status` gives that worktree's URL.
+- The demo's fake Sources listen on free ports, printed at start. `demo/start.ts` writes `demo/settings.yaml` with those URLs to `demo/.settings-<pid>.yaml`, which git ignores and the run deletes at exit: edit `demo/settings.yaml`.
+- Every worktree shares the one Valkey of `compose.yaml`. A worktree whose Settings use `cacheStore: redis` sets a `keyPrefix` of its own, such as `vitrine-<worktree>:`, so it reads only its own content. Tests give every Redis test a prefix of its own.
+
 ## Documentation
 
 Full documentation: https://docs.astro.build
