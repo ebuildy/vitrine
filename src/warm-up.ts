@@ -1,4 +1,5 @@
 // Runs in `npm run warm-up` as well as in the server, so it reads no Settings: what it needs comes as arguments.
+import type { Settings } from './settings.ts';
 
 /** Longer than a page takes with every Source timing out, which is the slowest a page can be. */
 const PAGE_TIMEOUT_MS = 60_000;
@@ -12,7 +13,7 @@ export interface WarmUpOptions {
 	startPaths?: string[];
 }
 
-export interface VisitedPage {
+export interface PageReport {
 	path: string;
 	/** What went wrong, such as a status or the alerts of a Source that is down. Empty when the page is fine. */
 	problems: string[];
@@ -20,7 +21,7 @@ export interface VisitedPage {
 
 export interface WarmUpReport {
 	baseUrl: string;
-	pages: VisitedPage[];
+	pages: PageReport[];
 	durationMs: number;
 }
 
@@ -33,7 +34,7 @@ export async function warmUp(baseUrl: string, { concurrency = DEFAULT_CONCURRENC
 	const base = new URL(baseUrl);
 	const seen = new Set<string>();
 	const queue: URL[] = [];
-	const pages: VisitedPage[] = [];
+	const pages: PageReport[] = [];
 
 	const enqueue = (href: string, from: URL) => {
 		const url = sameOriginPage(href, from, base);
@@ -124,7 +125,7 @@ function decodeEntities(text: string) {
 	return text.replace(/&(amp|lt|gt|quot|apos|#39|#x27);/g, (_, name: string) => ENTITIES[name]);
 }
 
-export function failedPages(report: WarmUpReport): VisitedPage[] {
+export function failedPages(report: WarmUpReport): PageReport[] {
 	return report.pages.filter(({ problems }) => problems.length > 0);
 }
 
@@ -135,14 +136,8 @@ export function formatReport(report: WarmUpReport): string {
 	return [...lines, `Warm-up of ${report.baseUrl}: visited ${report.pages.length} pages, ${failedPages(report).length} failed, in ${seconds} s`].join('\n');
 }
 
-export interface WarmUpSchedule {
-	atStart: boolean;
-	everyMinutes?: number;
-	concurrency: number;
-}
-
 /** Runs the warm-ups Settings ask for in the background, logging each report, and returns what stops them. */
-export function scheduleWarmUps(baseUrl: string, { atStart, everyMinutes, concurrency }: WarmUpSchedule, startPaths: string[]): () => void {
+export function scheduleWarmUps(baseUrl: string, { atStart, everyMinutes, concurrency }: Settings['warmUp'], startPaths: string[]): () => void {
 	let running = false;
 	const run = async () => {
 		// A warm-up longer than the interval is not run twice at once.

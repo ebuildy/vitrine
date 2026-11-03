@@ -56,7 +56,7 @@ export const routeSchema = z.strictObject({
 /** Settings adds `compiled` to a Route whose Template runs, so a Route never needs to know whether Templates are disabled. */
 export type Route = z.infer<typeof routeSchema> & { compiled?: CompiledTemplate };
 
-/** The pages under src/pages, which Astro prefers over any Route. */
+/** The URLs of Vitrine's own pages under src/pages, which Astro prefers over any Route, kept in step with them. */
 const SERVED_BY_VITRINE = ['/sitemap.xml'];
 
 export function routeProblems(routes: Route[], sources: Source[]) {

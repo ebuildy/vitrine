@@ -81,6 +81,20 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 
 			expect(entries.map(({ loc }) => loc)).toEqual(survivesRestart ? expect.arrayContaining([`${vitrine.url}/nexus/main-nexus`]) : []);
 		});
+
+		test('leaves out a page once it is not found', async () => {
+			await (await fetch(`${vitrine.url}/nexus/main-nexus`)).text();
+			await vitrine.stop();
+			// The same store, with the Source gone from Settings, so its page is not found.
+			vitrine = await startVitrine({ ...(settings as object), sources: [{ name: 'other-nexus', type: 'nexus', url: nexus.url }] });
+
+			expect((await fetch(`${vitrine.url}/nexus/main-nexus`)).status).toBe(404);
+			const xml = await (await fetch(`${vitrine.url}/sitemap.xml`)).text();
+
+			expect(xml).not.toContain('/nexus/main-nexus');
+			await vitrine.stop();
+			vitrine = await startVitrine(settings);
+		});
 	});
 });
 

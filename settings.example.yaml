@@ -68,7 +68,7 @@ cacheStore:
 # A warm-up crawls every page, as a Visitor would, so that the first Visitor never waits on a Source. Off by default.
 # It starts from every Route with a fixed URL and every Menu link, follows the links of each page to Vitrine itself,
 # and only loads what is missing or older than its allowed age. npm run warm-up -- <base URL> does the same from outside,
-# as a cron. npm run dev runs none.
+# as a cron. npm run dev runs none. With SERVER_CERT_PATH, it crawls https://127.0.0.1, so the certificate must hold that address.
 warmUp:
   # Once the server answers, without delaying it.
   atStart: true
