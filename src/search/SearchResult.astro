@@ -6,13 +6,14 @@ import ImageResult from './results/ImageResult.astro';
 import IssueResult from './results/IssueResult.astro';
 import MemberResult from './results/MemberResult.astro';
 import ProjectResult from './results/ProjectResult.astro';
+import RepositoryResult from './results/RepositoryResult.astro';
 import type { SearchResult } from './search-engine.ts';
 
 interface Props {
 	result: SearchResult;
 }
 
-const TYPE_NAMES = { group: 'Group', project: 'Project', issue: 'Issue', member: 'Member', epic: 'Epic', image: 'Image' } as const;
+const TYPE_NAMES = { group: 'Group', project: 'Project', issue: 'Issue', member: 'Member', epic: 'Epic', image: 'Image', repository: 'Repository' } as const;
 
 const { result } = Astro.props;
 const { colour, icon } = SOURCE_LOOKS[result.sourceType];
@@ -30,6 +31,7 @@ const { colour, icon } = SOURCE_LOOKS[result.sourceType];
 	{result.type === 'member' && <MemberResult url={result.url} member={result.member} />}
 	{result.type === 'epic' && <EpicResult url={result.url} epic={result.epic} />}
 	{result.type === 'image' && <ImageResult url={result.url} image={result.image} />}
+	{result.type === 'repository' && <RepositoryResult url={result.url} repository={result.repository} />}
 </li>
 
 <style>

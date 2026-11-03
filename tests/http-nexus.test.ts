@@ -31,7 +31,10 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 						{ name: 'main-nexus', type: 'nexus', url: nexus.url, username: 'vitrine', passwordEnv: 'NEXUS_PASSWORD' },
 						{ name: 'other-nexus', type: 'nexus', url: otherNexus.url, repositories: ['raw-files'] },
 					],
-					routes: [{ url: '/nexus/:source', controller: 'nexus' }],
+					routes: [
+						{ url: '/nexus/:source', controller: 'nexus' },
+						{ url: '/search', controller: 'search' },
+					],
 					cacheStore: await empty(),
 				},
 				{ NEXUS_PASSWORD: 's3cret' },
@@ -72,6 +75,17 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 			await (await fetch(`${vitrine.url}/nexus/main-nexus`)).text();
 
 			expect(nexus.requests).toHaveLength(before);
+		});
+
+		test('finds Repositories by a search for maven, each leading to the list of its Source', async () => {
+			const response = await fetch(`${vitrine.url}/search?q=maven`);
+
+			expect(response.status).toBe(200);
+			const html = await response.text();
+			expect(textOf(html)).toContain('1 result in');
+			expect(textOf(html)).toContain('Repository in main-nexus maven-releases maven2, hosted');
+			expect(html).toContain('href="/nexus/main-nexus"');
+			expect(html).not.toContain('raw-files');
 		});
 
 		test('returns a not-found page for an unknown Source, without asking Nexus', async () => {

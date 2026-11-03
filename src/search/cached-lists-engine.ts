@@ -1,11 +1,12 @@
 import type { CachedContent } from '../content-cache.ts';
-import { gitlabGroupUrl, gitlabIssuesUrl, gitlabProjectUrl, gitlabRoadmapUrl, harborImagesUrl } from '../router.ts';
+import { gitlabGroupUrl, gitlabIssuesUrl, gitlabProjectUrl, gitlabRoadmapUrl, harborImagesUrl, nexusRepositoriesUrl } from '../router.ts';
 import type { Route } from '../router.ts';
 import { getSettings } from '../settings.ts';
-import type { GitlabSource, HarborSource, Settings, Source } from '../settings.ts';
+import type { GitlabSource, HarborSource, NexusSource, Settings, Source } from '../settings.ts';
 import type { Group } from '../sources/gitlab-api.ts';
 import { EpicsUnavailableError, listEpics, listGroupIssues, listMemberAccounts, readMainGroupContent } from '../sources/gitlab.ts';
 import { listImages } from '../sources/harbor.ts';
+import { listRepositories } from '../sources/nexus.ts';
 import { matchScore, wordsOf } from './match.ts';
 import type { Field } from './match.ts';
 import type { MissingList, SearchEngine, SearchOutcome, SearchResult } from './search-engine.ts';
@@ -54,11 +55,10 @@ async function collect(settings: Settings): Promise<Collected> {
 	return merge(await Promise.all(settings.sources.map((source) => collectSource(source, settings))));
 }
 
-/** A Nexus Source is not searched yet: its Repositories add no result. */
 async function collectSource(source: Source, settings: Settings): Promise<Collected> {
 	if (source.type === 'gitlab') return collectGitlab(source, settings);
 	if (source.type === 'harbor') return collectHarbor(source, settings);
-	return { documents: [], missing: [] };
+	return collectNexus(source, settings);
 }
 
 /** What every result of a Source shares, where a result without a Route to show it has no url, as results stay on Vitrine. */
@@ -147,6 +147,21 @@ async function collectHarbor(source: HarborSource, { routes }: Settings): Promis
 		),
 	);
 	return merge(lists);
+}
+
+async function collectNexus(source: NexusSource, { routes }: Settings): Promise<Collected> {
+	const found = foundIn(source);
+	// The list of the Source shows every Repository, and Nexus itself is outside Vitrine.
+	const url = nexusRepositoriesUrl(routes, source.name);
+	return fromList(source, 'Repositories', await listRepositories(source), (repositories, stale) =>
+		repositories.map((repository) => ({
+			result: { ...found(repository.name, url, stale), type: 'repository' as const, repository },
+			fields: [
+				{ weight: TITLE, text: repository.name },
+				{ weight: DETAIL, text: `${repository.format} ${repository.type}` },
+			],
+		})),
+	);
 }
 
 function fromList<T>(source: { name: string }, list: string, content: CachedContent<T>, toDocuments: (data: T, stale: boolean) => Document[]): Collected {

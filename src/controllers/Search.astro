@@ -21,6 +21,7 @@ const TYPE_LABELS: Record<ContentType, string> = {
 	member: 'Members',
 	epic: 'Epics',
 	image: 'Images',
+	repository: 'Repositories',
 };
 
 const { template } = Astro.props;
@@ -54,7 +55,7 @@ const title = text ? `Search: ${text}` : 'Search';
 						name="q"
 						value={text}
 						aria-label="Search"
-						placeholder="Groups, Projects, Issues, Members, Epics and Images"
+						placeholder="Groups, Projects, Issues, Members, Epics, Images and Repositories"
 						autocomplete="off"
 						spellcheck="false"
 						autofocus

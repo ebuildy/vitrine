@@ -5,11 +5,14 @@ import { startFakeGitlab } from './support/fake-gitlab.ts';
 import type { FakeGitlab } from './support/fake-gitlab.ts';
 import { startFakeHarbor } from './support/fake-harbor.ts';
 import type { FakeHarbor } from './support/fake-harbor.ts';
+import { startFakeNexus } from './support/fake-nexus.ts';
+import type { FakeNexus } from './support/fake-nexus.ts';
 import { writeSettings } from './support/vitrine.ts';
 
 let gitlab: FakeGitlab;
 let toolsGitlab: FakeGitlab;
 let harbor: FakeHarbor;
+let nexus: FakeNexus;
 /** Down from the start, so that none of its lists is ever cached. */
 let brokenGitlab: FakeGitlab;
 
@@ -45,6 +48,14 @@ beforeAll(async () => {
 		projects: { platform: ['platform/payments'], aged: ['aged/payments'], private: ['private/payments'] },
 		artifacts: { 'platform/payments': [{ size: 1, tags: [{ name: '2.4.0', push_time: '2026-10-01T08:00:00.000Z' }] }] },
 	});
+	nexus = await startFakeNexus({
+		repositories: [
+			{ name: 'maven-releases', format: 'maven2', type: 'hosted' },
+			{ name: 'maven-central', format: 'maven2', type: 'proxy' },
+			{ name: 'java-libraries', format: 'maven2', type: 'group' },
+			{ name: 'npm-proxy', format: 'npm', type: 'proxy' },
+		],
+	});
 	process.env.VITRINE_SETTINGS = writeSettings({
 		sources: [
 			{ name: 'main-gitlab', type: 'gitlab', url: gitlab.url, mainGroups: ['platform', 'nothing'] },
@@ -52,6 +63,8 @@ beforeAll(async () => {
 			{ name: 'broken-gitlab', type: 'gitlab', url: brokenGitlab.url, mainGroups: ['broken'] },
 			{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: ['platform'] },
 			{ name: 'aged-harbor', type: 'harbor', url: harbor.url, projects: ['aged'], allowedAgeMinutes: 5 },
+			{ name: 'main-nexus', type: 'nexus', url: nexus.url },
+			{ name: 'selected-nexus', type: 'nexus', url: nexus.url, repositories: ['maven-releases'] },
 		],
 		routes: [
 			// Only for main-gitlab, so that tools-gitlab has no Vitrine page for its Groups and Projects.
@@ -60,6 +73,7 @@ beforeAll(async () => {
 			{ url: '/issues/:group+', controller: 'gitlab-issues' },
 			{ url: '/roadmap/:group+', controller: 'gitlab-roadmap' },
 			{ url: '/harbor/:source/:project', controller: 'harbor-images' },
+			{ url: '/nexus/:source', controller: 'nexus' },
 		],
 	});
 });
@@ -69,12 +83,14 @@ afterAll(async () => {
 	await toolsGitlab?.stop();
 	await brokenGitlab?.stop();
 	await harbor?.stop();
+	await nexus?.stop();
 });
 
 afterEach(() => {
 	vi.useRealTimers();
 	gitlab.behave('up');
 	harbor.behave('up');
+	nexus.behave('up');
 });
 
 function search(text: string, filters: { types?: SearchResult['type'][]; sources?: string[] } = {}) {
@@ -94,6 +110,24 @@ test('one search covers Groups, Projects, Issues, Members, Epics and Images acro
 	expect(found((await search('refund')).results)).toEqual(['issue main-gitlab Refund fails on Sundays']);
 	expect(found((await search('ada')).results)).toEqual(['member main-gitlab Ada Lovelace']);
 	expect(found((await search('checkout')).results)).toEqual(['epic main-gitlab Checkout redesign']);
+});
+
+test('finds Nexus Repositories by name, format and type', async () => {
+	const { results } = await search('maven');
+
+	expect(found(results)).toEqual([
+		'repository main-nexus java-libraries',
+		'repository main-nexus maven-central',
+		'repository main-nexus maven-releases',
+		'repository selected-nexus maven-releases',
+	]);
+	expect(found((await search('npm proxy')).results)).toEqual(['repository main-nexus npm-proxy']);
+});
+
+test('ranks a Repository named after the words above one only of that format', async () => {
+	const titles = (await search('maven', { sources: ['main-nexus'] })).results.map(({ title }) => title);
+
+	expect(titles.at(-1)).toBe('java-libraries');
 });
 
 test('finds only Published content', async () => {
@@ -146,6 +180,7 @@ test('links each result to the Vitrine page that shows its content', async () =>
 	expect(links((await search('lovelace')).results)).toEqual(['member /gitlab/platform']);
 	expect(links((await search('checkout')).results)).toEqual(['epic /roadmap/platform']);
 	expect(links((await search('payments', { sources: ['main-harbor'] })).results)).toEqual(['image /harbor/main-harbor/platform']);
+	expect(links((await search('npm')).results)).toEqual(['repository /nexus/main-nexus']);
 });
 
 test('leaves a result without a link when no Route shows its content, rather than leaving Vitrine', async () => {
@@ -155,7 +190,7 @@ test('leaves a result without a link when no Route shows its content, rather tha
 const MINUTE = 60_000;
 
 function sourceCalls() {
-	return gitlab.requests.length + toolsGitlab.requests.length + harbor.requests.length;
+	return gitlab.requests.length + toolsGitlab.requests.length + harbor.requests.length + nexus.requests.length;
 }
 
 test('makes no Source calls when lists are cached', async () => {
@@ -164,6 +199,7 @@ test('makes no Source calls when lists are cached', async () => {
 
 	await search('ledger');
 	await search('ada', { types: ['member'], sources: ['main-gitlab'] });
+	await search('maven');
 
 	expect(sourceCalls()).toBe(before);
 });
@@ -222,6 +258,20 @@ test('names the lists it could not read, and still answers from the others', asy
 		{ source: 'broken-gitlab', list: 'Epics of broken' },
 	]);
 	expect(found(results)).toContain('project main-gitlab payments');
+});
+
+test('names the Repositories of a Nexus that is down with nothing cached', async () => {
+	const down = await startFakeNexus({ repositories: [] });
+	down.behave('down');
+	const shared = process.env.VITRINE_SETTINGS;
+	process.env.VITRINE_SETTINGS = writeSettings({ sources: [{ name: 'down-nexus', type: 'nexus', url: down.url }], routes: [] });
+
+	const { missing } = await search('maven').finally(() => {
+		process.env.VITRINE_SETTINGS = shared;
+		return down.stop();
+	});
+
+	expect(missing).toEqual([{ source: 'down-nexus', list: 'Repositories' }]);
 });
 
 test('names no list of a GitLab without Epics, which has none to find', async () => {

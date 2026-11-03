@@ -109,6 +109,10 @@ function showsProjectImages({ url, controller }: Route) {
 	return controller === 'harbor-images' && names.includes('source') && names.includes('project');
 }
 
+function showsNexusRepositories({ url, controller }: Route) {
+	return controller === 'nexus' && urlParamNames(url).includes('source');
+}
+
 function showsGroups({ url, controller }: Route) {
 	return controller === 'gitlab-group' && urlParamNames(url).includes('group');
 }
@@ -195,6 +199,11 @@ export function fixedUrls(routes: Route[]): string[] {
 /** The URL listing the Harbor projects of one Source, if a Route offers one. */
 export function harborProjectsUrl(routes: Route[], source: string): string | undefined {
 	return routes.find(showsHarborProjects)?.url.replace(':source', encodeURIComponent(source));
+}
+
+/** The URL listing the Repositories of one Nexus Source, if a Route offers one. */
+export function nexusRepositoriesUrl(routes: Route[], source: string): string | undefined {
+	return routes.find(showsNexusRepositories)?.url.replace(':source', encodeURIComponent(source));
 }
 
 /** The URL showing one Group, if a Route offers one. */

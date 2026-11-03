@@ -1,6 +1,7 @@
 import type { Source } from '../settings.ts';
 import type { Epic, Group, Issue, Member, Project } from '../sources/gitlab-api.ts';
 import type { Image } from '../sources/harbor-api.ts';
+import type { Repository } from '../sources/nexus-api.ts';
 import { cachedListsEngine } from './cached-lists-engine.ts';
 
 /**
@@ -13,7 +14,7 @@ export interface SearchEngine {
 }
 
 /** The kinds of content one search covers, in the order a Visitor sees them. */
-export const CONTENT_TYPES = ['group', 'project', 'issue', 'member', 'epic', 'image'] as const;
+export const CONTENT_TYPES = ['group', 'project', 'issue', 'member', 'epic', 'image', 'repository'] as const;
 
 export type ContentType = (typeof CONTENT_TYPES)[number];
 
@@ -43,6 +44,7 @@ export type SearchResult = FoundContent &
 		| { type: 'member'; member: Member }
 		| { type: 'epic'; epic: Epic }
 		| { type: 'image'; image: Image }
+		| { type: 'repository'; repository: Repository }
 	);
 
 /** A list that could not be read, so that its content is missing from results. */
