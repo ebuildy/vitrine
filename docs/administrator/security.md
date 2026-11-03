@@ -25,6 +25,7 @@ Vitrine shows the content of private Projects to every Visitor, with no login. O
 - **Member emails**: the public email of each Member's GitLab profile, with their name, avatar and location.
 - **Issue assignments**: who is assigned to each open Issue and Epic, on Issue pages, Roadmaps and in search.
 - **Vulnerability counts**: the critical, high, medium and low vulnerabilities of every scanned Image tag, which tell an attacker which Images to target.
+- **Every page visited**: `/sitemap.xml` lists the URL of every page that answered, such as each Group and Project, without anyone having to crawl it.
 
 Keep Vitrine on an internal network, or behind an authenticating proxy such as oauth2-proxy, unless all of this may be public.
 

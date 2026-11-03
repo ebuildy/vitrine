@@ -56,9 +56,16 @@ export const routeSchema = z.strictObject({
 /** Settings adds `compiled` to a Route whose Template runs, so a Route never needs to know whether Templates are disabled. */
 export type Route = z.infer<typeof routeSchema> & { compiled?: CompiledTemplate };
 
+/** The pages under src/pages, which Astro prefers over any Route. */
+const SERVED_BY_VITRINE = ['/sitemap.xml'];
+
 export function routeProblems(routes: Route[], sources: Source[]) {
 	const problems = duplicates(routes.map((route) => route.url)).map((url) => `Route "${url}" is declared twice`);
 	for (const { url, controller, params } of routes) {
+		if (SERVED_BY_VITRINE.includes(url)) {
+			problems.push(`Route "${url}": Vitrine serves this URL itself`);
+			continue;
+		}
 		// A URL placeholder has no value until a request comes in, so only its name can be checked here.
 		const urlParams = Object.fromEntries(urlParamNames(url).map((name) => [name, name]));
 		const parsed = controllerParamsSchemas[controller].safeParse({ ...urlParams, ...params });

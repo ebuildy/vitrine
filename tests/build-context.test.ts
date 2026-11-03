@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-const NEEDED_TO_BUILD = ['astro.config.mjs', 'LICENSE', 'package-lock.json', 'package.json', 'start.ts', 'src/settings.ts', 'tsconfig.json'];
+const NEEDED_TO_BUILD = ['astro.config.mjs', 'LICENSE', 'package-lock.json', 'package.json', 'start.ts', 'warm-up.ts', 'src/settings.ts', 'tsconfig.json'];
 
 const LEFT_OUT = [
 	['settings.yaml', 'may hold real hostnames or secrets'],
