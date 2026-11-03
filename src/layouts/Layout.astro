@@ -1,5 +1,5 @@
 ---
-import { matchRoute, searchUrl } from '../router.ts';
+import { matchRoute } from '../router.ts';
 import { getSettings } from '../settings.ts';
 import '../themes/naval.css';
 
@@ -21,9 +21,6 @@ const themeVariables = Object.fromEntries([
 // Not every installation has a Route at the root URL, and a link home should not lead to not found.
 const hasHome = Boolean(matchRoute(settings, '/'));
 const SiteNameTag = hasHome ? 'a' : 'span';
-// The search page has a box of its own, which a second one would only repeat.
-const search = searchUrl(settings.routes);
-const showsSearchBox = search !== undefined && search !== Astro.url.pathname;
 ---
 
 <!doctype html>
@@ -61,13 +58,6 @@ const showsSearchBox = search !== undefined && search !== Astro.url.pathname;
 							))}
 						</ul>
 					</nav>
-				)
-			}
-			{
-				showsSearchBox && (
-					<form class="site-search" action={search} method="get" role="search">
-						<input type="search" name="q" aria-label="Search Vitrine" placeholder="Search" />
-					</form>
 				)
 			}
 			{/* Without JavaScript, the page follows the system, and a menu that does nothing stays hidden. */}
@@ -177,19 +167,6 @@ const showsSearchBox = search !== undefined && search !== Astro.url.pathname;
 
 	.site-name img {
 		height: 2rem;
-	}
-
-	.site-search {
-		margin-left: auto;
-	}
-
-	.site-search input {
-		padding: 0.3rem 0.6rem;
-		font: inherit;
-	}
-
-	.site-search + .color-mode {
-		margin-left: 0;
 	}
 
 	.color-mode {

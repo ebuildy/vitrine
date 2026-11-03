@@ -185,11 +185,6 @@ export function harborImagesUrl(routes: Route[], source: string, project: string
 	return routes.find(showsProjectImages)?.url.replace(':source', encodeURIComponent(source)).replace(':project', encodeURIComponent(project));
 }
 
-/** The URL of the search page, if a Route offers one that needs no value from the URL. */
-export function searchUrl(routes: Route[]): string | undefined {
-	return routes.find(({ url, controller }) => controller === 'search' && urlParamNames(url).length === 0)?.url;
-}
-
 /** The URLs that need no value from anyone, which are all a page can link to without knowing what a Route shows. */
 export function fixedUrls(routes: Route[]): string[] {
 	return routes.map(({ url }) => url).filter((url) => urlParamNames(url).length === 0);
