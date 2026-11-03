@@ -28,8 +28,6 @@ export interface SearchQuery {
 interface FoundContent {
 	source: string;
 	sourceType: Source['type'];
-	/** The address of the Source, for its own icon. */
-	sourceUrl: string;
 	title: string;
 	/** Where the content lives. */
 	url: string;

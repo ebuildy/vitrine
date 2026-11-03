@@ -54,7 +54,7 @@ async function collect(settings: Settings): Promise<Collected> {
 
 /** What every result of a Source shares. */
 function foundIn(source: Source) {
-	return (title: string, url: string, stale: boolean) => ({ source: source.name, sourceType: source.type, sourceUrl: source.url, title, url, stale });
+	return (title: string, url: string, stale: boolean) => ({ source: source.name, sourceType: source.type, title, url, stale });
 }
 
 async function collectGitlab(source: GitlabSource): Promise<Collected> {
