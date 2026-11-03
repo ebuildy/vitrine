@@ -28,7 +28,12 @@ const query = Astro.url.searchParams;
 const text = (query.get('q') ?? '').trim();
 const types = query.getAll('type').filter((type): type is ContentType => (CONTENT_TYPES as readonly string[]).includes(type));
 const sources = query.getAll('source');
+// What a Visitor waited for, lists loading from a Source included.
+const started = performance.now();
 const { results, counts, missing } = await getSearchEngine().search({ text, types, sources });
+const elapsed = performance.now() - started;
+// A search on cached lists takes well under a millisecond, which a whole number would show as 0 ms.
+const duration = `${elapsed < 10 ? elapsed.toFixed(1) : Math.round(elapsed)} ms`;
 const shown = results.slice(0, MAX_RESULTS);
 const title = text ? `Search: ${text}` : 'Search';
 ---
@@ -102,7 +107,9 @@ const title = text ? `Search: ${text}` : 'Search';
 						(shown.length > 0 ? (
 							<>
 								<p class="summary">
-									{results.length > shown.length ? `The first ${shown.length} of ${results.length} results.` : `${results.length} ${results.length === 1 ? 'result' : 'results'}.`}
+									{results.length > shown.length
+										? `The first ${shown.length} of ${results.length} results in ${duration}.`
+										: `${results.length} ${results.length === 1 ? 'result' : 'results'} in ${duration}.`}
 								</p>
 								<ul class="results">
 									{shown.map((result) => (
