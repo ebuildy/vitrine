@@ -21,5 +21,8 @@ COPY LICENSE start.ts warm-up.ts ./
 COPY src src
 # Numeric, or kubelet cannot check runAsNonRoot. It is the user node of the base image.
 USER 1000
+# Last, so that a new version reuses every layer above. image.yaml passes the release, or edge, and the commit: 1.2.3+abc1234.
+ARG VERSION=dev
+ENV VITRINE_VERSION=$VERSION
 EXPOSE 8080
 CMD ["node", "start.ts"]

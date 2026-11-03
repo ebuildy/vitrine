@@ -4,6 +4,9 @@ import { fixedUrls } from './src/router.ts';
 import { getSettings, prepareSettings, SettingsError } from './src/settings.ts';
 import { scheduleWarmUps } from './src/warm-up.ts';
 
+// First, so that a log of a failed start still says which Vitrine it was.
+console.log(`Vitrine ${process.env.VITRINE_VERSION ?? 'dev'}`);
+
 try {
 	prepareSettings();
 } catch (error) {

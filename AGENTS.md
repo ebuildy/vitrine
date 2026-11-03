@@ -28,6 +28,14 @@ To see a page with content, run `npm run demo`: it serves fake Sources to `astro
 - The demo's fake Sources listen on free ports, printed at start. `demo/start.ts` writes `demo/settings.yaml` with those URLs to `demo/.settings-<pid>.yaml`, which git ignores and the run deletes at exit: edit `demo/settings.yaml`.
 - Every worktree shares the one Valkey of `compose.yaml`. A worktree whose Settings use `cacheStore: redis` sets a `keyPrefix` of its own, such as `vitrine-<worktree>:`, so it reads only its own content. Tests give every Redis test a prefix of its own.
 
+## Releases
+
+release-please makes releases from commit messages, so write them as Conventional Commits: `feat:` bumps the minor version, `fix:` the patch. A change an Administrator must act on is breaking, written `feat!:` or with a `BREAKING CHANGE:` footer that says what to do: a renamed or removed Settings option, Controller, param, Component, prop or environment variable, or a new required one. Before `1.0.0`, a breaking change bumps the minor version.
+
+Never bump `package.json`, edit `CHANGELOG.md` or push a `v*` tag by hand. Every push to `main` updates one Release PR. Merging it tags `vX.Y.Z` and creates the GitHub Release, and the tag makes `image.yaml` publish the Container image as `X.Y.Z`, `X.Y` and `X`.
+
+`release.yaml` runs with the repository secret `RELEASE_PLEASE_TOKEN`, a fine-grained personal access token on `ebuildy/vitrine` only, with read and write access to Contents, Pull requests and Issues. With `GITHUB_TOKEN` instead, the tag would not trigger `image.yaml`. The Release PR's commits carry the sign-off set in `release-please-config.json`.
+
 ## Administrator documentation
 
 Keep it current: every change an Administrator would notice ships with its documentation, in the same commit.

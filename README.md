@@ -25,7 +25,9 @@ docker run -p 8080:8080 \
   ghcr.io/ebuildy/vitrine:edge
 ```
 
-Two kinds of tag exist, for `linux/amd64` and `linux/arm64`: `edge` follows `main`, and a release `v1.2.3` is published as `1.2.3`, `1.2` and `1`. There is no `latest`.
+Two kinds of tag exist, for `linux/amd64` and `linux/arm64`: `edge` follows `main`, and a release `v1.2.3` is published as `1.2.3`, `1.2` and `1`. There is no `latest`. Pin a release, `1.2.3` or `1.2`, and keep `edge` for trying what `main` holds. Each release lists its changes in [`CHANGELOG.md`](CHANGELOG.md) and on the [Releases](https://github.com/ebuildy/vitrine/releases) page. Before `1.0.0`, a release whose minor number changes, such as `0.3.0`, may need you to change Settings or environment variables, and its changelog says how.
+
+Vitrine prints its version first when it starts, such as `Vitrine 1.2.3+abc1234`: the release, or `edge`, then the commit it was built from.
 
 The Container image listens on port 8080, as user `node` (uid 1000), and stops within 5 seconds of `SIGTERM`, letting requests in progress finish. It creates no directory for a `files` cache store, so mount a writable one for that user. It serves no files of its own: host a logo or a stylesheet elsewhere, or put CSS files beside Settings, in the same ConfigMap.
 
@@ -43,6 +45,7 @@ Startup checks Settings before serving anything, and stops with a list of proble
 | `VITRINE_ENV_FILE` | A file of environment variables read at start. Defaults to `.env` in the working directory. Vitrine works without one, and a variable the environment already sets wins. |
 | `VITRINE_TEMPLATE_DISABLE` | Any non-empty value, even `false`, stops Templates from being compiled or run. |
 | `HOST`, `PORT` | Where the server listens. The Container image sets `0.0.0.0` and `8080`. |
+| `VITRINE_VERSION` | The version Vitrine prints when it starts. The Container image sets it, and it is `dev` from source. |
 | Those Settings name | Each `tokenEnv`, `passwordEnv` and `urlEnv` in Settings names a variable holding a secret. Startup stops when one is not set. |
 
 ### Cache warm-up

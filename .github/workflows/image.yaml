@@ -40,6 +40,9 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+      - id: version
+        name: Name the version the image reports
+        run: echo "version=${{ steps.meta.outputs.version }}+${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - name: Build the image to smoke test
         uses: docker/build-push-action@v7
         with:
@@ -48,6 +51,7 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: vitrine:smoke
+          build-args: VERSION=${{ steps.version.outputs.version }}
       - name: Smoke test the image
         shell: bash
         run: |
@@ -57,6 +61,7 @@ jobs:
           fi
           echo "$output"
           grep --quiet 'Invalid Settings' <<<"$output"
+          grep --quiet --fixed-strings 'Vitrine ${{ steps.version.outputs.version }}' <<<"$output"
 
           # Run as the Helm chart runs it: a read-only root, with /tmp alone writable, and no capabilities.
           docker run --detach --name vitrine-smoke --publish 8080:8080 \
@@ -75,4 +80,4 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
+          build-args: VERSION=${{ steps.version.outputs.version }}
