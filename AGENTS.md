@@ -24,6 +24,20 @@ To see a page with content, run `npm run demo`: it serves fake Sources to `astro
 - The demo's fake Sources listen on free ports, printed at start. `demo/start.ts` writes `demo/settings.yaml` with those URLs to `demo/.settings-<pid>.yaml`, which git ignores and the run deletes at exit: edit `demo/settings.yaml`.
 - Every worktree shares the one Valkey of `compose.yaml`. A worktree whose Settings use `cacheStore: redis` sets a `keyPrefix` of its own, such as `vitrine-<worktree>:`, so it reads only its own content. Tests give every Redis test a prefix of its own.
 
+## Administrator documentation
+
+Keep it current: every change an Administrator would notice ships with its documentation, in the same commit.
+
+- A Settings option: `settings.example.yaml`
+- A Controller or its params: `docs/administrator/controllers.md`
+- A Component or its props: `docs/administrator/components.md`
+- What a Template can use, or what startup checks: `docs/administrator/templates.md`
+- A cache store: `docs/administrator/cache-stores.md`
+- What Visitors see, or what credentials read: `docs/administrator/security.md`
+- Deployment, the Container image or an environment variable: `README.md`
+
+`tests/documentation.test.ts` goes red on a missing option, Controller, param, Component or prop. A description that no longer matches the code passes it, so reread the section of whatever you changed.
+
 ## Documentation
 
 Full documentation: https://docs.astro.build
