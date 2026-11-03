@@ -8,7 +8,7 @@ You configure it with one Settings file, change its look with a Theme and Templa
 
 - [`settings.example.yaml`](settings.example.yaml): every option of Settings, explained, to copy as `settings.yaml`.
 - [Controllers](docs/administrator/controllers.md): the kinds of page a Route can show, and their params.
-- [Components](docs/administrator/components.md): the building blocks a Template or a page of a fork places, and their props.
+- [Components](docs/administrator/components.md): what a Template or a page of a fork places on a page, and their props.
 - [Templates](docs/administrator/templates.md): rearranging a page from Settings.
 - [Cache stores](docs/administrator/cache-stores.md): memory, local files or Redis.
 - [Security](docs/administrator/security.md): **read before you deploy**. Token permissions are the real boundary around private projects, and an installation exposed to the internet shows Member emails, Issue assignments and vulnerability counts to anyone.
