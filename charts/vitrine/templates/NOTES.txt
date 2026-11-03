@@ -1,0 +1,17 @@
+Vitrine listens on port {{ .Values.service.port }} of the Service {{ include "vitrine.fullname" . }}.
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}/
+{{- end }}
+{{- else if .Values.httpRoute.enabled }}
+{{- range .Values.httpRoute.hostnames }}
+  https://{{ . }}/
+{{- end }}
+{{- else }}
+To reach it from here:
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "vitrine.fullname" . }} 8080:{{ .Values.service.port }}
+  open http://localhost:8080/
+{{- end }}
+
+Startup stops on invalid Settings, with a list of problems:
+  kubectl --namespace {{ .Release.Namespace }} logs deployment/{{ include "vitrine.fullname" . }}

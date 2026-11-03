@@ -15,6 +15,8 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '24.x'
+      # tests/helm-chart.test.ts renders and lints the chart.
+      - uses: azure/setup-helm@v4
       - run: docker compose up -d --wait
       - run: npm ci
       - run: npm run check

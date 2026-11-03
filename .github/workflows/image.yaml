@@ -58,7 +58,9 @@ jobs:
           echo "$output"
           grep --quiet 'Invalid Settings' <<<"$output"
 
+          # Run as the Helm chart runs it: a read-only root, with /tmp alone writable, and no capabilities.
           docker run --detach --name vitrine-smoke --publish 8080:8080 \
+            --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
             --volume "$PWD/tests/fixtures/container-settings.yaml:/etc/vitrine/settings.yaml:ro" \
             vitrine:smoke
           trap 'docker logs vitrine-smoke; docker rm --force vitrine-smoke' EXIT

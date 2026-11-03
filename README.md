@@ -31,6 +31,10 @@ The Container image listens on port 8080, as user `node` (uid 1000), and stops w
 
 Startup checks Settings before serving anything, and stops with a list of problems: first a misspelt or misplaced option, then, once Settings read correctly, a Route to a Source that does not exist, a missing environment variable or a Template that does not compile.
 
+### Helm chart
+
+[`charts/vitrine`](charts/vitrine/README.md) deploys the Container image on Kubernetes: Settings as Helm values, rendered into a ConfigMap, secrets from Secrets through `extraEnvs`, a pod on a read-only root, and, when enabled, an Ingress, a Gateway API HTTPRoute, a NetworkPolicy and a Valkey for a `redis` cache store.
+
 ### Environment variables
 
 | Variable | What it does |
@@ -81,7 +85,7 @@ npm run demo
 
 Open the URL Astro prints. `/`, `/images`, `/images/tools`, `/harbor/main-harbor`, `/gitlab/data/analytics`, `/issues/platform`, `/roadmap/platform`, `/search?q=api` and `/nexus/main-nexus` all show content, and `/roadmap/data/analytics` shows the error of a GitLab tier without Epics. Links to GitLab and Nexus themselves lead to the fake ones, which answer 404.
 
-`npm test` needs the Valkey of `compose.yaml`, so run `docker compose up -d --wait` first, and a Docker engine with BuildKit. `npm run test:e2e` runs the browser tests. See [`AGENTS.md`](AGENTS.md) for working in several worktrees at once.
+`npm test` needs the Valkey of `compose.yaml`, so run `docker compose up -d --wait` first, a Docker engine with BuildKit, and `helm`, which fetches the Valkey chart from the network. `npm run test:e2e` runs the browser tests. See [`AGENTS.md`](AGENTS.md) for working in several worktrees at once.
 
 ## License
 

@@ -34,3 +34,4 @@ vitest-report/
 
 # the demo Settings, at the ports of this run
 /demo/.settings-*.yaml
+charts/vitrine/charts/

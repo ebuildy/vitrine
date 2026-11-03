@@ -1,0 +1,18 @@
+apiVersion: v2
+name: vitrine
+description: A portal in front of GitLab, Harbor and Nexus, to browse their content and find where to download it.
+type: application
+version: 0.1.0
+# The tag of ghcr.io/ebuildy/vitrine that image.tag defaults to. No release is published yet, so it follows main.
+appVersion: edge
+home: https://github.com/ebuildy/vitrine
+sources:
+  - https://github.com/ebuildy/vitrine
+annotations:
+  artifacthub.io/license: MIT
+dependencies:
+  # The official chart of the Valkey project, for a redis cache store. Bitnami no longer publishes free images.
+  - name: valkey
+    version: 0.12.1
+    repository: https://valkey.io/valkey-helm/
+    condition: valkey.enabled
