@@ -63,7 +63,7 @@ The site name and logo that give an installation its organisation's identity, se
 _Avoid_: Logo, identity, white label
 
 **Menu**:
-The links at the top of every page, set under `navigation` in Settings.
+The links at the top of every page, set under `navigation` in Settings, each with an optional icon before its label.
 _Avoid_: Navigation bar, navbar, links
 
 **Theme**:

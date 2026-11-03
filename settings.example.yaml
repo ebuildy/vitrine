@@ -70,11 +70,17 @@ branding:
   logo: https://cdn.example.com/logo.svg
 
 # The Menu at the top of every page, in this order. A url starts with http://, https:// or /.
+# An icon, before the label, is optional. It is one of:
+#   - an emoji, by its GitHub shortcode, like :rocket: or :books:
+#   - a logo the build carries: gitlab or harbor
+#   - an image at a URL starting with https:// or /
 navigation:
   - label: Images
     url: /images
+    icon: harbor
   - label: Handbook
     url: https://docs.example.com/
+    icon: ":books:"
 
 # name picks a complete Theme, with its own colours and decorations. Leave it out for the plain default.
 # Every Theme, the default too, has a light and a dark mode. Each Visitor's system picks one, unless the Visitor

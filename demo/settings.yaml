@@ -41,8 +41,10 @@ navigation:
     url: /
   - label: Images
     url: /images
+    icon: harbor
   - label: Roadmap
     url: /roadmap/platform
+    icon: ":rocket:"
   - label: Issues
     url: /issues/platform
   - label: Search

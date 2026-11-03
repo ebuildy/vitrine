@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { nameToEmoji } from 'gemoji';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import { duplicates, routeProblems, routeSchema } from './router.ts';
@@ -62,9 +63,39 @@ const brandingSchema = z.strictObject({
 	logo: addressSchema.optional(),
 });
 
+/** The logos the build carries, which a Menu item names in Settings: those of the kinds of Source, in src/source-looks.ts. */
+const EMBEDDED_ICONS = ['gitlab', 'harbor'] as const satisfies readonly Source['type'][];
+type EmbeddedIcon = (typeof EMBEDDED_ICONS)[number];
+
+/** What a Menu item shows before its label: an emoji, a logo of the build, or an image at an address. */
+export type MenuIcon = { emoji: string } | { embedded: EmbeddedIcon } | { url: string };
+
+const SHORTCODE = /^:([^:\s]+):$/;
+// Not http://, as a browser blocks or warns about an image over plain HTTP on a page served over HTTPS.
+const ICON_URL = /^(https:\/\/|\/)/i;
+
+/** Read by its shape, so that a misspelt value fails at startup and not as a Menu with no icon. */
+const menuIconSchema = z.string().transform((icon, context): MenuIcon => {
+	const shortcode = SHORTCODE.exec(icon)?.[1];
+	if (shortcode !== undefined) {
+		const emoji = Object.hasOwn(nameToEmoji, shortcode) ? nameToEmoji[shortcode] : undefined;
+		if (emoji) return { emoji };
+		context.addIssue({ code: 'custom', message: `${icon} is not an emoji shortcode, like :rocket:` });
+		return z.NEVER;
+	}
+	if ((EMBEDDED_ICONS as readonly string[]).includes(icon)) return { embedded: icon as EmbeddedIcon };
+	if (ICON_URL.test(icon)) return { url: icon };
+	context.addIssue({
+		code: 'custom',
+		message: `must be an emoji shortcode like :rocket:, one of ${EMBEDDED_ICONS.join(', ')}, or a URL starting with https:// or /`,
+	});
+	return z.NEVER;
+});
+
 const navigationItemSchema = z.strictObject({
 	label: z.string().min(1),
 	url: addressSchema,
+	icon: menuIconSchema.optional(),
 });
 
 // The characters of a CSS colour, so that a stray `;` or `}` fails at startup and not as a page with no colours.
