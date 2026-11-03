@@ -41,6 +41,8 @@ navigation:
     url: /roadmap/platform
   - label: Issues
     url: /issues/platform
+  - label: Search
+    url: /search
 
 # The naval Theme: a crisp layout in ocean blues, with a sea of drifting waves, boats and submarines at the foot of every page.
 theme:
@@ -98,3 +100,5 @@ routes:
     controller: gitlab-roadmap
   - url: /issues/:group+
     controller: gitlab-issues
+  - url: /search
+    controller: search

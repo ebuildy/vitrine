@@ -23,6 +23,7 @@ const controllerParamsSchemas = {
 	'gitlab-project': z.strictObject({ source: z.string().optional(), group: z.string(), project: z.string() }),
 	'gitlab-roadmap': z.strictObject({ source: z.string().optional(), group: z.string() }),
 	'gitlab-issues': z.strictObject({ source: z.string().optional(), group: z.string() }),
+	search: z.strictObject({}),
 };
 
 export type ControllerName = keyof typeof controllerParamsSchemas;
@@ -35,6 +36,7 @@ export const controllerSourceTypes: Record<ControllerName, Source['type'] | unde
 	'gitlab-project': 'gitlab',
 	'gitlab-roadmap': 'gitlab',
 	'gitlab-issues': 'gitlab',
+	search: undefined,
 };
 
 export const routeSchema = z.strictObject({
@@ -181,6 +183,11 @@ function resolveSource({ controller }: Route, params: Record<string, string>, so
 /** The URL showing the Images of one Harbor project, if a Route offers one. */
 export function harborImagesUrl(routes: Route[], source: string, project: string): string | undefined {
 	return routes.find(showsProjectImages)?.url.replace(':source', encodeURIComponent(source)).replace(':project', encodeURIComponent(project));
+}
+
+/** The URL of the search page, if a Route offers one that needs no value from the URL. */
+export function searchUrl(routes: Route[]): string | undefined {
+	return routes.find(({ url, controller }) => controller === 'search' && urlParamNames(url).length === 0)?.url;
 }
 
 /** The URLs that need no value from anyone, which are all a page can link to without knowing what a Route shows. */

@@ -3,7 +3,7 @@ import type { CachedContent, Loader } from '../content-cache.ts';
 import { findMainGroup, isAtOrBeneath } from '../router.ts';
 import type { GitlabSource } from '../settings.ts';
 import * as gitlabApi from './gitlab-api.ts';
-import type { Commit, Contributor, DetailedMember, Epic, Group, Issue, MainGroupContent, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
+import type { Commit, Contributor, DetailedMember, Epic, Group, Issue, MainGroupContent, Member, Project, ProjectCard, Readme, Release } from './gitlab-api.ts';
 
 export { EpicsUnavailableError } from './gitlab-api.ts';
 
@@ -68,18 +68,10 @@ export function getProject(source: GitlabSource, path: string): Promise<CachedCo
  * whose profile is not read yet shows what the list gives.
  */
 export async function listMembers(source: GitlabSource, group: string, deep: boolean): Promise<MemberList> {
-	const list = await inMainGroup(source, group, (mainGroup) =>
-		deep
-			? readSource(source, `${source.name}/members/${mainGroup}`, async (signal) => {
-					const content = await fromMainGroup(source, mainGroup, (mainGroupContent) => mainGroupContent);
-					if (content.error) throw content.error;
-					return gitlabApi.readMembers(source, content.data, signal);
-				})
-			: readSource(source, `${source.name}/group-members/${group}`, (signal) => gitlabApi.readMembers(source, { groups: [{ path: group }], projects: [] }, signal)),
-	);
+	const list = await readMemberList(source, group, deep);
 	if (list.error) return list;
 
-	const members = list.data.filter(({ paths }) => paths.some((path) => isAtOrBeneath(path, group)));
+	const members = list.data;
 	const profiles = await readWhileUp(members, gitlabApi.MEMBER_READS_AT_ONCE, (member) =>
 		readSource(source, `${source.name}/member/${member.id}/profile`, (signal) => gitlabApi.readMemberProfile(source, member, signal)),
 	);
@@ -91,9 +83,49 @@ export async function listMembers(source: GitlabSource, group: string, deep: boo
 	};
 }
 
-/** Lists the Epics of a Main Group, cached apart from its other lists, as a GitLab without Epics must not stop browsing. */
+/** Lists the Members beneath a Main Group as its list gives them, without the profiles that cost a request each, so bots are told by username alone. */
+export async function listMemberAccounts(source: GitlabSource, mainGroup: string): Promise<CachedContent<Member[]>> {
+	const list = await readMemberList(source, mainGroup, true);
+	return list.error ? list : { data: list.data.filter((member) => !gitlabApi.isBot(member)), stale: list.stale };
+}
+
+async function readMemberList(source: GitlabSource, group: string, deep: boolean): Promise<CachedContent<Member[]>> {
+	const list = await inMainGroup(source, group, (mainGroup) =>
+		deep
+			? readSource(source, `${source.name}/members/${mainGroup}`, async (signal) => {
+					const content = await readMainGroupContent(source, mainGroup);
+					if (content.error) throw content.error;
+					return gitlabApi.readMembers(source, content.data, signal);
+				})
+			: readSource(source, `${source.name}/group-members/${group}`, (signal) => gitlabApi.readMembers(source, { groups: [{ path: group }], projects: [] }, signal)),
+	);
+	return list.error ? list : { data: list.data.filter(({ paths }) => paths.some((path) => isAtOrBeneath(path, group))), stale: list.stale };
+}
+
+/** Everything a Main Group holds, its own Group first, from the list every page and search reads. */
+export function readMainGroupContent(source: GitlabSource, mainGroup: string): Promise<CachedContent<MainGroupContent>> {
+	return fromMainGroup(source, mainGroup, (content) => content);
+}
+
+/**
+ * Lists the Epics of a Main Group, cached apart from its other lists, as a GitLab without Epics must not stop browsing.
+ * That GitLab has no Epics is cached too, for as long as a list, so that pages and searches do not ask it again each time.
+ */
 export function listEpics(source: GitlabSource, path: string): Promise<CachedContent<Epic[] | undefined>> {
-	return ifMainGroup(source, path, () => readSource(source, `${source.name}/epics/${path}`, (signal) => gitlabApi.readEpics(source, path, signal)));
+	return ifMainGroup(source, path, async () => {
+		const epics = await readSource(source, `${source.name}/epics/${path}`, (signal) => readEpicsUnlessUnavailable(source, path, signal));
+		if (epics.error) return epics;
+		return Array.isArray(epics.data) ? { data: epics.data, stale: epics.stale } : { error: new gitlabApi.EpicsUnavailableError(epics.data.unavailable) };
+	});
+}
+
+async function readEpicsUnlessUnavailable(source: GitlabSource, mainGroup: string, signal: AbortSignal): Promise<Epic[] | { unavailable: string }> {
+	try {
+		return await gitlabApi.readEpics(source, mainGroup, signal);
+	} catch (error) {
+		if (error instanceof gitlabApi.EpicsUnavailableError) return { unavailable: error.message };
+		throw error;
+	}
 }
 
 /** Lists the Issues beneath a Group, cached whole per Main Group and apart from its other lists, as each fails and takes time of its own. */

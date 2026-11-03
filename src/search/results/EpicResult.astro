@@ -1,0 +1,18 @@
+---
+import { formatDate } from '../../format.ts';
+import type { Epic } from '../../sources/gitlab-api.ts';
+
+interface Props {
+	url: string;
+	epic: Epic;
+}
+
+const { url, epic } = Astro.props;
+const dates = [epic.startDate && `from ${formatDate(epic.startDate)}`, epic.dueDate && `due ${formatDate(epic.dueDate)}`].filter(Boolean).join(', ');
+---
+
+<h2><a href={url}>{epic.title}</a></h2>
+<p>
+	{epic.issues.closed} of {epic.issues.all} Issues closed{dates && ` · ${dates}`}
+</p>
+{epic.assignees.length > 0 && <p>Assigned to {epic.assignees.map(({ name }) => name).join(', ')}</p>}

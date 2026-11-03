@@ -134,6 +134,12 @@ routes:
   # Shows the open Issues of a Group and of everything beneath it, read once per Main Group.
   - url: /issues/:group+
     controller: gitlab-issues
+  # Searches every Group, Project, Issue, Member and Epic of every Main Group and every Image of every selected Harbor
+  # project from one box, filtered by content type and by Source. It answers from the lists the other pages cache, so a
+  # search costs the Sources nothing while they are fresh. A word may have one letter wrong. Every page shows a search
+  # box in its header that leads here.
+  - url: /search
+    controller: search
   # Shows the open Epics of a Main Group and of everything beneath it on a timeline. Any other Group is not found.
   # Epics need GitLab 18.1 or later on a tier that includes them. Otherwise the Roadmap shows an error.
   - url: /roadmap/:group+

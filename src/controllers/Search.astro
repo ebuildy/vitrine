@@ -1,0 +1,161 @@
+---
+import Arrangement from '../layouts/Arrangement.astro';
+import Layout from '../layouts/Layout.astro';
+import SearchResult from '../search/SearchResult.astro';
+import { CONTENT_TYPES, getSearchEngine } from '../search/search-engine.ts';
+import type { ContentType } from '../search/search-engine.ts';
+import { getSettings } from '../settings.ts';
+import type { CompiledTemplate } from '../template-compiler.ts';
+
+interface Props {
+	template?: CompiledTemplate;
+}
+
+// Enough for a Visitor to find what they meant, or to see they should search with more words.
+const MAX_RESULTS = 100;
+
+const TYPE_LABELS: Record<ContentType, string> = {
+	group: 'Groups',
+	project: 'Projects',
+	issue: 'Issues',
+	member: 'Members',
+	epic: 'Epics',
+	image: 'Images',
+};
+
+const { template } = Astro.props;
+const query = Astro.url.searchParams;
+const text = (query.get('q') ?? '').trim();
+const types = query.getAll('type').filter((type): type is ContentType => (CONTENT_TYPES as readonly string[]).includes(type));
+const sources = query.getAll('source');
+const { results, counts, missing } = await getSearchEngine().search({ text, types, sources });
+const shown = results.slice(0, MAX_RESULTS);
+const title = text ? `Search: ${text}` : 'Search';
+---
+
+<Layout title={title}>
+	<Arrangement template={template} title={title}>
+		<h1>Search</h1>
+		<form class="search" method="get" role="search">
+			<div class="box">
+				<input type="search" name="q" value={text} aria-label="Search" placeholder="Groups, Projects, Issues, Members, Epics and Images" autofocus />
+				<button type="submit">Search</button>
+			</div>
+			<fieldset>
+				<legend>Content type</legend>
+				{
+					CONTENT_TYPES.map((type) => (
+						<label>
+							<input type="checkbox" name="type" value={type} checked={types.includes(type)} />
+							{TYPE_LABELS[type]}
+							{text && <span class="count">{counts.types[type] ?? 0}</span>}
+						</label>
+					))
+				}
+			</fieldset>
+			<fieldset>
+				<legend>Source</legend>
+				{
+					getSettings().sources.map(({ name }) => (
+						<label>
+							<input type="checkbox" name="source" value={name} checked={sources.includes(name)} />
+							{name}
+							{text && <span class="count">{counts.sources[name] ?? 0}</span>}
+						</label>
+					))
+				}
+			</fieldset>
+		</form>
+		{shown.some(({ stale }) => stale) && <p role="status">Some results are Stale because their Source is down.</p>}
+		{
+			missing.length > 0 && (
+				<p role="alert">
+					Some content could not be searched: {missing.map(({ source, list }) => `${list} from ${source}`).join(', ')}.
+				</p>
+			)
+		}
+		{
+			text &&
+				(shown.length > 0 ? (
+					<>
+						<p class="summary">
+							{results.length > shown.length ? `The first ${shown.length} of ${results.length} results.` : `${results.length} ${results.length === 1 ? 'result' : 'results'}.`}
+						</p>
+						<ul class="results">
+							{shown.map((result) => (
+								<SearchResult result={result} />
+							))}
+						</ul>
+					</>
+				) : (
+					<p>Nothing matches “{text}”.</p>
+				))
+		}
+	</Arrangement>
+</Layout>
+
+<script>
+	// A filter applies as soon as it changes. Without JavaScript, the Search button applies it.
+	for (const filter of document.querySelectorAll<HTMLInputElement>('form.search input[type="checkbox"]')) {
+		filter.addEventListener('change', () => filter.form?.requestSubmit());
+	}
+</script>
+
+<style>
+	h1,
+	.search,
+	.summary,
+	[role='status'],
+	[role='alert'],
+	p {
+		margin: 1rem;
+	}
+
+	.box {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.box input {
+		flex: 1;
+		min-width: 0;
+		padding: 0.5rem 0.75rem;
+		font: inherit;
+	}
+
+	fieldset {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem 1rem;
+		margin: 0.75rem 0 0;
+		border: none;
+		padding: 0;
+	}
+
+	legend {
+		float: left;
+		margin-right: 0.5rem;
+		font-weight: bold;
+	}
+
+	.count {
+		margin-left: 0.25rem;
+		opacity: 0.7;
+	}
+
+	.count::before {
+		content: '(';
+	}
+
+	.count::after {
+		content: ')';
+	}
+
+	.results {
+		display: grid;
+		gap: 0.75rem;
+		margin: 0 1rem 1rem;
+		padding: 0;
+		list-style: none;
+	}
+</style>
