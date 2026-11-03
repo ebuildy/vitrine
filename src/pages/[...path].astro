@@ -7,6 +7,7 @@ import GitlabProject from '../controllers/GitlabProject.astro';
 import GitlabRoadmap from '../controllers/GitlabRoadmap.astro';
 import Harbor from '../controllers/Harbor.astro';
 import HarborImages from '../controllers/HarborImages.astro';
+import Navigation from '../controllers/Navigation.astro';
 import Layout from '../layouts/Layout.astro';
 import { matchRoute } from '../router.ts';
 import type { ControllerName } from '../router.ts';
@@ -14,6 +15,7 @@ import { getGitlabSource, getSettings } from '../settings.ts';
 import { getGroup, getMainGroup, getProject } from '../sources/gitlab.ts';
 
 const controllers: Record<ControllerName, AstroComponentFactory> = {
+	navigation: Navigation,
 	harbor: Harbor,
 	'harbor-images': HarborImages,
 	'gitlab-group': GitlabGroup,

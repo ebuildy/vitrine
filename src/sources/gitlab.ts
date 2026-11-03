@@ -7,10 +7,25 @@ import type { Commit, Contributor, DetailedMember, Epic, Group, Issue, MainGroup
 
 export { EpicsUnavailableError } from './gitlab-api.ts';
 
-export type Subgroup = Group & { projectCount: number };
+export type CountedGroup = Group & { projectCount: number };
+
+/** How far what a list adds to each of its items, at a request each, could be read. */
+interface ListDetails {
+	detailsStale?: boolean;
+	detailsMissing?: boolean;
+}
+
+/** A release, with the Project it belongs to. */
+export type GroupRelease = Release & { project: Pick<Project, 'name' | 'path'> };
+
+/** The releases of a Group, and how far those of each Project could be read. */
+export type GroupReleaseList = CachedContent<GroupRelease[]> & ListDetails;
+
+/** The Main Groups of a Source, and whether some of them could not be read. */
+export type MainGroupList = CachedContent<CountedGroup[]> & Pick<ListDetails, 'detailsMissing'>;
 
 /** The list of Members, and how far their profiles could be read. */
-export type MemberList = CachedContent<DetailedMember[]> & { detailsStale?: boolean; detailsMissing?: boolean };
+export type MemberList = CachedContent<DetailedMember[]> & ListDetails;
 
 export function getGroup(source: GitlabSource, path: string): Promise<CachedContent<Group | undefined>> {
 	return fromMainGroup(source, path, ({ groups }) => groups.find((group) => group.path === path));
@@ -21,12 +36,21 @@ export function getMainGroup(source: GitlabSource, path: string): Promise<Cached
 	return ifMainGroup(source, path, () => getGroup(source, path));
 }
 
-export function listSubgroups(source: GitlabSource, group: string): Promise<CachedContent<Subgroup[]>> {
+export function listSubgroups(source: GitlabSource, group: string): Promise<CachedContent<CountedGroup[]>> {
 	return fromMainGroup(source, group, ({ groups, projects }) =>
 		groups
 			.filter(({ path }) => parentOf(path) === group)
-			.map((subgroup) => ({ ...subgroup, projectCount: projects.filter(({ path }) => path.startsWith(`${subgroup.path}/`)).length })),
+			.map((subgroup) => withProjectCount(subgroup, projects)),
 	);
+}
+
+/** Lists the Main Groups of a Source, keeping those that load when others do not. */
+export async function listMainGroups(source: GitlabSource): Promise<MainGroupList> {
+	const lists = await Promise.all(
+		source.mainGroups.map((path) => fromMainGroup(source, path, ({ groups, projects }) => groups.filter((group) => group.path === path).map((group) => withProjectCount(group, projects)))),
+	);
+	if (lists.every(({ error }) => error)) return lists[0];
+	return { data: lists.flatMap(({ data }) => data ?? []), stale: lists.some(({ stale }) => stale), detailsMissing: lists.some(({ error }) => error) };
 }
 
 export function listProjects(source: GitlabSource, group: string): Promise<CachedContent<Project[]>> {
@@ -78,6 +102,25 @@ export async function listGroupIssues(source: GitlabSource, group: string): Prom
 	return list.error ? list : { data: list.data.filter(({ project }) => isAtOrBeneath(project, group)), stale: list.stale };
 }
 
+/**
+ * Lists the releases beneath a Group, newest first, at one request per Project, cached per Project and shared with its
+ * page. Only reads Projects the Main Group lists, as GitLab's releases of a Group do not tell whether they leave out archived ones.
+ */
+export async function listGroupReleases(source: GitlabSource, group: string): Promise<GroupReleaseList> {
+	const list = await listProjects(source, group);
+	if (list.error) return list;
+
+	const releases = await readWhileUp(list.data, gitlabApi.CARDS_AT_ONCE, (project) => readReleases(source, project));
+	return {
+		data: releases
+			.flatMap(({ data }, index) => (data ?? []).map((release) => ({ ...release, project: list.data[index] })))
+			.toSorted((first, second) => second.releasedAt.localeCompare(first.releasedAt)),
+		stale: list.stale,
+		detailsStale: releases.some(({ stale }) => stale),
+		detailsMissing: releases.length < list.data.length || releases.some(({ error }) => error),
+	};
+}
+
 /** Reads cards in list order and may stop early, as readWhileUp tells. */
 export function readProjectCards(source: GitlabSource, projects: Project[]): Promise<CachedContent<ProjectCard>[]> {
 	return readWhileUp(projects, gitlabApi.CARDS_AT_ONCE, (project) =>
@@ -101,6 +144,10 @@ export function listReleases(source: GitlabSource, path: string): Promise<Cached
 	return fromProject(source, path, 'releases', (project) => (signal) => gitlabApi.listReleases(source, project, signal));
 }
 
+function readReleases(source: GitlabSource, project: Project) {
+	return readProject(source, project, 'releases', (signal) => gitlabApi.listReleases(source, project, signal));
+}
+
 export function listContributors(source: GitlabSource, path: string): Promise<CachedContent<Contributor[]>> {
 	return fromProject(source, path, 'contributors', (project) => (signal) => gitlabApi.listContributors(source, project, signal));
 }
@@ -110,7 +157,11 @@ async function fromProject<T>(source: GitlabSource, path: string, kind: string, 
 	const project = await getProject(source, path);
 	if (project.error) return project;
 	if (!project.data) return { error: new Error(`"${path}" is not a Project of "${source.name}"`) };
-	return readSource(source, `${source.name}/project/${path}/${kind}`, loader(project.data));
+	return readProject(source, project.data, kind, loader(project.data));
+}
+
+function readProject<T>(source: GitlabSource, { path }: Project, kind: string, loader: Loader<T>): Promise<CachedContent<T>> {
+	return readSource(source, `${source.name}/project/${path}/${kind}`, loader);
 }
 
 /** Lists are cached whole per Main Group, so every page and search reads the same data. */
@@ -144,6 +195,10 @@ async function readWhileUp<T, R>(items: T[], atOnce: number, read: (item: T) => 
 		if (batch.some(({ error }) => error) || Date.now() - started >= SOURCE_TIMEOUT_MS) break;
 	}
 	return results;
+}
+
+function withProjectCount(group: Group, projects: Project[]): CountedGroup {
+	return { ...group, projectCount: projects.filter(({ path }) => path.startsWith(`${group.path}/`)).length };
 }
 
 function parentOf(path: string) {

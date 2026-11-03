@@ -273,6 +273,6 @@ export function getGitlabSource(name: string): GitlabSource {
 	return source;
 }
 
-function getGitlabSources(): GitlabSource[] {
+export function getGitlabSources(): GitlabSource[] {
 	return getSettings().sources.filter((source) => source.type === 'gitlab');
 }

@@ -4,6 +4,7 @@ import GitlabCommitList from '../../src/components/GitlabCommitList.astro';
 import GitlabContributorList from '../../src/components/GitlabContributorList.astro';
 import GitlabGroupIssues from '../../src/components/GitlabGroupIssues.astro';
 import GitlabGroupList from '../../src/components/GitlabGroupList.astro';
+import GitlabGroupReleases from '../../src/components/GitlabGroupReleases.astro';
 import GitlabGroupSummary from '../../src/components/GitlabGroupSummary.astro';
 import GitlabProjectIssues from '../../src/components/GitlabProjectIssues.astro';
 import GitlabProjectList from '../../src/components/GitlabProjectList.astro';
@@ -33,6 +34,7 @@ const onGroup = { props: { group: 'platform' } };
 const onProject = { props: { project: 'platform/api' } };
 /** Every Component, with what it shows normally, the start of its error, and what it shows when empty. */
 const components = [
+	{ name: 'GitlabGroupReleases', component: GitlabGroupReleases, ...onGroup, shown: 'Spring', error: 'Releases could not be loaded', none: 'No releases found.' },
 	{ name: 'GitlabGroupSummary', component: GitlabGroupSummary, ...onGroup, shown: 'View in GitLab', error: 'This Group could not be loaded', none: undefined },
 	{ name: 'GitlabGroupList', component: GitlabGroupList, ...onGroup, shown: 'backend', error: 'Subgroups could not be loaded', none: undefined },
 	{ name: 'GitlabProjectList', component: GitlabProjectList, ...onGroup, shown: 'api', error: 'Projects could not be loaded', none: undefined },
@@ -63,7 +65,11 @@ beforeAll(async () => {
 		],
 		projects: [
 			{ ...project, members: [{ id: 202, name: 'Katherine Johnson' }] },
-			...Array.from({ length: 149 }, (_, index) => ({ path: `platform/backend/extra-${index}` })),
+			...Array.from({ length: 149 }, (_, index) => ({
+				path: `platform/backend/extra-${index}`,
+				releases: index === 148 ? [{ name: 'Autumn', tag_name: 'v2', released_at: '2026-10-01T08:00:00.000Z' }] : [],
+				releasesRefused: index === 0,
+			})),
 		],
 	});
 	emptyGitlab = await startFakeGitlab({ groups: [{ path: 'platform' }, { path: 'platform/quiet' }], projects: [{ path: 'platform/api' }] });
@@ -72,11 +78,16 @@ beforeAll(async () => {
 			gitlabSource('main-gitlab', gitlab.url),
 			gitlabSource('empty-gitlab', emptyGitlab.url),
 			gitlabSource('stale-details', gitlab.url, 5),
+			gitlabSource('partial-releases', gitlab.url),
+			{ ...gitlabSource('partial-main-groups', gitlab.url), mainGroups: ['platform', 'missing'] },
+			gitlabSource('down-main-groups', gitlab.url),
 			...components.flatMap(({ name }) => [gitlabSource(`stale-${name}`, gitlab.url, 5), gitlabSource(`down-${name}`, gitlab.url)]),
 		],
 		routes: [
 			{ url: '/gitlab/:group+', controller: 'gitlab-group' },
 			{ url: '/gitlab/:group+/-/:project', controller: 'gitlab-project' },
+			{ url: '/issues/:group+', controller: 'gitlab-issues' },
+			{ url: '/roadmap/:group+', controller: 'gitlab-roadmap' },
 		],
 	});
 });
@@ -91,7 +102,7 @@ afterEach(() => {
 	gitlab.behave('up');
 });
 
-async function render(component: (typeof components)[number]['component'], props: Record<string, string | boolean>) {
+async function render(component: (typeof components)[number]['component'], props: Record<string, string | number | boolean>) {
 	const container = await AstroContainer.create();
 	return container.renderToString(component, { props });
 }
@@ -122,6 +133,98 @@ describe.each(components)('$name', ({ name, component, props, shown, error, none
 	test.runIf(none !== undefined)('says so when it has nothing to show', async () => {
 		expect(await render(component, { source: 'empty-gitlab', ...props })).toContain(none as string);
 	});
+});
+
+test('shows the latest releases of every Project of a Group, up to maxItems', async () => {
+	const html = await render(GitlabGroupReleases, { source: 'main-gitlab', group: 'platform', maxItems: 1 });
+
+	expect(html).toContain('Autumn');
+	expect(html).not.toContain('Spring');
+	expect(html).toContain('href="/gitlab/platform/backend/-/extra-148"');
+});
+
+test('counts a Project that turned releases off as having none, and reads on past it', async () => {
+	const html = await render(GitlabGroupReleases, { source: 'main-gitlab', group: 'platform' });
+
+	expect(html).toContain('Autumn');
+	expect(html).not.toContain('role="alert"');
+});
+
+test('shows the newest release first', async () => {
+	const html = await render(GitlabGroupReleases, { source: 'main-gitlab', group: 'platform' });
+
+	expect(html.indexOf('Autumn')).toBeLessThan(html.indexOf('Spring'));
+});
+
+test('warns when the releases of some Projects could not be loaded', async () => {
+	await render(GitlabGroupList, { source: 'partial-releases', group: 'platform' });
+	gitlab.behave('down-after-lists');
+
+	expect(await render(GitlabGroupReleases, { source: 'partial-releases', group: 'platform' })).toContain('Releases of some Projects could not be loaded');
+});
+
+test('lists the Main Groups of the Source when given no Group', async () => {
+	const html = await render(GitlabGroupList, { source: 'main-gitlab' });
+
+	expect(html).toContain('href="/gitlab/platform"');
+	expect(html).toContain('150 Projects');
+});
+
+test('calls them Main Groups, and subgroups otherwise', async () => {
+	expect(await render(GitlabGroupList, { source: 'main-gitlab' })).toContain('Main Groups');
+	expect(await render(GitlabGroupList, { source: 'main-gitlab', group: 'platform' })).toContain('Subgroups');
+});
+
+test('keeps the other Main Groups when one cannot be loaded', async () => {
+	const html = await render(GitlabGroupList, { source: 'partial-main-groups' });
+
+	expect(html).toContain('href="/gitlab/platform"');
+	expect(html).toContain('Some Groups could not be loaded from partial-main-groups.');
+});
+
+test('shows an error when no Main Group can be loaded', async () => {
+	gitlab.behave('down');
+
+	expect(await render(GitlabGroupList, { source: 'down-main-groups' })).toContain('Main Groups could not be loaded');
+});
+
+test('links a Group to its Issues', async () => {
+	expect(await render(GitlabGroupList, { source: 'main-gitlab', group: 'platform' })).toContain('href="/issues/platform/backend"');
+});
+
+test('links a Main Group to its Roadmap, which no other Group has', async () => {
+	expect(await render(GitlabGroupList, { source: 'main-gitlab' })).toContain('href="/roadmap/platform"');
+	expect(await render(GitlabGroupList, { source: 'main-gitlab', group: 'platform' })).not.toContain('/roadmap/');
+});
+
+test('shows at most maxItems Members', async () => {
+	const html = await render(GroupMembers, { source: 'main-gitlab', group: 'platform', maxItems: 2 });
+
+	expect(html).toContain('Ada Lovelace');
+	expect(html).not.toContain('Person 1<');
+});
+
+test('shows at most maxItems subgroups', async () => {
+	const html = await render(GitlabGroupList, { source: 'main-gitlab', group: 'platform', maxItems: 1 });
+
+	expect(html).toContain('backend');
+	expect(html).not.toContain('frontend');
+});
+
+test('leaves its heading to the page when given an empty title', async () => {
+	for (const [component, props] of [
+		[GroupMembers, { group: 'platform' }],
+		[GitlabGroupList, {}],
+		[GitlabGroupReleases, { group: 'platform' }],
+	] as const) {
+		expect(await render(component, { source: 'main-gitlab', ...props, title: '' })).not.toContain('<h2');
+	}
+});
+
+test('takes the title it is given', async () => {
+	expect(await render(GroupMembers, { source: 'main-gitlab', group: 'platform', title: 'Our people' })).toContain('Our people');
+	expect(await render(GitlabGroupList, { source: 'main-gitlab', title: 'Our Groups' })).toContain('Our Groups');
+	expect(await render(GitlabGroupReleases, { source: 'main-gitlab', group: 'platform', title: 'Our releases' })).toContain('Our releases');
 });
 
 test('leaves the subgroups out entirely when a Group has none', async () => {

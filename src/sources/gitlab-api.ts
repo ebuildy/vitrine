@@ -373,8 +373,9 @@ function toIssues(issues: GitlabIssue[]): Issue[] {
 }
 
 export async function listReleases(source: GitlabSource, { id }: Project, signal: AbortSignal): Promise<Release[]> {
-	const releases = await fetchJson<GitlabRelease[]>(source, `/projects/${id}/releases`, { per_page: String(LATEST_RELEASES) }, signal);
-	return releases.map(({ name, tag_name, released_at, _links }) => ({ name, tagName: tag_name, releasedAt: released_at, webUrl: _links?.self }));
+	// GitLab refuses releases on a Project that turned them off.
+	const releases = await fetchIfAllowed<GitlabRelease[]>(source, `/projects/${id}/releases`, { per_page: String(LATEST_RELEASES) }, signal);
+	return (releases ?? []).map(({ name, tag_name, released_at, _links }) => ({ name, tagName: tag_name, releasedAt: released_at, webUrl: _links?.self }));
 }
 
 /** Leaves out the email GitLab gives for each contributor. */

@@ -1,0 +1,70 @@
+---
+import { formatDate } from '../format.ts';
+import { gitlabProjectUrl } from '../router.ts';
+import { getGitlabSource, getSettings } from '../settings.ts';
+import { listGroupReleases } from '../sources/gitlab.ts';
+
+interface Props {
+	source: string;
+	group: string;
+	/** Left empty, the page heads this list itself. */
+	title?: string;
+	maxItems?: number;
+}
+
+const { source, group, title = 'Releases', maxItems } = Astro.props;
+const { data: releases, stale, detailsStale, detailsMissing } = await listGroupReleases(getGitlabSource(source), group);
+---
+
+<section>
+	{title && <h2>{title}</h2>}
+	{stale && <p role="status">This list is Stale because {source} is down.</p>}
+	{!stale && detailsStale && <p role="status">Releases of some Projects are Stale because {source} is down.</p>}
+	{detailsMissing && <p role="alert">Releases of some Projects could not be loaded from {source}.</p>}
+	{
+		!releases ? (
+			<p role="alert">Releases could not be loaded from {source}.</p>
+		) : releases.length > 0 ? (
+			<ul>
+				{releases.slice(0, maxItems).map((release) => {
+					const url = gitlabProjectUrl(getSettings().routes, source, release.project.path);
+					return (
+						<li>
+							{release.webUrl ? <a href={release.webUrl}>{release.name}</a> : release.name}
+							<p>
+								{url ? <a href={url}>{release.project.name}</a> : release.project.name}, {release.tagName}, {formatDate(release.releasedAt)}
+							</p>
+						</li>
+					);
+				})}
+			</ul>
+		) : (
+			<p>No releases found.</p>
+		)
+	}
+</section>
+
+<style>
+	section {
+		padding: 1rem;
+	}
+
+	h2 {
+		margin: 0 0 0.75rem;
+	}
+
+	ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	li {
+		padding: 0.5rem 0;
+		overflow-wrap: anywhere;
+	}
+
+	li p {
+		margin: 0;
+	}
+</style>
