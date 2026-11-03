@@ -12,6 +12,8 @@ Commit with `git commit -s`, amends included: the sign-off respects the DCO.
 
 `npm test` needs the Redis from `compose.yaml`: run `docker compose up -d --wait` first. It also needs a Docker engine with BuildKit, for `docker build --output`.
 
+`npm test` and `npm run test:e2e` also write an HTML report, to `vitest-report/` and `playwright-report/` (with traces of failed tests), and never open a browser. `npm run test:report` and `npm run test:e2e:report` serve them, each on a free port.
+
 To see a page with content, run `npm run demo`: it serves fake Sources to `astro dev` in the foreground, with `demo/settings.yaml` instead of `settings.yaml`. Seed data lives in `demo/content.ts`.
 
 ### Several worktrees at once
