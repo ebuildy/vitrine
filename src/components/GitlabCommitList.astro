@@ -12,27 +12,29 @@ const { source, project } = Astro.props;
 const { data: commits, stale } = await listCommits(getGitlabSource(source), project);
 ---
 
-<section>
+<section class="project-part project-commits">
 	<h2>Latest commits</h2>
-	{stale && <p role="status">This list is Stale because {source} is down.</p>}
-	{
-		!commits ? (
-			<p role="alert">Commits could not be loaded from {source}.</p>
-		) : commits.length > 0 ? (
-			<ul>
-				{commits.map((commit) => (
-					<li>
-						<a href={commit.webUrl}>{commit.title}</a>
-						<p>
-							{commit.authorName}, {formatDate(commit.committedAt)}
-						</p>
-					</li>
-				))}
-			</ul>
-		) : (
-			<p>No commits found.</p>
-		)
-	}
+	<div class="card">
+		{stale && <p role="status">This list is Stale because {source} is down.</p>}
+		{
+			!commits ? (
+				<p role="alert">Commits could not be loaded from {source}.</p>
+			) : commits.length > 0 ? (
+				<ul>
+					{commits.map((commit) => (
+						<li>
+							<a href={commit.webUrl}>{commit.title}</a>
+							<p>
+								{commit.authorName}, {formatDate(commit.committedAt)}
+							</p>
+						</li>
+					))}
+				</ul>
+			) : (
+				<p>No commits found.</p>
+			)
+		}
+	</div>
 </section>
 
 <style>

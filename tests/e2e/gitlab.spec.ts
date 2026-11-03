@@ -159,3 +159,41 @@ test('a Visitor reads the Roadmap on a phone without scrolling sideways', async 
 	await expect(sectionOf(page, 'Roadmap').locator('.bar').first()).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 });
+
+test('a Visitor folds and unfolds a part of a Project by clicking its title', async ({ page }) => {
+	await page.goto(`${vitrine.url}/gitlab/platform/backend/-/api`);
+
+	const toggle = page.getByRole('heading', { name: 'README' }).getByRole('button', { name: 'README' });
+	const guide = page.getByRole('link', { name: 'guide' });
+	await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+	await expect(guide).toBeVisible();
+
+	await toggle.click();
+	await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+	await expect(guide).toBeHidden();
+
+	// The whole title strip is the target, chevron included, not only the words.
+	const title = (await page.getByRole('heading', { name: 'README' }).boundingBox())!;
+	await page.mouse.click(title.x + title.width - 4, title.y + title.height / 2);
+	await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+	await expect(guide).toBeVisible();
+});
+
+test('a Visitor folds a part of a Project from the keyboard', async ({ page }) => {
+	await page.goto(`${vitrine.url}/gitlab/platform/backend/-/api`);
+
+	const toggle = page.getByRole('button', { name: 'Latest commits' });
+	await toggle.focus();
+	await page.keyboard.press('Enter');
+	await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+	await expect(page.getByRole('link', { name: 'Add login' })).toBeHidden();
+	await page.keyboard.press('Space');
+	await expect(page.getByRole('link', { name: 'Add login' })).toBeVisible();
+});
+
+test('a Visitor sees the main parts of a Project fold, and the sidebar stay open', async ({ page }) => {
+	await page.goto(`${vitrine.url}/gitlab/platform/backend/-/api`);
+
+	for (const name of ['README', 'Latest commits', 'Latest Issues']) await expect(page.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'true');
+	for (const name of ['Releases', 'Contributors']) await expect(page.getByRole('heading', { name }).getByRole('button')).toHaveCount(0);
+});

@@ -259,7 +259,7 @@ describe('a Template that fails on a page', () => {
 		expect(response.status).toBe(200);
 		const html = await response.text();
 		expect(html).toContain('<title>Images</title>');
-		expect(html).toMatch(/<body[^>]*><p role="alert">This page could not be shown\.<\/p><\/body>/);
+		expect(html).toMatch(/<\/header><p role="alert">This page could not be shown\.<\/p><\/body>/);
 		expect(html).not.toContain(error);
 		expect(html).not.toContain(hidden);
 		expect(vitrine.stderr()).toContain(error);

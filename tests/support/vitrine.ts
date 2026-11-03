@@ -4,7 +4,7 @@ import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import { stringify } from 'yaml';
 
@@ -22,9 +22,15 @@ export function buildVitrine() {
 	execFileSync(ASTRO, ['build'], { cwd: BUILD_DIR, stdio: 'inherit' });
 }
 
-export function writeSettings(settings: unknown): string {
-	const path = join(mkdtempSync(join(tmpdir(), 'vitrine-')), 'settings.yaml');
+/** Writes Settings, with `files` beside them under their relative paths, for Settings that name local files. */
+export function writeSettings(settings: unknown, files: Record<string, string> = {}): string {
+	const directory = mkdtempSync(join(tmpdir(), 'vitrine-'));
+	const path = join(directory, 'settings.yaml');
 	writeFileSync(path, typeof settings === 'string' ? settings : stringify(settings));
+	for (const [name, content] of Object.entries(files)) {
+		mkdirSync(dirname(join(directory, name)), { recursive: true });
+		writeFileSync(join(directory, name), content);
+	}
 	return path;
 }
 
@@ -42,17 +48,17 @@ export interface RunningVitrine {
 	stop: () => Promise<number | null>;
 }
 
-function spawnVitrine(command: string, args: string[], settings: unknown, env: Record<string, string | undefined>) {
+function spawnVitrine(command: string, args: string[], settings: unknown, env: Record<string, string | undefined>, files?: Record<string, string>) {
 	return spawn(command, args, {
 		cwd: BUILD_DIR,
-		env: { ...process.env, VITRINE_SETTINGS: writeSettings(settings), ...env },
+		env: { ...process.env, VITRINE_SETTINGS: writeSettings(settings, files), ...env },
 		stdio: ['ignore', 'pipe', 'pipe'],
 	});
 }
 
-export async function startVitrine(settings: unknown, env: Record<string, string> = {}): Promise<RunningVitrine> {
+export async function startVitrine(settings: unknown, env: Record<string, string> = {}, files?: Record<string, string>): Promise<RunningVitrine> {
 	const port = await freePort();
-	return untilServing(spawnVitrine('node', ['start.ts'], settings, { ...env, HOST: '127.0.0.1', PORT: String(port) }), port);
+	return untilServing(spawnVitrine('node', ['start.ts'], settings, { ...env, HOST: '127.0.0.1', PORT: String(port) }, files), port);
 }
 
 /** Astro serves no pages in dev under the VITEST variable, which every test inherits. */
@@ -88,9 +94,9 @@ async function untilServing(child: ChildProcessByStdio<null, Readable, Readable>
 }
 
 /** Runs a command that is expected to end by itself, and returns how it ended. */
-async function runToExit(command: string, args: string[], settings: unknown, env: Record<string, string>) {
+async function runToExit(command: string, args: string[], settings: unknown, env: Record<string, string>, files?: Record<string, string>) {
 	const port = await freePort();
-	const child = spawnVitrine(command, args, settings, { ...env, HOST: '127.0.0.1', PORT: String(port) });
+	const child = spawnVitrine(command, args, settings, { ...env, HOST: '127.0.0.1', PORT: String(port) }, files);
 	let output = '';
 	child.stdout.on('data', (chunk) => (output += chunk));
 	child.stderr.on('data', (chunk) => (output += chunk));
@@ -100,8 +106,8 @@ async function runToExit(command: string, args: string[], settings: unknown, env
 	return { exitCode, output };
 }
 
-export function startupFailure(settings: unknown, env: Record<string, string> = {}) {
-	return runToExit('node', ['start.ts'], settings, env);
+export function startupFailure(settings: unknown, env: Record<string, string> = {}, files?: Record<string, string>) {
+	return runToExit('node', ['start.ts'], settings, env, files);
 }
 
 export function devStartupFailure(settings: unknown) {

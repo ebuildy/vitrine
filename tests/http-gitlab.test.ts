@@ -219,6 +219,8 @@ describe.each(cacheStores)('a Project page with the $name cache store', ({ empty
 						'![Logo](logo.png)',
 						'<script>alert("readme")</script>',
 						'<img src="x.png" onerror="alert(1)">',
+						'```sh\nmake run\n```',
+						'<code class="tracker">not a language</code>',
 					].join('\n\n'),
 					commits: Array.from({ length: 12 }, (_, index) => ({
 						id: `sha-${index}`,
@@ -290,6 +292,13 @@ describe.each(cacheStores)('a Project page with the $name cache store', ({ empty
 
 		expect(html).not.toContain('alert(');
 		expect(html).not.toContain('onerror');
+	});
+
+	test('keeps the language of a code block in the README, and no other class', async () => {
+		const html = await open('platform/backend/-/api');
+
+		expect(html).toContain('<pre><code class="language-sh">make run');
+		expect(html).toContain('<code>not a language</code>');
 	});
 
 	test('shows the last 10 commits', async () => {

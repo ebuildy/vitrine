@@ -38,7 +38,7 @@ async function render(group = 'platform') {
 
 /** What the page holds for one Epic, as the fields of one Epic must not be read from another. */
 async function epic(title: string) {
-	const items = (await render()).split('<li class="epic"');
+	const items = (await render()).split(/<li class="[^"]*\bepic\b/);
 	return items.find((item) => item.includes(title)) ?? '';
 }
 

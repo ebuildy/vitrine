@@ -1,0 +1,944 @@
+/*
+ * The naval Theme: a crisp, quiet interface in ocean blues, with a sea at the foot of every page.
+ * Colours in Settings still win, as they sit on <html> itself, and so does the CSS of Settings,
+ * because every rule here stays one attribute away from a plain selector.
+ *
+ * It has a light mode, a bright harbour, and a dark mode, the sea at night. Each colour is a pair, and
+ * light-dark() picks the one of the current mode, which the system or the Visitor's choice decides.
+ */
+:root[data-theme='naval'] {
+	--color-primary-light: #0b5fa5;
+	--color-primary-dark: #6cb8ee;
+	--color-background-light: #f4f7fb;
+	--color-background-dark: #0a1520;
+	--color-text-light: #0f2137;
+	--color-text-dark: #e3ecf6;
+	--color-border-light: #dde6ef;
+	--color-border-dark: #1f3347;
+	--naval-navy: #0b2545;
+	--naval-badge: light-dark(#0b2545, #1d5d96);
+	--naval-muted: light-dark(#5a6b82, #93a6bc);
+	--naval-surface: light-dark(#fff, #0f1e2d);
+	--naval-chip: light-dark(#edf2f8, #18293b);
+	--naval-hover: light-dark(#f8fafd, #13263a);
+	--naval-header: light-dark(rgb(255 255 255 / 0.88), rgb(10 21 32 / 0.85));
+	--naval-sea: #1d7cc4;
+	--naval-shadow: light-dark(rgba(11, 37, 69, 0.04), rgba(0, 0, 0, 0.3));
+	--naval-shadow-raised: light-dark(rgba(11, 37, 69, 0.1), rgba(0, 0, 0, 0.45));
+	--naval-status-border: light-dark(#f1dca7, #5c4a1c);
+	--naval-status-background: light-dark(#fdf6e3, #2a2312);
+	--naval-status-text: light-dark(#6b4e0b, #f1d58c);
+	--naval-alert-border: light-dark(#f3c4c4, #6b2a2a);
+	--naval-alert-background: light-dark(#fdf0f0, #2d1616);
+	--naval-alert-text: light-dark(#8a1c1c, #f5b1b1);
+	--naval-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+	--naval-gutter: 2rem;
+}
+
+[data-theme='naval'] body {
+	position: relative;
+	box-sizing: border-box;
+	/* The waves need the page to grow with its content, and to reach the bottom of the window when it is short. */
+	height: auto;
+	min-height: 100%;
+	padding-bottom: 10rem;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* Pages have no wrapper of their own, so each top-level block sits in the same centred column. */
+[data-theme='naval'] body > :not(.site-header, .sea) {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 78rem;
+	margin-inline: auto;
+	padding-inline: var(--naval-gutter);
+}
+
+@media (max-width: 40rem) {
+	:root[data-theme='naval'] {
+		--naval-gutter: 1rem;
+	}
+
+	/* The Menu wraps on a phone, and a header that tall should scroll away. */
+	:root[data-theme='naval'] .site-header {
+		position: static;
+	}
+
+	:root[data-theme='naval'] .site-header nav a {
+		padding-inline: 0.625rem;
+	}
+}
+
+[data-theme='naval'] :is(h1, h2, h3) {
+	line-height: 1.25;
+	letter-spacing: -0.01em;
+}
+
+[data-theme='naval'] h1 {
+	font-size: 1.75rem;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+}
+
+[data-theme='naval'] h2 {
+	font-size: 1.25rem;
+	font-weight: 650;
+}
+
+[data-theme='naval'] h3 {
+	font-size: 1rem;
+	font-weight: 600;
+}
+
+[data-theme='naval'] a {
+	text-decoration: none;
+}
+
+[data-theme='naval'] a:hover {
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+}
+
+[data-theme='naval'] :focus-visible {
+	outline: 2px solid var(--color-primary);
+	outline-offset: 2px;
+	border-radius: 0.25rem;
+}
+
+/* The site header: white, a hairline below, and a thin band of the sea above. */
+[data-theme='naval'] .site-header {
+	position: sticky;
+	z-index: 3;
+	top: 0;
+	gap: 0.5rem 2rem;
+	min-height: 4rem;
+	padding: 0.75rem max(var(--naval-gutter), calc((100% - 78rem) / 2 + var(--naval-gutter)));
+	box-sizing: border-box;
+	border-bottom: 1px solid var(--color-border);
+	background:
+		linear-gradient(90deg, var(--naval-navy), var(--naval-sea), #5fb0e5) top / 100% 3px no-repeat,
+		var(--naval-header);
+	backdrop-filter: saturate(1.8) blur(12px);
+	color: var(--color-text);
+}
+
+[data-theme='naval'] .site-header .site-name {
+	gap: 0.625rem;
+	color: var(--color-text);
+	font-size: 1.0625rem;
+	font-weight: 650;
+}
+
+[data-theme='naval'] .site-header .site-name:hover {
+	text-decoration: none;
+}
+
+/* With no logo, the site name gets an anchor in a navy badge. */
+[data-theme='naval'] .site-name:not(:has(img))::before {
+	content: '';
+	flex: none;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 0.5rem;
+	background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.5'/%3E%3Cpath d='M12 7.5V21M7.5 11h9M4.5 13.5a7.5 7.5 0 0 0 15 0'/%3E%3C/svg%3E") center / 1.25rem no-repeat var(--naval-badge);
+	box-shadow: inset 0 -2px 0 rgb(255 255 255 / 0.12);
+}
+
+[data-theme='naval'] .site-name img {
+	border-radius: 0.5rem;
+}
+
+[data-theme='naval'] .site-header nav ul {
+	gap: 0.25rem;
+}
+
+[data-theme='naval'] .site-header nav a {
+	display: block;
+	padding: 0.4375rem 0.875rem;
+	border-radius: 0.5rem;
+	color: var(--naval-muted);
+	font-size: 0.9375rem;
+	font-weight: 500;
+	transition:
+		background-color 0.15s ease,
+		color 0.15s ease;
+}
+
+[data-theme='naval'] .site-header nav a:hover,
+[data-theme='naval'] .site-header nav a[aria-current='page'] {
+	background: var(--naval-chip);
+	color: var(--color-text);
+	text-decoration: none;
+}
+
+[data-theme='naval'] .site-header nav a[aria-current='page'] {
+	font-weight: 600;
+}
+
+/* The colour mode menu: a small pill at the right of the site header, with the icon of the current mode. */
+[data-theme='naval'] .site-header .color-mode {
+	padding: 0.375rem 2rem 0.375rem 2.125rem;
+	border: 1px solid var(--color-border);
+	border-radius: 0.5rem;
+	background:
+		var(--naval-mode-icon) left 0.75rem center / 1rem no-repeat,
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%237b8ba0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5'/%3E%3C/svg%3E") right 0.625rem center / 0.875rem no-repeat,
+		var(--naval-surface);
+	color: var(--naval-muted);
+	font: inherit;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	cursor: pointer;
+	appearance: none;
+	transition:
+		border-color 0.15s ease,
+		color 0.15s ease;
+	--naval-mode-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%237b8ba0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='5.5'/%3E%3Cpath d='M8 2.5a5.5 5.5 0 0 1 0 11z' fill='%237b8ba0'/%3E%3C/svg%3E");
+}
+
+[data-theme='naval'] .site-header .color-mode:has(option[value='light']:checked) {
+	--naval-mode-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%237b8ba0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='3'/%3E%3Cpath d='M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1'/%3E%3C/svg%3E");
+}
+
+[data-theme='naval'] .site-header .color-mode:has(option[value='dark']:checked) {
+	--naval-mode-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%237b8ba0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7z'/%3E%3C/svg%3E");
+}
+
+[data-theme='naval'] .site-header .color-mode:hover {
+	border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+	color: var(--color-text);
+}
+
+[data-theme='naval'] .site-header .color-mode[hidden] {
+	display: none;
+}
+
+/* The header of a page: its title, a muted description and its links. */
+[data-theme='naval'] body > header:not(.site-header) {
+	padding-block: 2.5rem 0.5rem;
+}
+
+[data-theme='naval'] body > header:not(.site-header) p {
+	margin: 0.5rem 0 0;
+	color: var(--naval-muted);
+}
+
+[data-theme='naval'] body > h1 {
+	margin-block: 2.5rem 1.5rem;
+}
+
+/* Sections stack with air between them, and a hairline across the column, inside its gutters. */
+[data-theme='naval'] section {
+	padding-block: 2rem;
+}
+
+[data-theme='naval'] section + section::before {
+	content: '';
+	display: block;
+	height: 1px;
+	margin: -2rem 0 2rem;
+	background: var(--color-border);
+}
+
+[data-theme='naval'] section > h2 {
+	margin: 0 0 1rem;
+}
+
+/* Status and alert messages read as soft callouts. */
+[data-theme='naval'] :is([role='status'], [role='alert']) {
+	padding: 0.75rem 1rem;
+	border: 1px solid var(--naval-status-border);
+	border-radius: 0.625rem;
+	background: var(--naval-status-background);
+	color: var(--naval-status-text);
+	font-size: 0.875rem;
+}
+
+[data-theme='naval'] [role='alert'] {
+	border-color: var(--naval-alert-border);
+	background: var(--naval-alert-background);
+	color: var(--naval-alert-text);
+}
+
+/* Three layers of waves drift at their own pace, the front one fastest. Each layer is a tile that loops seamlessly. */
+[data-theme='naval'] body::after {
+	content: '';
+	position: absolute;
+	z-index: 1;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	height: 7rem;
+	pointer-events: none;
+	background-image:
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 160' preserveAspectRatio='none'%3E%3Cpath fill='%230b2545' d='M0 135 Q360 122 720 135 T1440 135 V160 H0Z'/%3E%3C/svg%3E"),
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 160' preserveAspectRatio='none'%3E%3Cpath fill='%231d7cc4' fill-opacity='.85' d='M0 105 Q360 80 720 105 T1440 105 V160 H0Z'/%3E%3C/svg%3E"),
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 160' preserveAspectRatio='none'%3E%3Cpath fill='%239cc3e0' d='M0 70 Q360 52 720 70 T1440 70 V160 H0Z'/%3E%3C/svg%3E");
+	background-repeat: repeat-x;
+	background-position: 0 bottom;
+	background-size:
+		1500px 100%,
+		900px 100%,
+		1200px 100%;
+	animation: naval-swell 90s linear infinite;
+}
+
+/* Each layer moves by whole tiles, so the end of the loop matches its start. */
+@keyframes naval-swell {
+	to {
+		background-position-x: -3000px, 1800px, -1200px;
+	}
+}
+
+/* Boats sail behind the waves, so that their hulls sit in the water, and submarines cruise in front, under the surface. */
+[data-theme='naval'] .sea {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	height: 7rem;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+[data-theme='naval'] .vessel {
+	position: absolute;
+	left: 0;
+	translate: -6rem 0;
+	background: center / contain no-repeat;
+}
+
+/*
+ * Every vessel crosses in 50s of a 120s cycle, and their crossings start 30s apart.
+ * A crossing overlaps only the next one, so the sea never holds more than two vessels at once.
+ */
+[data-theme='naval'] .boat {
+	z-index: 0;
+	bottom: 3.75rem;
+	transform-origin: 50% 100%;
+	animation:
+		naval-sail 120s linear infinite,
+		naval-bob 3.2s ease-in-out infinite alternate;
+}
+
+[data-theme='naval'] .sailboat {
+	width: 3rem;
+	height: 2.75rem;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 44'%3E%3Cpath fill='%230b2545' d='M23 4h2v28h-2z'/%3E%3Cpath fill='%23e63946' d='M25 4l7 2.5-7 2.5z'/%3E%3Cpath fill='%23fff' stroke='%230b2545' stroke-width='1.5' stroke-linejoin='round' d='M26.5 9L40 30H26.5z'/%3E%3Cpath fill='%23fff' stroke='%230b2545' stroke-width='1.5' stroke-linejoin='round' d='M21.5 12L11 30h10.5z'/%3E%3Cpath fill='%230b2545' d='M3 32h42l-6 10H9z'/%3E%3Cpath fill='%23e63946' d='M4.8 35h38.4l-.6 1.2H5.6z'/%3E%3C/svg%3E");
+	animation-delay: -20s, 0s;
+}
+
+[data-theme='naval'] .tugboat {
+	width: 3.5rem;
+	height: 2.25rem;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 36'%3E%3Cpath fill='%23e63946' d='M37 4h7v15h-7z'/%3E%3Cpath fill='%230b2545' d='M37 4h7v3h-7z'/%3E%3Cpath fill='%23fff' stroke='%230b2545' stroke-width='1.5' d='M14 10h20v12H14z'/%3E%3Cpath fill='%230b5fa5' d='M17 13h4v4h-4zm6 0h4v4h-4zm6 0h2.5v4H29z'/%3E%3Cpath fill='%230b2545' d='M2 22h53l-8 12H8z'/%3E%3C/svg%3E");
+	animation-delay: 40s, -1.6s;
+}
+
+[data-theme='naval'] .submarine {
+	z-index: 2;
+	bottom: 1.25rem;
+	width: 4.5rem;
+	height: 1.875rem;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 30'%3E%3Cpath fill='none' stroke='%230b2545' stroke-width='2' d='M33 7V2h-4'/%3E%3Cpath fill='%230b2545' d='M28 6h12l2 7H26z'/%3E%3Cpath fill='%230b2545' stroke='%23bfe3ff' stroke-opacity='.6' d='M6 20c0-5 7-8 18-8h34c6 0 10 3 10 8s-4 8-10 8H24C13 28 6 25 6 20z'/%3E%3Cpath fill='%230b2545' d='M67 20l5-5v10z'/%3E%3Ccircle cx='19' cy='20' r='1.6' fill='%23bfe3ff'/%3E%3Ccircle cx='28' cy='20' r='1.6' fill='%23bfe3ff'/%3E%3Ccircle cx='37' cy='20' r='1.6' fill='%23bfe3ff'/%3E%3C/svg%3E");
+	animation: naval-dive 120s linear 10s infinite;
+}
+
+[data-theme='naval'] .submarine + .boat + .submarine {
+	animation-delay: 70s;
+}
+
+@keyframes naval-sail {
+	0% {
+		translate: -6rem 0;
+	}
+	41.667%,
+	100% {
+		translate: calc(100vw + 1rem) 0;
+	}
+}
+
+@keyframes naval-dive {
+	0% {
+		translate: calc(100vw + 1rem) 0;
+	}
+	41.667%,
+	100% {
+		translate: -6rem 0;
+	}
+}
+
+@keyframes naval-bob {
+	from {
+		rotate: -3deg;
+	}
+	to {
+		rotate: 3deg;
+	}
+}
+
+/*
+ * The sea at night: the waves dim, and the vessels take a faint moonlit outline against the dark sky.
+ * Pictures cannot use light-dark(), so dark mode needs its own selectors: the system's, unless the Visitor picked light, or the Visitor's.
+ */
+@media (prefers-color-scheme: dark) {
+	:root[data-theme='naval']:not([data-color-mode='light']) body::after {
+		filter: brightness(0.62) saturate(1.15);
+	}
+
+	:root[data-theme='naval']:not([data-color-mode='light']) .vessel {
+		filter: drop-shadow(0 0 1px rgb(156 195 224 / 0.85));
+	}
+}
+
+:root[data-theme='naval'][data-color-mode='dark'] body::after {
+	filter: brightness(0.62) saturate(1.15);
+}
+
+:root[data-theme='naval'][data-color-mode='dark'] .vessel {
+	filter: drop-shadow(0 0 1px rgb(156 195 224 / 0.85));
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-theme='naval'] body::after {
+		animation: none;
+	}
+
+	[data-theme='naval'] .sea {
+		display: none;
+	}
+}
+
+
+/* Cards: white, a hairline border and the faintest shadow. */
+[data-theme='naval'] .card {
+	background: var(--naval-surface);
+	border-color: var(--color-border);
+	border-radius: 0.625rem;
+	box-shadow: 0 1px 2px var(--naval-shadow);
+	transition:
+		transform 0.18s ease,
+		box-shadow 0.18s ease,
+		border-color 0.18s ease;
+}
+
+[data-theme='naval'] .card :is(h2, h3) {
+	font-size: 1rem;
+	font-weight: 600;
+}
+
+[data-theme='naval'] .card :is(h2, h3) a {
+	color: var(--color-text);
+	transition: color 0.15s ease;
+}
+
+[data-theme='naval'] .card p {
+	margin-block: 0 0.5rem;
+	color: var(--naval-muted);
+	font-size: 0.875rem;
+}
+
+[data-theme='naval'] .card .source-link {
+	font-size: 0.8125rem;
+	font-weight: 500;
+}
+
+/* Only a card that opens a page lifts, so that a Member's card does not look clickable. */
+[data-theme='naval'] .card:has(> :is(h2, h3) > a):hover {
+	border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+	transform: translateY(-2px);
+	box-shadow:
+		0 2px 4px var(--naval-shadow),
+		0 12px 28px var(--naval-shadow-raised);
+}
+
+[data-theme='naval'] .card:has(> :is(h2, h3) > a):hover :is(h2, h3) a {
+	color: var(--color-primary);
+	text-decoration: none;
+}
+
+/* Topics read as small grey tags, and faces as avatars ringed in white. */
+[data-theme='naval'] .card .topics span {
+	padding: 0.0625rem 0.5rem;
+	border-color: transparent;
+	border-radius: 0.25rem;
+	background: var(--naval-chip);
+	color: var(--naval-muted);
+	font-size: 0.75rem;
+}
+
+[data-theme='naval'] .card :is(.contributors, .assignees) > *,
+[data-theme='naval'] .card > :is(img, .avatar) {
+	box-shadow: 0 0 0 2px var(--naval-surface);
+}
+
+[data-theme='naval'] progress {
+	height: 0.375rem;
+	border: 0;
+	border-radius: 999px;
+	background: var(--naval-chip);
+	appearance: none;
+	overflow: hidden;
+}
+
+[data-theme='naval'] progress::-webkit-progress-bar {
+	border-radius: 999px;
+	background: var(--naval-chip);
+}
+
+[data-theme='naval'] progress::-webkit-progress-value {
+	border-radius: 999px;
+	background: linear-gradient(90deg, var(--naval-sea), var(--color-primary));
+}
+
+[data-theme='naval'] progress::-moz-progress-bar {
+	border-radius: 999px;
+	background: linear-gradient(90deg, var(--naval-sea), var(--color-primary));
+}
+
+/* The Roadmap: slim tracks of sea mist, and bars of the sea itself. */
+[data-theme='naval'] .gantt .track {
+	height: 0.625rem;
+	border-radius: 999px;
+	background: var(--naval-chip);
+}
+
+[data-theme='naval'] .gantt .months {
+	height: 1.25rem;
+	background: none;
+}
+
+[data-theme='naval'] .gantt .months span {
+	color: var(--naval-muted);
+	font-family: var(--naval-mono);
+	font-size: 0.6875rem;
+}
+
+[data-theme='naval'] .gantt .bar {
+	min-width: 0.625rem;
+	border-radius: 999px;
+	background: linear-gradient(90deg, var(--naval-sea), var(--color-primary));
+	opacity: 1;
+}
+
+[data-theme='naval'] .gantt li.row {
+	padding-block: 0.375rem;
+}
+
+[data-theme='naval'] .gantt .label a {
+	color: var(--color-text);
+	font-weight: 550;
+}
+
+[data-theme='naval'] .gantt .label p {
+	color: var(--naval-muted);
+	font-size: 0.8125rem;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Tables and lists of Issues sit in a white panel, row under row, like a ledger. */
+[data-theme='naval'] table,
+[data-theme='naval'] .issues {
+	border: 1px solid var(--color-border);
+	border-radius: 0.625rem;
+	background: var(--naval-surface);
+	box-shadow: 0 1px 2px var(--naval-shadow);
+}
+
+[data-theme='naval'] table {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	font-size: 0.875rem;
+	font-variant-numeric: tabular-nums;
+}
+
+[data-theme='naval'] li:has(> table) {
+	overflow-x: auto;
+}
+
+[data-theme='naval'] :is(th, td) {
+	padding: 0.625rem 1rem;
+	text-align: left;
+	white-space: nowrap;
+}
+
+[data-theme='naval'] thead th {
+	border-bottom: 1px solid var(--color-border);
+	color: var(--naval-muted);
+	font-size: 0.75rem;
+	font-weight: 600;
+}
+
+[data-theme='naval'] tbody tr + tr > * {
+	border-top: 1px solid var(--color-border);
+}
+
+[data-theme='naval'] tbody tr:hover > * {
+	background: var(--naval-hover);
+}
+
+[data-theme='naval'] tbody tr:last-child > :first-child {
+	border-bottom-left-radius: 0.625rem;
+}
+
+[data-theme='naval'] tbody tr:last-child > :last-child {
+	border-bottom-right-radius: 0.625rem;
+}
+
+[data-theme='naval'] tbody th {
+	font-family: var(--naval-mono);
+	font-size: 0.8125rem;
+	font-weight: 600;
+}
+
+[data-theme='naval'] pre {
+	padding: 1rem 1.25rem;
+	overflow-x: auto;
+	border: 1px solid var(--color-border);
+	border-radius: 0.625rem;
+	background: var(--naval-surface);
+	font-size: 0.875rem;
+	line-height: 1.6;
+}
+
+[data-theme='naval'] pre code {
+	padding: 0;
+	background: none;
+	font-size: inherit;
+}
+
+[data-theme='naval'] code {
+	padding: 0.125rem 0.375rem;
+	border-radius: 0.25rem;
+	background: var(--naval-chip);
+	font-family: var(--naval-mono);
+	font-size: 0.8125em;
+}
+
+[data-theme='naval'] button {
+	margin-left: 0.5rem;
+	padding: 0.25rem 0.625rem;
+	border: 1px solid var(--color-border);
+	border-radius: 0.375rem;
+	background: var(--naval-surface);
+	color: var(--color-text);
+	font: inherit;
+	font-size: 0.75rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition:
+		border-color 0.15s ease,
+		color 0.15s ease;
+}
+
+[data-theme='naval'] button:hover {
+	border-color: var(--color-primary);
+	color: var(--color-primary);
+}
+
+/* The page of Images lists its repositories one under the other. */
+[data-theme='naval'] body > ul {
+	margin-block: 0;
+	list-style: none;
+}
+
+[data-theme='naval'] body > ul > li {
+	margin-bottom: 2rem;
+}
+
+[data-theme='naval'] body > ul > li > h2 {
+	margin: 0 0 0.75rem;
+	font-family: var(--naval-mono);
+	font-size: 1rem;
+}
+
+[data-theme='naval'] .issues > li {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.125rem 1rem;
+	padding: 0.875rem 1.25rem;
+}
+
+[data-theme='naval'] .issues > li + li {
+	border-top: 1px solid var(--color-border);
+}
+
+[data-theme='naval'] .issues > li > a {
+	flex-basis: 100%;
+	color: var(--color-text);
+	font-weight: 600;
+}
+
+[data-theme='naval'] .issues > li > a:hover {
+	color: var(--color-primary);
+}
+
+[data-theme='naval'] .issues > li > p {
+	color: var(--naval-muted);
+	font-size: 0.8125rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-theme='naval'] :is(.card, .site-header nav a, button) {
+		transition: none;
+	}
+
+	[data-theme='naval'] .card:has(> :is(h2, h3) > a):hover {
+		transform: none;
+	}
+}
+
+/* The page of a Project: its README, commits and Issues in a column of cards, with Releases and Contributors beside them. */
+/* One attribute more than the Controller's own rule, which sits later in the page. */
+:root[data-theme='naval'] .columns {
+	gap: 2rem;
+	padding-block: 2.25rem 0;
+}
+
+[data-theme='naval'] .columns > :is(main, aside) {
+	display: flex;
+	flex-direction: column;
+	gap: 1.75rem;
+	min-width: 0;
+}
+
+/* Each part of a Project is a plain title above its card, with no rule between them. */
+[data-theme='naval'] section.project-part {
+	padding: 0;
+}
+
+[data-theme='naval'] section.project-part::before {
+	display: none;
+}
+
+[data-theme='naval'] .project-part > h2 {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0 0 0.75rem;
+	font-size: 1.0625rem;
+	font-weight: 650;
+}
+
+[data-theme='naval'] .project-part > h2::before {
+	flex: none;
+	font-size: 1.125rem;
+	line-height: 1;
+}
+
+[data-theme='naval'] .project-part > .card {
+	padding: 1.25rem 1.5rem;
+	border-width: 1px;
+	border-style: solid;
+}
+
+/* The emoji are decoration, so their alternative text is empty and screen readers skip them. */
+[data-theme='naval'] .project-readme > h2::before {
+	content: '📖' / '';
+}
+
+[data-theme='naval'] .project-commits > h2::before {
+	content: '📝' / '';
+}
+
+[data-theme='naval'] .project-issues > h2::before {
+	content: '🐛' / '';
+}
+
+[data-theme='naval'] .project-releases > h2::before {
+	content: '🚀' / '';
+}
+
+[data-theme='naval'] .project-contributors > h2::before {
+	content: '👥' / '';
+}
+
+/* Commits, Releases and Contributors: rows split by hairlines, the title strong and its details muted. */
+[data-theme='naval'] :is(.project-commits, .project-releases, .project-contributors) li {
+	padding-block: 0.625rem;
+}
+
+[data-theme='naval'] :is(.project-commits, .project-releases, .project-contributors) li + li {
+	border-top: 1px solid var(--color-border);
+}
+
+[data-theme='naval'] :is(.project-commits, .project-releases, .project-contributors) li:first-child {
+	padding-top: 0;
+}
+
+[data-theme='naval'] :is(.project-commits, .project-releases, .project-contributors) li:last-child {
+	padding-bottom: 0;
+}
+
+[data-theme='naval'] :is(.project-commits, .project-releases) li > a {
+	color: var(--color-text);
+	font-size: 0.9375rem;
+	font-weight: 550;
+}
+
+[data-theme='naval'] :is(.project-commits, .project-releases) li > a:hover {
+	color: var(--color-primary);
+}
+
+[data-theme='naval'] :is(.project-commits, .project-releases) li > p {
+	margin: 0.125rem 0 0;
+	font-size: 0.8125rem;
+}
+
+[data-theme='naval'] .project-contributors li {
+	font-size: 0.875rem;
+}
+
+/* The Issues of a Project fill their card edge to edge, under its title. */
+[data-theme='naval'] .card .issues {
+	margin: -1.25rem -1.5rem;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+}
+
+[data-theme='naval'] .card .issues > li {
+	padding-inline: 1.5rem;
+}
+
+/* A README reads as a document: body text, not the muted small print of a card. */
+[data-theme='naval'] .card .readme {
+	font-size: 0.9375rem;
+	line-height: 1.65;
+}
+
+[data-theme='naval'] .card .readme :is(p, li) {
+	margin-block: 0 0.75rem;
+	color: var(--color-text);
+	font-size: inherit;
+}
+
+[data-theme='naval'] .card .readme li {
+	margin-block: 0 0.25rem;
+}
+
+[data-theme='naval'] .card .readme table {
+	margin-bottom: 1rem;
+}
+
+[data-theme='naval'] .card .readme > :first-child {
+	margin-top: 0;
+}
+
+[data-theme='naval'] .card .readme > :last-child {
+	margin-bottom: 0;
+}
+
+[data-theme='naval'] .card .readme h1 {
+	margin: 0 0 0.75rem;
+	font-size: 1.5rem;
+}
+
+[data-theme='naval'] .card .readme h2 {
+	margin: 1.75rem 0 0.75rem;
+	padding-bottom: 0.375rem;
+	border-bottom: 1px solid var(--color-border);
+	font-size: 1.125rem;
+}
+
+[data-theme='naval'] .card .readme h3 {
+	margin: 1.25rem 0 0.5rem;
+}
+
+[data-theme='naval'] .card .readme ul {
+	padding-left: 1.25rem;
+}
+
+[data-theme='naval'] .card .readme blockquote {
+	margin: 0 0 0.75rem;
+	padding: 0.25rem 1rem;
+	border-left: 3px solid var(--color-primary);
+	background: var(--naval-hover);
+	color: var(--naval-muted);
+}
+
+/* A code block in a README is a little terminal window: dark, with three lights in its title bar. */
+[data-theme='naval'] .readme pre {
+	position: relative;
+	margin: 0 0 1rem;
+	padding: 2.75rem 1.25rem 1.125rem;
+	border: 1px solid light-dark(var(--naval-navy), #23384f);
+	border-radius: 0.75rem;
+	background: #0b1a2e;
+	box-shadow:
+		0 1px 2px var(--naval-shadow),
+		0 10px 28px var(--naval-shadow-raised);
+	color: #d9e8f6;
+	font-size: 0.8125rem;
+	line-height: 1.7;
+}
+
+[data-theme='naval'] .readme pre::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	height: 2rem;
+	border-bottom: 1px solid rgb(255 255 255 / 0.06);
+	border-radius: 0.6875rem 0.6875rem 0 0;
+	background:
+		radial-gradient(circle at 1.125rem 50%, #ff5f57 0.28rem, transparent 0.31rem),
+		radial-gradient(circle at 1.875rem 50%, #febc2e 0.28rem, transparent 0.31rem),
+		radial-gradient(circle at 2.625rem 50%, #28c840 0.28rem, transparent 0.31rem),
+		#12263f;
+}
+
+[data-theme='naval'] .readme pre::after {
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	color: #8aa0b8;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	font-size: 0.75rem;
+	line-height: 2rem;
+	text-align: center;
+}
+
+/* A shell block is named a terminal, and its text takes the green of a prompt. */
+[data-theme='naval'] .readme pre:has(> code:is(.language-sh, .language-bash, .language-shell, .language-zsh, .language-console))::after {
+	content: 'Terminal' / '';
+}
+
+[data-theme='naval'] .readme pre > code:is(.language-sh, .language-bash, .language-shell, .language-zsh, .language-console) {
+	color: #b8f5c8;
+}
+
+/* A folding title: its chevron is muted, and turns blue under the pointer. */
+[data-theme='naval'] .project-part > h2 .chevron {
+	color: var(--naval-muted);
+	transition:
+		rotate 0.2s ease,
+		color 0.15s ease;
+}
+
+[data-theme='naval'] .project-part > h2:hover .chevron {
+	color: var(--color-primary);
+}
+
+[data-theme='naval'] .project-part > h2 > button:focus-visible {
+	outline: none;
+}
+
+[data-theme='naval'] .project-part > h2:has(> button:focus-visible) {
+	border-radius: 0.375rem;
+	outline: 2px solid var(--color-primary);
+	outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-theme='naval'] .project-part > h2 .chevron {
+		transition: none;
+	}
+}

@@ -11,24 +11,26 @@ const { source, project } = Astro.props;
 const { data: contributors, stale } = await listContributors(getGitlabSource(source), project);
 ---
 
-<section>
+<section class="project-part project-contributors">
 	<h2>Contributors</h2>
-	{stale && <p role="status">This list is Stale because {source} is down.</p>}
-	{
-		!contributors ? (
-			<p role="alert">Contributors could not be loaded from {source}.</p>
-		) : contributors.length > 0 ? (
-			<ul>
-				{contributors.map((contributor) => (
-					<li>
-						{contributor.name}, {contributor.commits} {contributor.commits === 1 ? 'commit' : 'commits'}
-					</li>
-				))}
-			</ul>
-		) : (
-			<p>No contributors found.</p>
-		)
-	}
+	<div class="card">
+		{stale && <p role="status">This list is Stale because {source} is down.</p>}
+		{
+			!contributors ? (
+				<p role="alert">Contributors could not be loaded from {source}.</p>
+			) : contributors.length > 0 ? (
+				<ul>
+					{contributors.map((contributor) => (
+						<li>
+							{contributor.name}, {contributor.commits} {contributor.commits === 1 ? 'commit' : 'commits'}
+						</li>
+					))}
+				</ul>
+			) : (
+				<p>No contributors found.</p>
+			)
+		}
+	</div>
 </section>
 
 <style>

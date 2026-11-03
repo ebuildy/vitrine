@@ -18,7 +18,7 @@ const { data: issues, stale } = await listGroupIssues(getGitlabSource(source), g
 		!issues ? (
 			<p role="alert">Issues could not be loaded from {source}.</p>
 		) : issues.length > 0 ? (
-			<ul>
+			<ul class="issues">
 				{issues.map((issue) => (
 					<li>
 						<a href={issue.webUrl}>{issue.title}</a>

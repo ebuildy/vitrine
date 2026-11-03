@@ -48,6 +48,54 @@ cacheStore:
   # The name of the environment variable holding the connection URL, never the URL itself.
   # urlEnv: REDIS_URL
 
+# The site name and logo at the top of every page. Defaults to the name Vitrine and no logo.
+branding:
+  siteName: Acme Portal
+  # Starts with http://, https:// or /. The Container image serves no files of its own, so host the logo elsewhere.
+  logo: https://cdn.example.com/logo.svg
+
+# The Menu at the top of every page, in this order. A url starts with http://, https:// or /.
+navigation:
+  - label: Images
+    url: /images
+  - label: Handbook
+    url: https://docs.example.com/
+
+# name picks a complete Theme, with its own colours and decorations. Leave it out for the plain default.
+# Every Theme, the default too, has a light and a dark mode. Each Visitor's system picks one, unless the Visitor
+# picks another with the menu at the top right, which their browser remembers.
+#   naval: a crisp layout in ocean blues, with a sea of drifting waves, boats and submarines at the foot of every page.
+# The colours are any CSS colour, and win over those of the named Theme: those at the top for light mode, and
+# those under dark for dark mode. Quote a hex colour, as YAML reads # as a comment. Each one you leave out keeps
+# the Theme's own for that mode.
+# Components use them as the CSS variables --color-primary, --color-background, --color-text and --color-border,
+# and a Template can do the same.
+theme:
+  name: naval
+  # Links, card highlights and Roadmap bars.
+  primary: '#00795c'
+  background: '#ffffff'
+  text: '#1e1e3c'
+  border: '#c8d0d8'
+  dark:
+    primary: '#4fd1a5'
+    background: '#0d1b2a'
+    text: '#e6edf3'
+    border: '#2a3a4a'
+  # Your own CSS, after Vitrine's and the named Theme's so that it wins, in this order. Each item is one of:
+  #   - a URL starting with http://, https:// or /, which the browser loads
+  #   - a file starting with ./ or ../, beside this file, read when Vitrine starts: a change needs a restart
+  #   - CSS code, told apart by its {
+  # Every card has the class card, so that one rule styles them all, as in .card { border-radius: 0; }.
+  # Each part of a Project page is a title above a card, in a .project-part: .project-readme, .project-commits, .project-issues, .project-releases and .project-contributors.
+  # Like a Template, CSS runs in every Visitor's browser, so only let people trusted with the site edit it.
+  css:
+    - https://cdn.example.com/brand.css
+    # Startup stops on a file that does not exist, so create vitrine.css before you uncomment this line.
+    # - ./vitrine.css
+    - |
+      h1 { letter-spacing: 0.02em; }
+
 routes:
   # Shows the latest releases, Harbor projects, Members and Groups of every Source, and leads to the other pages.
   # Add as many of these as you like, on any URL, even the root one.

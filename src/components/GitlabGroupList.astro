@@ -34,7 +34,7 @@ const { data: groups, stale, detailsMissing }: MainGroupList = await (group === 
 					const issuesUrl = gitlabIssuesUrl(routes, source, listed.path);
 					const roadmapUrl = gitlabSource.mainGroups.includes(listed.path) ? gitlabRoadmapUrl(routes, source, listed.path) : undefined;
 					return (
-						<li>
+						<li class="card">
 							<h3>{url ? <a href={url}>{listed.name}</a> : listed.name}</h3>
 							{listed.description && <p>{listed.description}</p>}
 							<p>
@@ -74,12 +74,12 @@ const { data: groups, stale, detailsMissing }: MainGroupList = await (group === 
 	li {
 		position: relative;
 		padding: 1rem;
-		border: 1px solid #8884;
+		border: 1px solid var(--color-border);
 		border-radius: 0.5rem;
 	}
 
 	li:hover {
-		border-color: currentColor;
+		border-color: var(--color-primary);
 	}
 
 	h3 {

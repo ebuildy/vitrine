@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import { duplicates, routeProblems, routeSchema } from './router.ts';
@@ -37,10 +38,63 @@ const cacheStoreSchema = z.discriminatedUnion('type', [
 	z.strictObject({ type: z.literal('redis'), urlEnv: z.string().min(1) }),
 ]);
 
+/** A page-relative address would point somewhere else on every page, and a Container image serves no files of its own. */
+const addressSchema = z.string().regex(/^(https?:\/\/|\/)/i, 'must start with http://, https:// or /');
+
+const brandingSchema = z.strictObject({
+	siteName: z.string().min(1).default('Vitrine'),
+	logo: addressSchema.optional(),
+});
+
+const navigationItemSchema = z.strictObject({
+	label: z.string().min(1),
+	url: addressSchema,
+});
+
+// The characters of a CSS colour, so that a stray `;` or `}` fails at startup and not as a page with no colours.
+const colourSchema = z.string().regex(/^[#\w\s(),.%/-]+$/, 'must be a CSS colour, like "#0a7" or rgb(0 120 200)');
+
+/** CSS ends up inside a <style>, which `</style>` would close early. */
+const CLOSES_STYLE = /<\/style/i;
+const STYLESHEET_URL = /^(https?:\/\/|\/)/i;
+const STYLESHEET_FILE = /^\.\.?\//;
+
+/** CSS has a `{`, unlike a URL or a file, so an item is read by its shape. */
+const cssItemSchema = z.string().superRefine((item, context) => {
+	if (item.includes('{')) {
+		if (CLOSES_STYLE.test(item)) context.addIssue({ code: 'custom', message: 'must not contain </style>' });
+	} else if (!STYLESHEET_URL.test(item) && !STYLESHEET_FILE.test(item)) {
+		context.addIssue({ code: 'custom', message: 'must be CSS, a URL starting with http://, https:// or /, or a file starting with ./ or ../' });
+	}
+});
+
+const coloursSchema = {
+	primary: colourSchema.optional(),
+	background: colourSchema.optional(),
+	text: colourSchema.optional(),
+	border: colourSchema.optional(),
+};
+
+const themeSchema = z.strictObject({
+	// Each name has its own stylesheet in src/themes, with a light and a dark mode.
+	name: z.enum(['naval']).optional(),
+	// The colours of light mode, and under dark, those of dark mode. A colour left out is the Theme's own.
+	...coloursSchema,
+	dark: z.strictObject(coloursSchema).default({}),
+	// After Vitrine's own styles and the named Theme, so that they win.
+	css: z.array(cssItemSchema).default([]),
+});
+
+/** A stylesheet the browser loads, or CSS the page carries, read from a file when Settings name one. */
+export type Stylesheet = { href: string } | { code: string };
+
 const settingsSchema = z.strictObject({
 	sources: z.array(sourceSchema),
 	routes: z.array(routeSchema),
 	cacheStore: cacheStoreSchema.default({ type: 'memory' }),
+	branding: brandingSchema.prefault({}),
+	navigation: z.array(navigationItemSchema).default([]),
+	theme: themeSchema.prefault({}),
 });
 
 export type HarborSource = z.infer<typeof harborSourceSchema> & { password?: string };
@@ -53,6 +107,9 @@ export interface Settings {
 	sources: Source[];
 	routes: Route[];
 	cacheStore: CacheStoreSettings;
+	branding: z.infer<typeof brandingSchema>;
+	navigation: z.infer<typeof navigationItemSchema>[];
+	theme: Omit<z.infer<typeof themeSchema>, 'css'> & { css: Stylesheet[] };
 }
 
 export class SettingsError extends Error {
@@ -80,13 +137,17 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 		);
 	}
 
-	const { sources, cacheStore } = parsed.data;
+	const { sources, cacheStore, branding, navigation, theme } = parsed.data;
 	const { routes, problems: compileProblems } = templatesDisabled(env) ? { routes: parsed.data.routes, problems: [] } : compileRoutes(parsed.data.routes, sources);
-	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources), ...cacheStoreProblems(cacheStore, env), ...compileProblems];
+	const { stylesheets, problems: cssProblems } = readStylesheets(theme.css, dirname(path));
+	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources), ...cacheStoreProblems(cacheStore, env), ...compileProblems, ...cssProblems];
 	if (problems.length > 0) throw new SettingsError(path, problems);
 
 	return {
 		routes,
+		branding,
+		navigation,
+		theme: { ...theme, css: stylesheets },
 		cacheStore: cacheStore.type === 'redis' ? { ...cacheStore, url: env[cacheStore.urlEnv] as string } : cacheStore,
 		sources: sources.map((source) =>
 			source.type === 'harbor'
@@ -133,6 +194,24 @@ function sourceProblems(sources: z.infer<typeof sourceSchema>[], env: Record<str
 		}
 	}
 	return problems;
+}
+
+/** Reads the files the Container image cannot serve, from beside Settings, so that they can live in the same ConfigMap. */
+function readStylesheets(items: string[], directory: string) {
+	const problems: string[] = [];
+	const stylesheets = items.map((item, index): Stylesheet => {
+		if (item.includes('{')) return { code: item };
+		if (STYLESHEET_URL.test(item)) return { href: item };
+		try {
+			const code = readFileSync(resolve(directory, item), 'utf8');
+			if (CLOSES_STYLE.test(code)) problems.push(`theme.css.${index}: ${item} must not contain </style>`);
+			return { code };
+		} catch (error) {
+			problems.push(`theme.css.${index}: cannot read ${item}: ${error instanceof Error ? error.message : String(error)}`);
+			return { code: '' };
+		}
+	});
+	return { stylesheets, problems };
 }
 
 function cacheStoreProblems(cacheStore: z.infer<typeof cacheStoreSchema>, env: Record<string, string | undefined>) {

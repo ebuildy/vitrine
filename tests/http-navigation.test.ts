@@ -110,13 +110,15 @@ describe('a Route to the navigation Controller', () => {
 	});
 
 	test('leads to the Routes with a fixed URL, other Navigation pages included, but not to itself', async () => {
-		const html = await open('/');
+		// Only the list of pages: the site name in the header links home from every page.
+		const pagesOf = (html: string) => /<ul class="pages"[^>]*>(.*?)<\/ul>/s.exec(html)?.[1] ?? '';
+		const pages = pagesOf(await open('/'));
 
-		expect(html).toContain('href="/images"');
-		expect(html).toContain('href="/short"');
-		expect(html).not.toContain('href="/"');
-		expect(html).not.toContain(':source');
-		expect(await open('/short')).toContain('href="/"');
+		expect(pages).toContain('href="/images"');
+		expect(pages).toContain('href="/short"');
+		expect(pages).not.toContain('href="/"');
+		expect(pages).not.toContain(':source');
+		expect(pagesOf(await open('/short'))).toContain('href="/"');
 	});
 
 	test('keeps showing the other Sources when one is down', async () => {
