@@ -40,7 +40,7 @@ function initialsOf(name: string) {
 						const url = gitlabProjectUrl(getSettings().routes, source, project.path);
 						const card = cards[index]?.data;
 						return (
-							<li>
+							<li class="card">
 								<h3>{url ? <a href={url}>{project.name}</a> : project.name}</h3>
 								{project.description && <p>{project.description}</p>}
 								{project.topics.length > 0 && (

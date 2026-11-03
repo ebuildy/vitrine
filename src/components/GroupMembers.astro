@@ -24,7 +24,7 @@ const { data: members, stale, detailsStale, detailsMissing } = await listMembers
 		) : members.length > 0 ? (
 			<ul>
 				{members.map(({ name, avatarUrl, location, email }) => (
-					<li>
+					<li class="card">
 						{avatarUrl ? <img src={avatarUrl} alt="" width="40" height="40" loading="lazy" /> : <span class="avatar" />}
 						<div>
 							<h3>{name}</h3>

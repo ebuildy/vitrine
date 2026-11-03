@@ -40,8 +40,13 @@ navigation:
   - label: Issues
     url: /issues/platform
 
+# The naval Theme: a crisp layout in ocean blues, with a sea of drifting waves, boats and submarines at the foot of every page.
 theme:
-  primary: '#00795c'
+  name: naval
+  # Your own CSS wins over the Theme's. See settings.example.yaml for files and URLs.
+  css:
+    - |
+      .site-name { letter-spacing: 0.08em; text-transform: uppercase; }
 
 routes:
   - url: /

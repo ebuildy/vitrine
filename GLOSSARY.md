@@ -63,7 +63,7 @@ The links at the top of every page, set under `navigation` in Settings.
 _Avoid_: Navigation bar, navbar, links
 
 **Theme**:
-The colours of an installation, set in Settings, which Components use through CSS variables.
+The look of an installation, set in Settings: a named set of colours and decorations, such as naval, whose colours Settings can override. Components use the colours through CSS variables.
 _Avoid_: Palette, skin, Template
 
 **Component**:

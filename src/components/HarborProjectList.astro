@@ -21,7 +21,7 @@ const { data: projects, stale } = await listProjects(getHarborSource(source));
 			{projects.map((project) => {
 				const url = harborImagesUrl(getSettings().routes, source, project.name);
 				return (
-					<li>
+					<li class="card">
 						<h2>{url ? <a href={url}>{project.name}</a> : project.name}</h2>
 						<dl>
 							<div>

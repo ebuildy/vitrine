@@ -1,6 +1,7 @@
 ---
 import { matchRoute } from '../router.ts';
 import { getSettings } from '../settings.ts';
+import '../themes/naval.css';
 
 interface Props {
 	title: string;
@@ -11,14 +12,15 @@ const { title, description } = Astro.props;
 const settings = getSettings();
 const { branding, navigation, theme } = settings;
 const { siteName, logo } = branding;
-const themeVariables = Object.fromEntries(Object.entries(theme).map(([name, colour]) => [`--color-${name}`, colour]));
+const { name: themeName, css, ...colours } = theme;
+const themeVariables = Object.fromEntries(Object.entries(colours).map(([name, colour]) => [`--color-${name}`, colour]));
 // Not every installation has a Route at the root URL, and a link home should not lead to not found.
 const hasHome = Boolean(matchRoute(settings, '/'));
 const SiteNameTag = hasHome ? 'a' : 'span';
 ---
 
 <!doctype html>
-<html lang="en" style={themeVariables}>
+<html lang="en" data-theme={themeName} style={themeVariables}>
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
@@ -27,7 +29,9 @@ const SiteNameTag = hasHome ? 'a' : 'span';
 		{description && <meta name="description" content={description} />}
 	</head>
 	<body>
-		<header>
+		{/* Astro adds its own styles at the end of <head>, and the CSS of Settings must come after them to win. */}
+		{css.map((stylesheet) => ('href' in stylesheet ? <link rel="stylesheet" href={stylesheet.href} /> : <style is:inline set:html={stylesheet.code} />))}
+		<header class="site-header">
 			<SiteNameTag class="site-name" href={hasHome ? '/' : undefined}>
 				{logo && <img src={logo} alt="" />}
 				{siteName}
@@ -38,7 +42,7 @@ const SiteNameTag = hasHome ? 'a' : 'span';
 						<ul>
 							{navigation.map(({ label, url }) => (
 								<li>
-									<a href={url}>{label}</a>
+									<a href={url} aria-current={url === Astro.url.pathname ? 'page' : undefined}>{label}</a>
 								</li>
 							))}
 						</ul>
@@ -47,11 +51,21 @@ const SiteNameTag = hasHome ? 'a' : 'span';
 			}
 		</header>
 		<slot />
+		{
+			themeName === 'naval' && (
+				<div class="sea" aria-hidden="true">
+					<span class="vessel boat sailboat" />
+					<span class="vessel submarine" />
+					<span class="vessel boat tugboat" />
+					<span class="vessel submarine" />
+				</div>
+			)
+		}
 	</body>
 </html>
 
 <style is:global>
-	/* The defaults of the Theme. Settings override them on <html>, and Components and Templates read them. */
+	/* The defaults of the Theme. A named Theme and then Settings override them on <html>, and Components and Templates read them. */
 	:root {
 		--color-primary: LinkText;
 		--color-background: Canvas;

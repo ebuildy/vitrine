@@ -11,6 +11,8 @@ export function renderMarkdown(markdown: string, { linkBase, imageBase }: Bases)
 	return sanitizeHtml(marked.parse(markdown, { async: false }), {
 		allowedTags: [...sanitizeHtml.defaults.allowedTags, 'img'],
 		allowedAttributes: { a: ['href', 'title'], img: ['src', 'alt', 'title'] },
+		// The language of a code block, so that a Theme can show a shell block as a terminal.
+		allowedClasses: { code: ['language-*'] },
 		transformTags: {
 			a: (tagName, attribs) => ({ tagName, attribs: withAbsoluteUrl(attribs, 'href', linkBase) }),
 			img: (tagName, attribs) => ({ tagName, attribs: withAbsoluteUrl(attribs, 'src', imageBase) }),
