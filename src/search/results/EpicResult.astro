@@ -1,0 +1,19 @@
+---
+import { formatDate } from '../../format.ts';
+import type { Epic } from '../../sources/gitlab-api.ts';
+
+interface Props {
+	/** Left out when no Route shows the content, and the title is then no link. */
+	url?: string;
+	epic: Epic;
+}
+
+const { url, epic } = Astro.props;
+const dates = [epic.startDate && `from ${formatDate(epic.startDate)}`, epic.dueDate && `due ${formatDate(epic.dueDate)}`].filter(Boolean).join(', ');
+---
+
+<h2>{url ? <a href={url}>{epic.title}</a> : epic.title}</h2>
+<p>
+	{epic.issues.closed} of {epic.issues.all} Issues closed{dates && ` · ${dates}`}
+</p>
+{epic.assignees.length > 0 && <p>Assigned to {epic.assignees.map(({ name }) => name).join(', ')}</p>}

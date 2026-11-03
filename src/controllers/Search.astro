@@ -1,0 +1,321 @@
+---
+import Arrangement from '../layouts/Arrangement.astro';
+import Layout from '../layouts/Layout.astro';
+import SearchResult from '../search/SearchResult.astro';
+import { CONTENT_TYPES, getSearchEngine } from '../search/search-engine.ts';
+import type { ContentType } from '../search/search-engine.ts';
+import { getSettings } from '../settings.ts';
+import type { CompiledTemplate } from '../template-compiler.ts';
+
+interface Props {
+	template?: CompiledTemplate;
+}
+
+// Enough for a Visitor to find what they meant, or to see they should search with more words.
+const MAX_RESULTS = 100;
+
+const TYPE_LABELS: Record<ContentType, string> = {
+	group: 'Groups',
+	project: 'Projects',
+	issue: 'Issues',
+	member: 'Members',
+	epic: 'Epics',
+	image: 'Images',
+};
+
+const { template } = Astro.props;
+const query = Astro.url.searchParams;
+const text = (query.get('q') ?? '').trim();
+const types = query.getAll('type').filter((type): type is ContentType => (CONTENT_TYPES as readonly string[]).includes(type));
+const sources = query.getAll('source');
+// What a Visitor waited for, lists loading from a Source included.
+const started = performance.now();
+const { results, counts, missing } = await getSearchEngine().search({ text, types, sources });
+const elapsed = performance.now() - started;
+// A search on cached lists takes well under a millisecond, which a whole number would show as 0 ms.
+const duration = `${elapsed < 10 ? elapsed.toFixed(1) : Math.round(elapsed)} ms`;
+const shown = results.slice(0, MAX_RESULTS);
+const title = text ? `Search: ${text}` : 'Search';
+---
+
+<Layout title={title}>
+	<Arrangement template={template} title={title}>
+		{/* One block, so that a Theme laying out each block of a page lays out the card with the rest. */}
+		<div class="search-page">
+			<h1>Search</h1>
+			<form class="search" method="get" role="search">
+				<div class="box">
+					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+						<circle cx="11" cy="11" r="7"></circle>
+						<path d="m20 20-4-4"></path>
+					</svg>
+					<input
+						type="search"
+						name="q"
+						value={text}
+						aria-label="Search"
+						placeholder="Groups, Projects, Issues, Members, Epics and Images"
+						autocomplete="off"
+						spellcheck="false"
+						autofocus
+					/>
+					<button type="submit">Search</button>
+				</div>
+				{/* Swapped whole on each search, so that the counts follow the text. */}
+				<div class="filters" data-search-filters>
+					<fieldset>
+						<legend>Content type</legend>
+						<div class="chips">
+							{
+								CONTENT_TYPES.map((type) => (
+									<label class="chip">
+										<input type="checkbox" name="type" value={type} checked={types.includes(type)} />
+										{TYPE_LABELS[type]}
+										{text && <span class="count">{counts.types[type] ?? 0}</span>}
+									</label>
+								))
+							}
+						</div>
+					</fieldset>
+					<fieldset>
+						<legend>Source</legend>
+						<div class="chips">
+							{
+								getSettings().sources.map(({ name }) => (
+									<label class="chip">
+										<input type="checkbox" name="source" value={name} checked={sources.includes(name)} />
+										{name}
+										{text && <span class="count">{counts.sources[name] ?? 0}</span>}
+									</label>
+								))
+							}
+						</div>
+					</fieldset>
+				</div>
+			</form>
+			<div class="answer" data-search-results aria-live="polite">
+				{shown.some(({ stale }) => stale) && <p role="status">Some results are Stale because their Source is down.</p>}
+				{
+					missing.length > 0 && (
+						<p role="alert">
+							Some content could not be searched: {missing.map(({ source, list }) => `${list} from ${source}`).join(', ')}.
+						</p>
+					)
+				}
+				{
+					text &&
+						(shown.length > 0 ? (
+							<>
+								<p class="summary">
+									{results.length > shown.length
+										? `The first ${shown.length} of ${results.length} results in ${duration}.`
+										: `${results.length} ${results.length === 1 ? 'result' : 'results'} in ${duration}.`}
+								</p>
+								<ul class="results">
+									{shown.map((result) => (
+										<SearchResult result={result} />
+									))}
+								</ul>
+							</>
+						) : (
+							<p>Nothing matches “{text}”.</p>
+						))
+				}
+			</div>
+		</div>
+	</Arrangement>
+</Layout>
+
+<script>
+	// Results follow the box: 2 seconds after the last key, or at once for a filter, Enter or the button. Without
+	// JavaScript, the form submits as a plain page load.
+	const TYPING_PAUSE_MS = 2000;
+
+	const form = document.querySelector<HTMLFormElement>('form.search');
+	const input = form?.querySelector<HTMLInputElement>('input[name="q"]');
+	if (form && input) {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let running: AbortController | undefined;
+		// Moves the caret past what the Visitor typed, which autofocus leaves at the start.
+		input.setSelectionRange(input.value.length, input.value.length);
+
+		const search = async () => {
+			clearTimeout(timer);
+			running?.abort();
+			running = new AbortController();
+			const url = new URL(form.action);
+			url.search = new URLSearchParams([...new FormData(form)].map(([name, value]) => [name, String(value)])).toString();
+			form.dataset.searching = '';
+			try {
+				const response = await fetch(url, { signal: running.signal });
+				const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+				for (const part of ['[data-search-filters]', '[data-search-results]']) {
+					const fresh = page.querySelector(part);
+					if (fresh) document.querySelector(part)?.replaceWith(fresh);
+				}
+				document.title = page.title;
+				history.replaceState(null, '', url);
+				delete form.dataset.searching;
+			} catch (error) {
+				// A newer search took over, and it clears the state when it ends.
+				if (!(error instanceof DOMException && error.name === 'AbortError')) {
+					delete form.dataset.searching;
+					throw error;
+				}
+			}
+		};
+
+		input.addEventListener('input', () => {
+			clearTimeout(timer);
+			timer = setTimeout(search, TYPING_PAUSE_MS);
+		});
+		// The filters are replaced on each search, so the form listens for them.
+		form.addEventListener('change', (event) => {
+			if (event.target !== input) search();
+		});
+		form.addEventListener('submit', (event) => {
+			event.preventDefault();
+			search();
+		});
+	}
+</script>
+
+<style>
+	h1,
+	.answer > p {
+		margin: 1rem;
+	}
+
+	/* A white card in light mode. In dark mode, a surface just lighter than the page, as white would glare. */
+	.search {
+		margin: 1rem;
+		padding: 1rem;
+		border: 1px solid var(--color-border);
+		border-radius: 0.75rem;
+		background: light-dark(#fff, color-mix(in srgb, var(--color-background), white 6%));
+		box-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+	}
+
+	.box {
+		position: relative;
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.icon {
+		position: absolute;
+		top: 50%;
+		left: 0.85rem;
+		width: 1.15rem;
+		height: 1.15rem;
+		translate: 0 -50%;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 2;
+		stroke-linecap: round;
+		opacity: 0.55;
+		pointer-events: none;
+	}
+
+	.box input {
+		flex: 1;
+		min-width: 0;
+		padding: 0.7rem 0.9rem 0.7rem 2.6rem;
+		border: 1px solid var(--color-border);
+		border-radius: 0.5rem;
+		background: light-dark(#fff, var(--color-background));
+		color: var(--color-text);
+		font: inherit;
+		font-size: 1.05rem;
+	}
+
+	.box input:focus {
+		border-color: var(--color-primary);
+		outline: 3px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+	}
+
+	.box button {
+		padding: 0 1.2rem;
+		border: none;
+		border-radius: 0.5rem;
+		background: var(--color-primary);
+		color: light-dark(#fff, var(--color-background));
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	/* While a search runs, the button says so without moving anything. */
+	.search[data-searching] .box button {
+		opacity: 0.6;
+		cursor: progress;
+	}
+
+	fieldset {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.5rem;
+		margin: 0.9rem 0 0;
+		border: none;
+		padding: 0;
+	}
+
+	legend {
+		float: left;
+		min-width: 7rem;
+		font-size: 0.85rem;
+		font-weight: 600;
+		opacity: 0.75;
+	}
+
+	.chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.25rem 0.7rem;
+		border: 1px solid var(--color-border);
+		border-radius: 1rem;
+		font-size: 0.9rem;
+		cursor: pointer;
+		user-select: none;
+	}
+
+	/* The box itself stays focusable for the keyboard, and the chip shows its state. */
+	.chip input {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.chip:has(input:checked) {
+		border-color: var(--color-primary);
+		background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+		color: var(--color-primary);
+		font-weight: 600;
+	}
+
+	.chip:has(input:focus-visible) {
+		outline: 2px solid var(--color-primary);
+		outline-offset: 2px;
+	}
+
+	.count {
+		font-size: 0.8rem;
+		opacity: 0.65;
+	}
+
+	.results {
+		display: grid;
+		gap: 0.75rem;
+		margin: 0 1rem 1rem;
+		padding: 0;
+		list-style: none;
+	}
+</style>

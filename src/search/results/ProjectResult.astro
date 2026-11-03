@@ -1,0 +1,32 @@
+---
+import { formatDate } from '../../format.ts';
+import type { Project } from '../../sources/gitlab-api.ts';
+
+interface Props {
+	/** Left out when no Route shows the content, and the title is then no link. */
+	url?: string;
+	project: Project;
+}
+
+const { url, project } = Astro.props;
+---
+
+<h2>{url ? <a href={url}>{project.name}</a> : project.name}</h2>
+<p><code>{project.path}</code> · active {formatDate(project.lastActivityAt)}</p>
+{project.description && <p>{project.description}</p>}
+{project.topics.length > 0 && <p class="topics">{project.topics.map((topic) => <span>{topic}</span>)}</p>}
+
+<style>
+	.topics {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem;
+	}
+
+	.topics span {
+		padding: 0 0.4rem;
+		border: 1px solid var(--color-border);
+		border-radius: 1rem;
+		font-size: 0.85rem;
+	}
+</style>

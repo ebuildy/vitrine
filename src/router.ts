@@ -23,6 +23,7 @@ const controllerParamsSchemas = {
 	'gitlab-project': z.strictObject({ source: z.string().optional(), group: z.string(), project: z.string() }),
 	'gitlab-roadmap': z.strictObject({ source: z.string().optional(), group: z.string() }),
 	'gitlab-issues': z.strictObject({ source: z.string().optional(), group: z.string() }),
+	search: z.strictObject({}),
 };
 
 export type ControllerName = keyof typeof controllerParamsSchemas;
@@ -35,6 +36,7 @@ export const controllerSourceTypes: Record<ControllerName, Source['type'] | unde
 	'gitlab-project': 'gitlab',
 	'gitlab-roadmap': 'gitlab',
 	'gitlab-issues': 'gitlab',
+	search: undefined,
 };
 
 export const routeSchema = z.strictObject({

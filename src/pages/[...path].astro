@@ -8,6 +8,7 @@ import GitlabRoadmap from '../controllers/GitlabRoadmap.astro';
 import Harbor from '../controllers/Harbor.astro';
 import HarborImages from '../controllers/HarborImages.astro';
 import Navigation from '../controllers/Navigation.astro';
+import Search from '../controllers/Search.astro';
 import Layout from '../layouts/Layout.astro';
 import { matchRoute } from '../router.ts';
 import type { ControllerName } from '../router.ts';
@@ -22,6 +23,7 @@ const controllers: Record<ControllerName, AstroComponentFactory> = {
 	'gitlab-project': GitlabProject,
 	'gitlab-roadmap': GitlabRoadmap,
 	'gitlab-issues': GitlabIssues,
+	search: Search,
 };
 
 type Subject = CachedContent<{ name: string; description: string } | undefined>;
