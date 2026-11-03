@@ -67,7 +67,7 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
-            {{- if eq (dig "cacheStore" "type" "" .Values.settings) "files" }}
+            {{- if include "vitrine.filesCacheStore" . }}
             - name: cache
               mountPath: {{ required "settings.cacheStore.directory is needed by a files cache store" .Values.settings.cacheStore.directory }}
             {{- end }}
@@ -77,7 +77,7 @@ spec:
             name: {{ include "vitrine.fullname" . }}
         - name: tmp
           emptyDir: {}
-        {{- if eq (dig "cacheStore" "type" "" .Values.settings) "files" }}
+        {{- if include "vitrine.filesCacheStore" . }}
         - name: cache
           emptyDir:
             {{- toYaml .Values.filesCache | nindent 12 }}

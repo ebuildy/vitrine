@@ -31,6 +31,11 @@ app.kubernetes.io/name: {{ include "vitrine.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{/* Non-empty when Settings use a files cache store, which needs a writable directory. */}}
+{{- define "vitrine.filesCacheStore" -}}
+{{- if eq (dig "cacheStore" "type" "" .Values.settings) "files" }}true{{ end }}
+{{- end }}
+
 {{- define "vitrine.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
 {{- default (include "vitrine.fullname" .) .Values.serviceAccount.name }}

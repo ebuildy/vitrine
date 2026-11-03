@@ -39,7 +39,7 @@ Keep it current: every change an Administrator would notice ships with its docum
 - Deployment, the Container image or an environment variable: `README.md`
 - A value of the Helm chart: `charts/vitrine/README.md`
 
-`tests/documentation.test.ts` goes red on a missing option, Controller, param, Component or prop, and on a word `GLOSSARY.md` says to avoid. A description that no longer matches the code passes it, so reread the section of whatever you changed.
+`tests/documentation.test.ts` goes red on a missing option, Controller, param, Component, prop or value of the Helm chart, and on a word `GLOSSARY.md` says to avoid. A description that no longer matches the code passes it, so reread the section of whatever you changed.
 
 ## Documentation
 

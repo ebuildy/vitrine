@@ -215,7 +215,7 @@ describe('the Helm chart', () => {
 	});
 
 	test('deploys Valkey beside Vitrine when enabled', () => {
-		const service = render({ valkey: { enabled: true } }).find((manifest) => manifest.kind === 'Service' && manifest.metadata.name === 'vitrine-valkey');
+		const service = render({ valkey: { enabled: true } }).find((manifest) => manifest.metadata.name === 'vitrine-valkey' && manifest.kind === 'Service');
 
 		expect(service?.spec.ports).toContainEqual(expect.objectContaining({ port: 6379 }));
 	});
