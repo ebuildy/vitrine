@@ -18,7 +18,7 @@ describe('a branded installation', () => {
 				{ label: 'Images', url: '/images' },
 				{ label: 'Handbook & FAQ', url: 'https://docs.acme.test/' },
 			],
-			theme: { primary: '#0a7', background: 'rgb(250 250 240)' },
+			theme: { primary: '#0a7', background: 'rgb(250 250 240)', dark: { primary: '#5fd' } },
 		});
 	});
 
@@ -51,13 +51,36 @@ describe('a branded installation', () => {
 		expect([...nav.matchAll(/<a[^>]*aria-current="page"[^>]*>([^<]+)</g)].map(([, label]) => label)).toEqual(['Images']);
 	});
 
-	test('sets the Theme as CSS variables', async () => {
+	test('sets the Theme as CSS variables, for light mode and for dark mode', async () => {
 		const html = await (await fetch(`${vitrine.url}/images`)).text();
 
 		const [, style] = /<html[^>]+style="([^"]*)"/.exec(html) ?? [];
-		expect(style).toContain('--color-primary:#0a7');
-		expect(style).toContain('--color-background:rgb(250 250 240)');
+		expect(style).toContain('--color-primary-light:#0a7');
+		expect(style).toContain('--color-background-light:rgb(250 250 240)');
+		expect(style).toContain('--color-primary-dark:#5fd');
+		expect(style).not.toContain('--color-background-dark');
 		expect(style).not.toContain('--color-text');
+	});
+
+	test('offers the colour modes in the site header, shown only once its script runs', async () => {
+		const html = await (await fetch(`${vitrine.url}/images`)).text();
+
+		const [, header] = /<header class="site-header[^>]*>(.*?)<\/header>/s.exec(html) ?? [];
+		const [select] = /<select[^>]*>/.exec(header) ?? [];
+		expect(select).toContain('aria-label="Colour mode"');
+		expect(select).toContain('hidden');
+		expect([...header.matchAll(/<option value="(\w+)"[^>]*>([^<]+)</g)].map(([, value, label]) => [value, label.trim()])).toEqual([
+			['system', 'System'],
+			['light', 'Light'],
+			['dark', 'Dark'],
+		]);
+	});
+
+	test('applies a remembered colour mode in <head>, before the page paints', async () => {
+		const html = await (await fetch(`${vitrine.url}/images`)).text();
+
+		const head = html.slice(0, html.indexOf('</head>'));
+		expect(head).toMatch(/<script>[^<]*localStorage[^<]*colorMode[^<]*<\/script>/);
 	});
 
 	test('has no named Theme by default', async () => {
@@ -72,7 +95,7 @@ describe('a branded installation', () => {
 		expect(response.status).toBe(404);
 		const html = await response.text();
 		expect(html).toContain('Acme Portal');
-		expect(html).toContain('--color-primary:#0a7');
+		expect(html).toContain('--color-primary-light:#0a7');
 	});
 
 	test('does not link the site name home without a Route at the root URL', async () => {
@@ -110,6 +133,8 @@ describe('startup', () => {
 		['a Menu item with no label', { navigation: [{ url: '/images' }] }, 'navigation.0.label'],
 		['a colour that would end the CSS declaration', { theme: { primary: 'red; color: blue' } }, 'theme.primary: must be a CSS colour'],
 		['a Theme colour that does not exist', { theme: { accent: 'red' } }, 'accent'],
+		['a dark colour that would end the CSS declaration', { theme: { dark: { primary: 'red; color: blue' } } }, 'theme.dark.primary: must be a CSS colour'],
+		['a dark colour that does not exist', { theme: { dark: { accent: 'red' } } }, 'accent'],
 		['a Theme name that does not exist', { theme: { name: 'pirate' } }, 'theme.name'],
 		['CSS that would close its <style>', { theme: { css: ['a { color: red } </style><script>'] } }, 'theme.css.0: must not contain </style>'],
 		['a CSS item that is neither CSS, a URL nor a file', { theme: { css: ['brand.css'] } }, 'theme.css.0: must be CSS'],
@@ -138,7 +163,7 @@ describe('an installation with a named Theme', () => {
 
 		const [, attributes] = /<html([^>]*)>/.exec(html) ?? [];
 		expect(attributes).toContain('data-theme="naval"');
-		expect(attributes).toContain('style="--color-primary:#c00"');
+		expect(attributes).toContain('style="--color-primary-light:#c00"');
 	});
 });
 

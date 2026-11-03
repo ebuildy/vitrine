@@ -63,8 +63,12 @@ The links at the top of every page, set under `navigation` in Settings.
 _Avoid_: Navigation bar, navbar, links
 
 **Theme**:
-The look of an installation, set in Settings: a named set of colours and decorations, such as naval, whose colours Settings can override. Components use the colours through CSS variables.
+The look of an installation, set in Settings: a named set of colours and decorations, such as naval, whose colours Settings can override. Every Theme has a light and a dark Colour mode. Components use the colours of the current mode through CSS variables.
 _Avoid_: Palette, skin, Template
+
+**Colour mode**:
+Light or dark, the two versions of every Theme. A Visitor's system picks one, unless the Visitor picks another in the site header, which their browser remembers.
+_Avoid_: Dark theme, light theme, night mode
 
 **Component**:
 A self-contained UI building block that can be placed on any page and presents its own content, warnings and errors.

@@ -62,9 +62,12 @@ navigation:
     url: https://docs.example.com/
 
 # name picks a complete Theme, with its own colours and decorations. Leave it out for the plain default.
+# Every Theme, the default too, has a light and a dark mode. Each Visitor's system picks one, unless the Visitor
+# picks another with the menu at the top right, which their browser remembers.
 #   naval: a crisp layout in ocean blues, with a sea of drifting waves, boats and submarines at the foot of every page.
-# The colours are any CSS colour, and win over those of the named Theme. Quote a hex colour, as YAML reads # as a
-# comment. Each one you leave out keeps the Theme's own.
+# The colours are any CSS colour, and win over those of the named Theme: those at the top for light mode, and
+# those under dark for dark mode. Quote a hex colour, as YAML reads # as a comment. Each one you leave out keeps
+# the Theme's own for that mode.
 # Components use them as the CSS variables --color-primary, --color-background, --color-text and --color-border,
 # and a Template can do the same.
 theme:
@@ -74,6 +77,11 @@ theme:
   background: '#ffffff'
   text: '#1e1e3c'
   border: '#c8d0d8'
+  dark:
+    primary: '#4fd1a5'
+    background: '#0d1b2a'
+    text: '#e6edf3'
+    border: '#2a3a4a'
   # Your own CSS, after Vitrine's and the named Theme's so that it wins, in this order. Each item is one of:
   #   - a URL starting with http://, https:// or /, which the browser loads
   #   - a file starting with ./ or ../, beside this file, read when Vitrine starts: a change needs a restart

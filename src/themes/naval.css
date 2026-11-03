@@ -2,20 +2,37 @@
  * The naval Theme: a crisp, quiet interface in ocean blues, with a sea at the foot of every page.
  * Colours in Settings still win, as they sit on <html> itself, and so does the CSS of Settings,
  * because every rule here stays one attribute away from a plain selector.
+ *
+ * It has a light mode, a bright harbour, and a dark mode, the sea at night. Each colour is a pair, and
+ * light-dark() picks the one of the current mode, which the system or the Visitor's choice decides.
  */
 :root[data-theme='naval'] {
-	--color-primary: #0b5fa5;
-	--color-background: #f4f7fb;
-	--color-text: #0f2137;
-	--color-border: #dde6ef;
+	--color-primary-light: #0b5fa5;
+	--color-primary-dark: #6cb8ee;
+	--color-background-light: #f4f7fb;
+	--color-background-dark: #0a1520;
+	--color-text-light: #0f2137;
+	--color-text-dark: #e3ecf6;
+	--color-border-light: #dde6ef;
+	--color-border-dark: #1f3347;
 	--naval-navy: #0b2545;
-	--naval-muted: #5a6b82;
-	--naval-surface: #fff;
-	--naval-chip: #edf2f8;
-	--naval-hover: #f8fafd;
+	--naval-badge: light-dark(#0b2545, #1d5d96);
+	--naval-muted: light-dark(#5a6b82, #93a6bc);
+	--naval-surface: light-dark(#fff, #0f1e2d);
+	--naval-chip: light-dark(#edf2f8, #18293b);
+	--naval-hover: light-dark(#f8fafd, #13263a);
+	--naval-header: light-dark(rgb(255 255 255 / 0.88), rgb(10 21 32 / 0.85));
+	--naval-sea: #1d7cc4;
+	--naval-shadow: light-dark(rgba(11, 37, 69, 0.04), rgba(0, 0, 0, 0.3));
+	--naval-shadow-raised: light-dark(rgba(11, 37, 69, 0.1), rgba(0, 0, 0, 0.45));
+	--naval-status-border: light-dark(#f1dca7, #5c4a1c);
+	--naval-status-background: light-dark(#fdf6e3, #2a2312);
+	--naval-status-text: light-dark(#6b4e0b, #f1d58c);
+	--naval-alert-border: light-dark(#f3c4c4, #6b2a2a);
+	--naval-alert-background: light-dark(#fdf0f0, #2d1616);
+	--naval-alert-text: light-dark(#8a1c1c, #f5b1b1);
 	--naval-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 	--naval-gutter: 2rem;
-	color-scheme: light;
 }
 
 [data-theme='naval'] body {
@@ -102,8 +119,8 @@
 	box-sizing: border-box;
 	border-bottom: 1px solid var(--color-border);
 	background:
-		linear-gradient(90deg, var(--naval-navy), var(--color-primary), #5fb0e5) top / 100% 3px no-repeat,
-		rgb(255 255 255 / 0.88);
+		linear-gradient(90deg, var(--naval-navy), var(--naval-sea), #5fb0e5) top / 100% 3px no-repeat,
+		var(--naval-header);
 	backdrop-filter: saturate(1.8) blur(12px);
 	color: var(--color-text);
 }
@@ -126,7 +143,7 @@
 	width: 2rem;
 	height: 2rem;
 	border-radius: 0.5rem;
-	background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.5'/%3E%3Cpath d='M12 7.5V21M7.5 11h9M4.5 13.5a7.5 7.5 0 0 0 15 0'/%3E%3C/svg%3E") center / 1.25rem no-repeat var(--naval-navy);
+	background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.5'/%3E%3Cpath d='M12 7.5V21M7.5 11h9M4.5 13.5a7.5 7.5 0 0 0 15 0'/%3E%3C/svg%3E") center / 1.25rem no-repeat var(--naval-badge);
 	box-shadow: inset 0 -2px 0 rgb(255 255 255 / 0.12);
 }
 
@@ -159,6 +176,44 @@
 
 [data-theme='naval'] .site-header nav a[aria-current='page'] {
 	font-weight: 600;
+}
+
+/* The colour mode menu: a small pill at the right of the site header, with the icon of the current mode. */
+[data-theme='naval'] .site-header .color-mode {
+	padding: 0.375rem 2rem 0.375rem 2.125rem;
+	border: 1px solid var(--color-border);
+	border-radius: 0.5rem;
+	background:
+		var(--naval-mode-icon) left 0.75rem center / 1rem no-repeat,
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%237b8ba0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5'/%3E%3C/svg%3E") right 0.625rem center / 0.875rem no-repeat,
+		var(--naval-surface);
+	color: var(--naval-muted);
+	font: inherit;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	cursor: pointer;
+	appearance: none;
+	transition:
+		border-color 0.15s ease,
+		color 0.15s ease;
+	--naval-mode-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%237b8ba0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='5.5'/%3E%3Cpath d='M8 2.5a5.5 5.5 0 0 1 0 11z' fill='%237b8ba0'/%3E%3C/svg%3E");
+}
+
+[data-theme='naval'] .site-header .color-mode:has(option[value='light']:checked) {
+	--naval-mode-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%237b8ba0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='3'/%3E%3Cpath d='M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1'/%3E%3C/svg%3E");
+}
+
+[data-theme='naval'] .site-header .color-mode:has(option[value='dark']:checked) {
+	--naval-mode-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%237b8ba0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7z'/%3E%3C/svg%3E");
+}
+
+[data-theme='naval'] .site-header .color-mode:hover {
+	border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+	color: var(--color-text);
+}
+
+[data-theme='naval'] .site-header .color-mode[hidden] {
+	display: none;
 }
 
 /* The header of a page: its title, a muted description and its links. */
@@ -195,17 +250,17 @@
 /* Status and alert messages read as soft callouts. */
 [data-theme='naval'] :is([role='status'], [role='alert']) {
 	padding: 0.75rem 1rem;
-	border: 1px solid #f1dca7;
+	border: 1px solid var(--naval-status-border);
 	border-radius: 0.625rem;
-	background: #fdf6e3;
-	color: #6b4e0b;
+	background: var(--naval-status-background);
+	color: var(--naval-status-text);
 	font-size: 0.875rem;
 }
 
 [data-theme='naval'] [role='alert'] {
-	border-color: #f3c4c4;
-	background: #fdf0f0;
-	color: #8a1c1c;
+	border-color: var(--naval-alert-border);
+	background: var(--naval-alert-background);
+	color: var(--naval-alert-text);
 }
 
 /* Three layers of waves drift at their own pace, the front one fastest. Each layer is a tile that loops seamlessly. */
@@ -325,6 +380,28 @@
 	}
 }
 
+/*
+ * The sea at night: the waves dim, and the vessels take a faint moonlit outline against the dark sky.
+ * Pictures cannot use light-dark(), so dark mode needs its own selectors: the system's, unless the Visitor picked light, or the Visitor's.
+ */
+@media (prefers-color-scheme: dark) {
+	:root[data-theme='naval']:not([data-color-mode='light']) body::after {
+		filter: brightness(0.62) saturate(1.15);
+	}
+
+	:root[data-theme='naval']:not([data-color-mode='light']) .vessel {
+		filter: drop-shadow(0 0 1px rgb(156 195 224 / 0.85));
+	}
+}
+
+:root[data-theme='naval'][data-color-mode='dark'] body::after {
+	filter: brightness(0.62) saturate(1.15);
+}
+
+:root[data-theme='naval'][data-color-mode='dark'] .vessel {
+	filter: drop-shadow(0 0 1px rgb(156 195 224 / 0.85));
+}
+
 @media (prefers-reduced-motion: reduce) {
 	[data-theme='naval'] body::after {
 		animation: none;
@@ -341,7 +418,7 @@
 	background: var(--naval-surface);
 	border-color: var(--color-border);
 	border-radius: 0.625rem;
-	box-shadow: 0 1px 2px rgba(11, 37, 69, 0.04);
+	box-shadow: 0 1px 2px var(--naval-shadow);
 	transition:
 		transform 0.18s ease,
 		box-shadow 0.18s ease,
@@ -374,8 +451,8 @@
 	border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
 	transform: translateY(-2px);
 	box-shadow:
-		0 2px 4px rgba(11, 37, 69, 0.04),
-		0 12px 28px rgba(11, 37, 69, 0.1);
+		0 2px 4px var(--naval-shadow),
+		0 12px 28px var(--naval-shadow-raised);
 }
 
 [data-theme='naval'] .card:has(> :is(h2, h3) > a):hover :is(h2, h3) a {
@@ -414,12 +491,12 @@
 
 [data-theme='naval'] progress::-webkit-progress-value {
 	border-radius: 999px;
-	background: linear-gradient(90deg, #1d7cc4, var(--color-primary));
+	background: linear-gradient(90deg, var(--naval-sea), var(--color-primary));
 }
 
 [data-theme='naval'] progress::-moz-progress-bar {
 	border-radius: 999px;
-	background: linear-gradient(90deg, #1d7cc4, var(--color-primary));
+	background: linear-gradient(90deg, var(--naval-sea), var(--color-primary));
 }
 
 /* The Roadmap: slim tracks of sea mist, and bars of the sea itself. */
@@ -443,7 +520,7 @@
 [data-theme='naval'] .gantt .bar {
 	min-width: 0.625rem;
 	border-radius: 999px;
-	background: linear-gradient(90deg, #1d7cc4, var(--color-primary));
+	background: linear-gradient(90deg, var(--naval-sea), var(--color-primary));
 	opacity: 1;
 }
 
@@ -468,7 +545,7 @@
 	border: 1px solid var(--color-border);
 	border-radius: 0.625rem;
 	background: var(--naval-surface);
-	box-shadow: 0 1px 2px rgba(11, 37, 69, 0.04);
+	box-shadow: 0 1px 2px var(--naval-shadow);
 }
 
 [data-theme='naval'] table {
@@ -790,12 +867,12 @@
 	position: relative;
 	margin: 0 0 1rem;
 	padding: 2.75rem 1.25rem 1.125rem;
-	border: 1px solid var(--naval-navy);
+	border: 1px solid light-dark(var(--naval-navy), #23384f);
 	border-radius: 0.75rem;
 	background: #0b1a2e;
 	box-shadow:
-		0 1px 2px rgba(11, 37, 69, 0.08),
-		0 10px 28px rgba(11, 37, 69, 0.18);
+		0 1px 2px var(--naval-shadow),
+		0 10px 28px var(--naval-shadow-raised);
 	color: #d9e8f6;
 	font-size: 0.8125rem;
 	line-height: 1.7;

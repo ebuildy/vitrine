@@ -12,8 +12,12 @@ const { title, description } = Astro.props;
 const settings = getSettings();
 const { branding, navigation, theme } = settings;
 const { siteName, logo } = branding;
-const { name: themeName, css, ...colours } = theme;
-const themeVariables = Object.fromEntries(Object.entries(colours).map(([name, colour]) => [`--color-${name}`, colour]));
+const { name: themeName, css, dark, ...light } = theme;
+// Settings set each colour for one mode, and the stylesheet makes --color-<name> of the pair.
+const themeVariables = Object.fromEntries([
+	...Object.entries(light).map(([name, colour]) => [`--color-${name}-light`, colour]),
+	...Object.entries(dark).map(([name, colour]) => [`--color-${name}-dark`, colour]),
+]);
 // Not every installation has a Route at the root URL, and a link home should not lead to not found.
 const hasHome = Boolean(matchRoute(settings, '/'));
 const SiteNameTag = hasHome ? 'a' : 'span';
@@ -27,6 +31,13 @@ const SiteNameTag = hasHome ? 'a' : 'span';
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 		{description && <meta name="description" content={description} />}
+		{/* Before the page paints, so that a Visitor who picked a mode never sees the other one flash. */}
+		<script is:inline>
+			try {
+				const mode = localStorage.getItem('vitrine-color-mode');
+				if (mode === 'light' || mode === 'dark') document.documentElement.dataset.colorMode = mode;
+			} catch {}
+		</script>
 	</head>
 	<body>
 		{/* Astro adds its own styles at the end of <head>, and the CSS of Settings must come after them to win. */}
@@ -49,6 +60,12 @@ const SiteNameTag = hasHome ? 'a' : 'span';
 					</nav>
 				)
 			}
+			{/* Without JavaScript, the page follows the system, and a menu that does nothing stays hidden. */}
+			<select class="color-mode" aria-label="Colour mode" hidden>
+				<option value="system">System</option>
+				<option value="light">Light</option>
+				<option value="dark">Dark</option>
+			</select>
 		</header>
 		<slot />
 		{
@@ -64,13 +81,54 @@ const SiteNameTag = hasHome ? 'a' : 'span';
 	</body>
 </html>
 
+<script>
+	const menu = document.querySelector<HTMLSelectElement>('select.color-mode');
+	if (menu) {
+		const root = document.documentElement;
+		menu.value = root.dataset.colorMode ?? 'system';
+		menu.hidden = false;
+		menu.addEventListener('change', () => {
+			const mode = menu.value;
+			if (mode === 'light' || mode === 'dark') root.dataset.colorMode = mode;
+			else delete root.dataset.colorMode;
+			try {
+				if (mode === 'light' || mode === 'dark') localStorage.setItem('vitrine-color-mode', mode);
+				else localStorage.removeItem('vitrine-color-mode');
+			} catch {
+				// A browser that refuses storage still switches, for this page.
+			}
+		});
+	}
+</script>
+
 <style is:global>
-	/* The defaults of the Theme. A named Theme and then Settings override them on <html>, and Components and Templates read them. */
+	/*
+	 * The defaults of the Theme, as one colour for each mode. A named Theme and then Settings override them on <html>,
+	 * and Components and Templates read --color-<name>, which is the colour of the current mode.
+	 */
 	:root {
-		--color-primary: LinkText;
-		--color-background: Canvas;
-		--color-text: CanvasText;
-		--color-border: #8884;
+		/* The system picks the mode, unless the Visitor picked one. */
+		color-scheme: light dark;
+		--color-primary-light: LinkText;
+		--color-primary-dark: LinkText;
+		--color-background-light: Canvas;
+		--color-background-dark: Canvas;
+		--color-text-light: CanvasText;
+		--color-text-dark: CanvasText;
+		--color-border-light: #8884;
+		--color-border-dark: #8884;
+		--color-primary: light-dark(var(--color-primary-light), var(--color-primary-dark));
+		--color-background: light-dark(var(--color-background-light), var(--color-background-dark));
+		--color-text: light-dark(var(--color-text-light), var(--color-text-dark));
+		--color-border: light-dark(var(--color-border-light), var(--color-border-dark));
+	}
+
+	:root[data-color-mode='light'] {
+		color-scheme: light;
+	}
+
+	:root[data-color-mode='dark'] {
+		color-scheme: dark;
 	}
 
 	body {
@@ -109,6 +167,10 @@ const SiteNameTag = hasHome ? 'a' : 'span';
 
 	.site-name img {
 		height: 2rem;
+	}
+
+	.color-mode {
+		margin-left: auto;
 	}
 
 	nav ul {

@@ -68,13 +68,19 @@ const cssItemSchema = z.string().superRefine((item, context) => {
 	}
 });
 
-const themeSchema = z.strictObject({
-	// Each name has its own stylesheet in src/themes.
-	name: z.enum(['naval']).optional(),
+const coloursSchema = {
 	primary: colourSchema.optional(),
 	background: colourSchema.optional(),
 	text: colourSchema.optional(),
 	border: colourSchema.optional(),
+};
+
+const themeSchema = z.strictObject({
+	// Each name has its own stylesheet in src/themes, with a light and a dark mode.
+	name: z.enum(['naval']).optional(),
+	// The colours of light mode, and under dark, those of dark mode. A colour left out is the Theme's own.
+	...coloursSchema,
+	dark: z.strictObject(coloursSchema).default({}),
 	// After Vitrine's own styles and the named Theme, so that they win.
 	css: z.array(cssItemSchema).default([]),
 });
