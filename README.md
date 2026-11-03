@@ -13,6 +13,7 @@ You configure it with one Settings file, change its look with a Theme and Templa
 - [Cache stores](docs/administrator/cache-stores.md): memory, local files or Redis, warm-ups and `/sitemap.xml`.
 - [Security](docs/administrator/security.md): **read before you deploy**. Token permissions are the real boundary around private projects, and an installation exposed to the internet shows Member emails, Issue assignments and vulnerability counts to anyone.
 - [`GLOSSARY.md`](GLOSSARY.md): the words these documents use, and [`docs/adr`](docs/adr): the decisions behind them.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): making a change, how releases are made, and setting up a fork so that it releases its own Container image.
 
 ## Deploy the Container image
 
