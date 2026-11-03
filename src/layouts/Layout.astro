@@ -1,6 +1,7 @@
 ---
 import { matchRoute } from '../router.ts';
 import { getSettings } from '../settings.ts';
+import { SOURCE_LOOKS } from '../source-looks.ts';
 import '../themes/naval.css';
 
 interface Props {
@@ -51,9 +52,15 @@ const SiteNameTag = hasHome ? 'a' : 'span';
 				navigation.length > 0 && (
 					<nav aria-label="Main">
 						<ul>
-							{navigation.map(({ label, url }) => (
+							{navigation.map(({ label, url, icon }) => (
 								<li>
-									<a href={url} aria-current={url === Astro.url.pathname ? 'page' : undefined}>{label}</a>
+									<a href={url} aria-current={url === Astro.url.pathname ? 'page' : undefined}>
+										{/* Decorative, so that a screen reader reads only the label. */}
+										{icon && 'emoji' in icon && <span class="icon" aria-hidden="true">{icon.emoji}</span>}
+										{icon && 'url' in icon && <img class="icon" src={icon.url} alt="" aria-hidden="true" />}
+										{icon && 'embedded' in icon && <img class="icon" src={SOURCE_LOOKS[icon.embedded].icon} alt="" aria-hidden="true" />}
+										{label}
+									</a>
 								</li>
 							))}
 						</ul>
@@ -171,6 +178,14 @@ const SiteNameTag = hasHome ? 'a' : 'span';
 
 	.color-mode {
 		margin-left: auto;
+	}
+
+	/* On the icon alone, so that a link without one, and a Theme's own layout of the links, stay as they are. */
+	nav .icon {
+		height: 1.2em;
+		margin-right: 0.35em;
+		vertical-align: middle;
+		line-height: 1;
 	}
 
 	nav ul {

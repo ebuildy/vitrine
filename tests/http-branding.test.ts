@@ -17,6 +17,10 @@ describe('a branded installation', () => {
 			navigation: [
 				{ label: 'Images', url: '/images' },
 				{ label: 'Handbook & FAQ', url: 'https://docs.acme.test/' },
+				{ label: 'Launches', url: '/launches', icon: ':rocket:' },
+				{ label: 'Code', url: 'https://gitlab.acme.test/', icon: 'gitlab' },
+				{ label: 'Status', url: 'https://status.acme.test/', icon: 'https://cdn.acme.test/status.svg' },
+				{ label: 'Wiki', url: '/wiki', icon: '/assets/wiki.png' },
 			],
 			theme: { primary: '#0a7', background: 'rgb(250 250 240)', dark: { primary: '#5fd' } },
 		});
@@ -38,10 +42,37 @@ describe('a branded installation', () => {
 		const html = await (await fetch(`${vitrine.url}/images`)).text();
 
 		const [, nav] = /<nav[^>]*>(.*?)<\/nav>/s.exec(html) ?? [];
-		expect([...nav.matchAll(/<a[^>]+href="([^"]+)"[^>]*>([^<]+)</g)].map(([, href, label]) => [href, label])).toEqual([
+		// The label is the last text of each link, after any icon.
+		expect([...nav.matchAll(/<a[^>]+href="([^"]+)"[^>]*>.*?([^<>]+)<\/a>/gs)].map(([, href, label]) => [href, label])).toEqual([
 			['/images', 'Images'],
 			['https://docs.acme.test/', 'Handbook &amp; FAQ'],
+			['/launches', 'Launches'],
+			['https://gitlab.acme.test/', 'Code'],
+			['https://status.acme.test/', 'Status'],
+			['/wiki', 'Wiki'],
 		]);
+	});
+
+	test('shows the icon of a Menu item before its label, hidden from screen readers', async () => {
+		const html = await (await fetch(`${vitrine.url}/images`)).text();
+
+		const [, nav] = /<nav[^>]*>(.*?)<\/nav>/s.exec(html) ?? [];
+		const linkTo = (href: string) => new RegExp(`<a[^>]+href="${href}"[^>]*>(.*?)</a>`, 's').exec(nav)?.[1] ?? '';
+		expect(linkTo('/launches')).toMatch(/^<span[^>]+aria-hidden="true"[^>]*>🚀<\/span>Launches$/);
+		expect(linkTo('https://gitlab.acme.test/')).toMatch(/^<img[^>]+src="(data:image\/svg\+xml|\/_astro\/)[^"]+"[^>]*>Code$/);
+		expect(linkTo('https://status.acme.test/')).toMatch(/^<img[^>]+src="https:\/\/cdn\.acme\.test\/status\.svg"[^>]*>Status$/);
+		expect(linkTo('/wiki')).toMatch(/^<img[^>]+src="\/assets\/wiki\.png"[^>]*>Wiki$/);
+		for (const img of nav.match(/<img[^>]*>/g) ?? []) {
+			expect(img).toContain('alt=""');
+			expect(img).toContain('aria-hidden="true"');
+		}
+	});
+
+	test('shows a Menu item without an icon as only its label', async () => {
+		const html = await (await fetch(`${vitrine.url}/images`)).text();
+
+		const [, nav] = /<nav[^>]*>(.*?)<\/nav>/s.exec(html) ?? [];
+		expect(nav).toMatch(/<a[^>]+href="\/images"[^>]*>Images<\/a>/);
 	});
 
 	test('marks the Menu item of the current page', async () => {
@@ -131,6 +162,10 @@ describe('startup', () => {
 		['a Menu item at a page-relative address', { navigation: [{ label: 'Images', url: 'images' }] }, 'navigation.0.url: must start with'],
 		['a Menu item at a script address', { navigation: [{ label: 'Images', url: 'javascript:alert(1)' }] }, 'navigation.0.url: must start with'],
 		['a Menu item with no label', { navigation: [{ url: '/images' }] }, 'navigation.0.label'],
+		['a Menu icon that is no emoji', { navigation: [{ label: 'Images', url: '/images', icon: ':not-an-emoji:' }] }, 'navigation.0.icon: :not-an-emoji: is not an emoji shortcode'],
+		['a Menu icon the build does not carry', { navigation: [{ label: 'Images', url: '/images', icon: 'nexus' }] }, 'navigation.0.icon: must be an emoji shortcode like :rocket:, one of gitlab, harbor, or a URL'],
+		['a Menu icon at a plain-HTTP address', { navigation: [{ label: 'Images', url: '/images', icon: 'http://cdn.acme.test/icon.svg' }] }, 'navigation.0.icon: must be'],
+		['a Menu icon at a page-relative address', { navigation: [{ label: 'Images', url: '/images', icon: 'icon.svg' }] }, 'navigation.0.icon: must be'],
 		['a colour that would end the CSS declaration', { theme: { primary: 'red; color: blue' } }, 'theme.primary: must be a CSS colour'],
 		['a Theme colour that does not exist', { theme: { accent: 'red' } }, 'accent'],
 		['a dark colour that would end the CSS declaration', { theme: { dark: { primary: 'red; color: blue' } } }, 'theme.dark.primary: must be a CSS colour'],
