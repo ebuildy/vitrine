@@ -1,5 +1,5 @@
 # Services for local development: `docker compose up -d` or `podman compose up -d`.
-# Every worktree shares these, under the one project name: a Redis cache store sets a keyPrefix of its own.
+# Every worktree shares these, under the one project name: a redis cache store in Settings sets a keyPrefix of its own.
 name: vitrine
 
 services:

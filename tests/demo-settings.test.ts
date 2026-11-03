@@ -21,7 +21,7 @@ describe('the demo Settings', () => {
 		expect(settings.routes.find(({ url }) => url === '/welcome')?.template).toContain('Welcome to the demo');
 	});
 
-	test('name a Source that has no fake', () => {
+	test('refuse a Source that has no fake, naming it', () => {
 		expect(() => withSourceUrls(demoSettings, { 'main-harbor': 'http://127.0.0.1:50001' })).toThrow('tools-harbor');
 	});
 });

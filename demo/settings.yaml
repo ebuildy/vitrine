@@ -4,7 +4,7 @@
 sources:
   - name: main-harbor
     type: harbor
-    url: http://127.0.0.1:4402
+    url: http://127.0.0.1:0
     projects:
       - platform
       - library
@@ -13,19 +13,19 @@ sources:
   # Anonymous read access, so no secret.
   - name: tools-harbor
     type: harbor
-    url: http://127.0.0.1:4403
+    url: http://127.0.0.1:0
     projects:
       - tools
   - name: main-gitlab
     type: gitlab
-    url: http://127.0.0.1:4401
+    url: http://127.0.0.1:0
     mainGroups:
       - platform
       - data/analytics
     tokenEnv: GITLAB_TOKEN
 
 # Restarting the demo starts from its seed data. Use `type: redis` with `urlEnv: REDIS_URL` to try the shared store,
-# and a keyPrefix of its own in each worktree, as every worktree shares the Redis of compose.yaml.
+# and a keyPrefix of its own in each worktree, as every worktree shares the Valkey of compose.yaml.
 cacheStore:
   type: memory
 
