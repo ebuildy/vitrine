@@ -1,24 +1,22 @@
 # Vitrine
 
-## Local demo
+A portal that DevOps teams put in front of their GitLab, Harbor and Nexus, so that people can browse content, find it and go to where it can be downloaded. Vitrine shows Groups, Projects, Releases, Issues, Epics, Members, Images and Repositories from one search box and a few pages, and links each one to its Source. It never mirrors a package or an Image.
 
-The demo needs no GitLab, Harbor, Nexus or Redis: it starts fake Sources filled with `demo/content.ts`, then the dev server.
+You configure it with one Settings file, change its look with a Theme and Templates, and fork it to change what Settings cannot.
 
-```sh
-npm install
-cp .env.example .env
-npm run demo
-```
+## Documentation
 
-Open the URL Astro prints. `/`, `/images`, `/images/tools`, `/harbor/main-harbor`, `/gitlab/data/analytics`, `/issues/platform`, `/roadmap/platform`, `/search?q=api` and `/nexus/main-nexus` all show content, and `/roadmap/data/analytics` shows the error of a GitLab tier without Epics. Links to GitLab and Nexus themselves lead to the fake ones, which answer 404.
+- [`settings.example.yaml`](settings.example.yaml): every option of Settings, explained, to copy as `settings.yaml`.
+- [Controllers](docs/administrator/controllers.md): the kinds of page a Route can show, and their params.
+- [Components](docs/administrator/components.md): the blocks a Template or a page of a fork places, and their props.
+- [Templates](docs/administrator/templates.md): rearranging a page from Settings.
+- [Cache stores](docs/administrator/cache-stores.md): memory, local files or Redis.
+- [Security](docs/administrator/security.md): **read before you deploy**. Token permissions are the real boundary around private projects, and an installation exposed to the internet shows Member emails, Issue assignments and vulnerability counts to anyone.
+- [`GLOSSARY.md`](GLOSSARY.md): the words these documents use, and [`docs/adr`](docs/adr): the decisions behind them.
 
-## Secrets
+## Deploy the Container image
 
-Vitrine reads `.env` from its working directory at start, with `npm run dev` as with `npm start`, and works without one. A variable the environment already sets wins, and `VITRINE_ENV_FILE` names another file. Restart after changing it. `.env` is ignored by git, and `.env.example` lists the variables.
-
-## Container image
-
-`ghcr.io/ebuildy/vitrine` runs from a Settings file mounted at `/etc/vitrine/settings.yaml`, such as a Kubernetes ConfigMap, with secrets in environment variables. It holds no Settings of its own and stops with a clear error without one.
+`ghcr.io/ebuildy/vitrine` runs from a Settings file mounted at `/etc/vitrine/settings.yaml`, such as a Kubernetes ConfigMap, with secrets in environment variables, such as a Kubernetes Secret. It holds no Settings of its own and stops with a clear error without one.
 
 ```sh
 docker run -p 8080:8080 \
@@ -29,51 +27,52 @@ docker run -p 8080:8080 \
 
 Two kinds of tag exist, for `linux/amd64` and `linux/arm64`: `edge` follows `main`, and a release `v1.2.3` is published as `1.2.3`, `1.2` and `1`. There is no `latest`.
 
-The image listens on port 8080, as user `node` (uid 1000). It creates no directory for a `files` cache store, so mount a writable one for that user. `src/pages` is built in: to change pages, fork and build your own image with `podman build .` or `docker build --file Containerfile .`.
+The image listens on port 8080, as user `node` (uid 1000), and stops within 5 seconds of `SIGTERM`, letting requests in progress finish. It creates no directory for a `files` cache store, so mount a writable one for that user. It serves no files of its own: host a logo or a stylesheet elsewhere, or put CSS files beside Settings, in the same ConfigMap.
 
-# Astro Starter Kit: Basics
+Startup checks Settings before serving anything, and stops with every problem it finds: an unknown option, a Route to a Source that does not exist, a missing environment variable, a Template that does not compile.
+
+### Environment variables
+
+| Variable | What it does |
+| --- | --- |
+| `VITRINE_SETTINGS` | The Settings file. Defaults to `settings.yaml` in the working directory, and to `/etc/vitrine/settings.yaml` in the image. |
+| `VITRINE_ENV_FILE` | A file of environment variables read at start. Defaults to `.env` in the working directory. Vitrine works without one, and a variable the environment already sets wins. |
+| `VITRINE_TEMPLATE_DISABLE` | Any non-empty value, even `false`, stops Templates from being compiled or run. |
+| `HOST`, `PORT` | Where the server listens. The image sets `0.0.0.0` and `8080`. |
+| Those Settings name | Each `tokenEnv`, `passwordEnv` and `urlEnv` in Settings names a variable holding a secret. Startup stops when one is not set. |
+
+## Run from source
+
+Vitrine needs Node.js 22.23.4 or later.
 
 ```sh
-npm create astro@latest -- --template basics
+npm ci
+cp settings.example.yaml settings.yaml   # then edit it
+cp .env.example .env                     # then put your secrets in it
+npm run build
+npm start
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+`settings.yaml` and `.env` are ignored by git: never commit real hostnames or secrets. Restart after changing either.
 
-## 🚀 Project Structure
+## Fork
 
-Inside of your Astro project, you'll see the following folders and files:
+Settings change the Sources, Routes, Branding, Menu, Theme and Templates. To add a page, a Controller or a Component, fork Vitrine: a page in `src/pages` wins over the Routes of Settings at the same URL, and can place any Component, as [Components](docs/administrator/components.md#on-a-page-of-a-fork) shows. Then build your own image with `podman build .` or `docker build --file Containerfile .`.
 
-```text
-/
-├── public/
-│   └── favicon.svg
-├── src
-│   ├── assets
-│   │   └── astro.svg
-│   ├── components
-│   │   └── Welcome.astro
-│   ├── layouts
-│   │   └── Layout.astro
-│   └── pages
-│       └── index.astro
-└── package.json
+## Develop
+
+The demo needs no GitLab, Harbor, Nexus or Redis: it starts fake Sources filled with `demo/content.ts`, then the dev server, with `demo/settings.yaml`.
+
+```sh
+npm ci
+cp .env.example .env
+npm run demo
 ```
 
-To learn more about the folder structure of an Astro project, refer to [our guide on project structure](https://docs.astro.build/en/basics/project-structure/).
+Open the URL Astro prints. `/`, `/images`, `/images/tools`, `/harbor/main-harbor`, `/gitlab/data/analytics`, `/issues/platform`, `/roadmap/platform`, `/search?q=api` and `/nexus/main-nexus` all show content, and `/roadmap/data/analytics` shows the error of a GitLab tier without Epics. Links to GitLab and Nexus themselves lead to the fake ones, which answer 404.
 
-## 🧞 Commands
+`npm test` needs the Valkey of `compose.yaml`, so run `docker compose up -d --wait` first, and a Docker engine with BuildKit. `npm run test:e2e` runs the browser tests. See [`AGENTS.md`](AGENTS.md) for working in several worktrees at once.
 
-All commands are run from the root of the project, from a terminal:
+## License
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+[MIT](LICENSE)
