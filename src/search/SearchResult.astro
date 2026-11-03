@@ -52,6 +52,21 @@ const { colour, icon } = SOURCE_LOOKS[result.sourceType];
 		border-left: 0.35rem solid var(--source-colour);
 		border-radius: 0.5rem;
 		overflow-wrap: anywhere;
+		position: relative;
+	}
+
+	/* Stretches the link of the title over its card, so that a click anywhere opens the result. */
+	.card.search-result :global(h2 a::after) {
+		content: '';
+		position: absolute;
+		inset: 0;
+	}
+
+	/* Every linked card lifts its border on hover, a Member's too, whose title sits deeper than a Theme looks. */
+	.card.search-result:has(h2 a):hover {
+		border-top-color: var(--color-primary);
+		border-right-color: var(--color-primary);
+		border-bottom-color: var(--color-primary);
 	}
 
 	.card.search-result .origin {
