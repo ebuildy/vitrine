@@ -19,6 +19,7 @@ const controllerParamsSchemas = {
 	'harbor-images': z
 		.strictObject({ source: z.string().optional(), project: z.string().optional() })
 		.refine(({ source, project }) => source !== undefined || project === undefined, { message: 'project needs a source' }),
+	nexus: z.strictObject({ source: z.string() }),
 	'gitlab-group': z.strictObject({ source: z.string().optional(), group: z.string() }),
 	'gitlab-project': z.strictObject({ source: z.string().optional(), group: z.string(), project: z.string() }),
 	'gitlab-roadmap': z.strictObject({ source: z.string().optional(), group: z.string() }),
@@ -32,6 +33,7 @@ export const controllerSourceTypes: Record<ControllerName, Source['type'] | unde
 	navigation: undefined,
 	harbor: 'harbor',
 	'harbor-images': 'harbor',
+	nexus: 'nexus',
 	'gitlab-group': 'gitlab',
 	'gitlab-project': 'gitlab',
 	'gitlab-roadmap': 'gitlab',

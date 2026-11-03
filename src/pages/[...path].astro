@@ -9,6 +9,7 @@ import Harbor from '../controllers/Harbor.astro';
 import HarborImages from '../controllers/HarborImages.astro';
 import Navigation from '../controllers/Navigation.astro';
 import Search from '../controllers/Search.astro';
+import Nexus from '../controllers/Nexus.astro';
 import Layout from '../layouts/Layout.astro';
 import { matchRoute } from '../router.ts';
 import type { ControllerName } from '../router.ts';
@@ -19,6 +20,7 @@ const controllers: Record<ControllerName, AstroComponentFactory> = {
 	navigation: Navigation,
 	harbor: Harbor,
 	'harbor-images': HarborImages,
+	nexus: Nexus,
 	'gitlab-group': GitlabGroup,
 	'gitlab-project': GitlabProject,
 	'gitlab-roadmap': GitlabRoadmap,

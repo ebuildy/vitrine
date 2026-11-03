@@ -2,7 +2,7 @@
 
 ## Local demo
 
-The demo needs no GitLab, Harbor or Redis: it starts fake Sources filled with `demo/content.ts`, then the dev server.
+The demo needs no GitLab, Harbor, Nexus or Redis: it starts fake Sources filled with `demo/content.ts`, then the dev server.
 
 ```sh
 npm install
@@ -10,7 +10,7 @@ cp .env.example .env
 npm run demo
 ```
 
-Open the URL Astro prints. `/`, `/images`, `/images/tools`, `/harbor/main-harbor`, `/gitlab/data/analytics`, `/issues/platform`, `/roadmap/platform` and `/search?q=api` all show content, and `/roadmap/data/analytics` shows the error of a GitLab tier without Epics. Links to GitLab itself lead to the fake one, which answers 404.
+Open the URL Astro prints. `/`, `/images`, `/images/tools`, `/harbor/main-harbor`, `/gitlab/data/analytics`, `/issues/platform`, `/roadmap/platform`, `/search?q=api` and `/nexus/main-nexus` all show content, and `/roadmap/data/analytics` shows the error of a GitLab tier without Epics. Links to GitLab and Nexus themselves lead to the fake ones, which answer 404.
 
 ## Secrets
 
@@ -23,7 +23,7 @@ Vitrine reads `.env` from its working directory at start, with `npm run dev` as 
 ```sh
 docker run -p 8080:8080 \
   -v "$PWD/settings.yaml:/etc/vitrine/settings.yaml:ro" \
-  -e GITLAB_TOKEN -e HARBOR_PASSWORD \
+  -e GITLAB_TOKEN -e HARBOR_PASSWORD -e NEXUS_PASSWORD \
   ghcr.io/ebuildy/vitrine:edge
 ```
 

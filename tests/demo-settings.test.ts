@@ -9,7 +9,7 @@ const env = { GITLAB_TOKEN: 'token', HARBOR_PASSWORD: 'password' };
 
 describe('the demo Settings', () => {
 	test('point every Source at the port its fake listens on', () => {
-		const urls = { 'main-harbor': 'http://127.0.0.1:50001', 'tools-harbor': 'http://127.0.0.1:50002', 'main-gitlab': 'http://127.0.0.1:50003' };
+		const urls = { 'main-harbor': 'http://127.0.0.1:50001', 'tools-harbor': 'http://127.0.0.1:50002', 'main-gitlab': 'http://127.0.0.1:50003', 'main-nexus': 'http://127.0.0.1:50004' };
 
 		const settings = loadSettings(writeSettings(withSourceUrls(demoSettings, urls)), env);
 
@@ -17,6 +17,7 @@ describe('the demo Settings', () => {
 			['main-harbor', 'http://127.0.0.1:50001'],
 			['tools-harbor', 'http://127.0.0.1:50002'],
 			['main-gitlab', 'http://127.0.0.1:50003'],
+			['main-nexus', 'http://127.0.0.1:50004'],
 		]);
 		expect(settings.routes.find(({ url }) => url === '/welcome')?.template).toContain('Welcome to the demo');
 	});

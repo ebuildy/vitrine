@@ -51,7 +51,14 @@ export const cachedListsEngine: SearchEngine = {
 };
 
 async function collect(settings: Settings): Promise<Collected> {
-	return merge(await Promise.all(settings.sources.map((source) => (source.type === 'gitlab' ? collectGitlab(source, settings) : collectHarbor(source, settings)))));
+	return merge(await Promise.all(settings.sources.map((source) => collectSource(source, settings))));
+}
+
+/** A Nexus Source is not searched yet: its Repositories add no result. */
+async function collectSource(source: Source, settings: Settings): Promise<Collected> {
+	if (source.type === 'gitlab') return collectGitlab(source, settings);
+	if (source.type === 'harbor') return collectHarbor(source, settings);
+	return { documents: [], missing: [] };
 }
 
 /** What every result of a Source shares, where a result without a Route to show it has no url, as results stay on Vitrine. */
