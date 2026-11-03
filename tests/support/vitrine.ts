@@ -1,12 +1,11 @@
 import { execFileSync, spawn } from 'node:child_process';
 import type { ChildProcessByStdio } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
-import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import { stringify } from 'yaml';
+import { freePort } from './free-port.ts';
 
 const BUILD_DIR = '.test-build';
 const ASTRO = resolve('node_modules/.bin/astro');
@@ -116,14 +115,4 @@ export function devStartupFailure(settings: unknown) {
 
 export function runBuiltEntryDirectly(settings: unknown) {
 	return runToExit('node', ['dist/server/entry.mjs'], settings, {});
-}
-
-async function freePort(): Promise<number> {
-	return new Promise((resolve) => {
-		const server = createServer();
-		server.listen(0, '127.0.0.1', () => {
-			const { port } = server.address() as AddressInfo;
-			server.close(() => resolve(port));
-		});
-	});
 }

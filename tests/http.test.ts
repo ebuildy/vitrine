@@ -9,6 +9,8 @@ import type { FakeHarbor } from './support/fake-harbor.ts';
 import { devStartupFailure, runBuiltEntryDirectly, startDevVitrine, startupFailure, startVitrine, writeEnvFile, writeSettings } from './support/vitrine.ts';
 import type { RunningVitrine } from './support/vitrine.ts';
 
+const redisCacheStore = cacheStores.find(({ name }) => name === 'Redis') as (typeof cacheStores)[number];
+
 const artifact = {
 	size: 1024,
 	push_time: '2026-10-01T08:00:00.000Z',
@@ -488,6 +490,32 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 			expect(html).toContain('platform/api');
 			expect(harbor.repositoryListRequests()).toHaveLength(survivesRestart ? 1 : 2);
 		});
+	});
+});
+
+describe('two Vitrines sharing one Redis', () => {
+	const route = { url: '/images', controller: 'harbor-images' };
+
+	test('read only their own cached data under different key prefixes', async () => {
+		const harbor = await startFakeHarbor({ projects: { platform: ['platform/api'] } });
+		// Two prefixes under that of an empty store, so that no earlier run has cached under either.
+		const cacheStore = await redisCacheStore.empty();
+		const settings = (keyPrefix: string) => ({
+			sources: [{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: ['platform'] }],
+			routes: [route],
+			cacheStore: { ...cacheStore, keyPrefix },
+		});
+
+		const first = await startVitrine(settings(`${cacheStore.keyPrefix}first:`));
+		await (await fetch(`${first.url}/images`)).text();
+		await first.stop();
+		const second = await startVitrine(settings(`${cacheStore.keyPrefix}second:`));
+		const html = await (await fetch(`${second.url}/images`)).text();
+
+		await second.stop();
+		await harbor.stop();
+		expect(html).toContain('platform/api');
+		expect(harbor.repositoryListRequests()).toHaveLength(2);
 	});
 });
 

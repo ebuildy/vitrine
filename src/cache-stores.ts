@@ -29,7 +29,7 @@ function createCacheStore(settings: CacheStoreSettings): CacheStore {
 		case 'files':
 			return filesStore(settings.directory);
 		case 'redis':
-			return redisStore(settings.url);
+			return redisStore(settings.url, settings.keyPrefix);
 	}
 }
 
@@ -64,17 +64,17 @@ function filesStore(directory: string): CacheStore {
 	};
 }
 
-function redisStore(url: string): CacheStore {
+function redisStore(url: string, keyPrefix: string): CacheStore {
 	const redis = new Redis(url, { maxRetriesPerRequest: 1, commandTimeout: 1_000 });
 	// The content cache logs every read and write that fails, which says more than the connection errors do.
 	redis.on('error', () => {});
 	return {
 		get: async (key) => {
-			const content = await redis.get(`vitrine:${key}`);
+			const content = await redis.get(`${keyPrefix}${key}`);
 			return content === null ? undefined : JSON.parse(content);
 		},
 		set: async (key, entry) => {
-			await redis.set(`vitrine:${key}`, JSON.stringify(entry));
+			await redis.set(`${keyPrefix}${key}`, JSON.stringify(entry));
 		},
 	};
 }
