@@ -53,7 +53,14 @@ beforeAll(async () => {
 			{ name: 'main-harbor', type: 'harbor', url: harbor.url, projects: ['platform'] },
 			{ name: 'aged-harbor', type: 'harbor', url: harbor.url, projects: ['aged'], allowedAgeMinutes: 5 },
 		],
-		routes: [{ url: '/harbor/:source/:project', controller: 'harbor-images' }],
+		routes: [
+			// Only for main-gitlab, so that tools-gitlab has no Vitrine page for its Groups and Projects.
+			{ url: '/gitlab/:group+', controller: 'gitlab-group', params: { source: 'main-gitlab' } },
+			{ url: '/gitlab/:group+/-/:project', controller: 'gitlab-project', params: { source: 'main-gitlab' } },
+			{ url: '/issues/:group+', controller: 'gitlab-issues' },
+			{ url: '/roadmap/:group+', controller: 'gitlab-roadmap' },
+			{ url: '/harbor/:source/:project', controller: 'harbor-images' },
+		],
 	});
 });
 
@@ -128,15 +135,21 @@ test('filters results by content type and by Source, and counts what each filter
 	expect(both.counts.sources).toEqual({ 'aged-harbor': 1, 'main-gitlab': 1, 'main-harbor': 1, 'tools-gitlab': 1 });
 });
 
-test('links each result to where its content lives', async () => {
-	const links = (results: SearchResult[]) => results.map(({ type, url }) => `${type} ${url}`).sort();
+function links(results: SearchResult[]) {
+	return results.map(({ type, url }) => `${type} ${url}`).sort();
+}
 
-	expect(links((await search('payments', { sources: ['main-gitlab'], types: ['project'] })).results)).toEqual([`project ${gitlab.url}/platform/backend/payments`]);
-	expect(links((await search('backend', { types: ['group'] })).results)).toEqual([`group ${gitlab.url}/groups/platform/backend`]);
-	expect(links((await search('refund')).results)).toEqual(['issue http://issues.test/23']);
-	expect(links((await search('lovelace')).results)).toEqual([`member ${gitlab.url}/ada`]);
-	expect(links((await search('checkout')).results)).toEqual([`epic ${gitlab.url}/groups/platform/-/work_items/1`]);
+test('links each result to the Vitrine page that shows its content', async () => {
+	expect(links((await search('payments', { sources: ['main-gitlab'], types: ['project'] })).results)).toEqual(['project /gitlab/platform/backend/-/payments']);
+	expect(links((await search('backend', { types: ['group'] })).results)).toEqual(['group /gitlab/platform/backend']);
+	expect(links((await search('refund')).results)).toEqual(['issue /issues/platform/backend']);
+	expect(links((await search('lovelace')).results)).toEqual(['member /gitlab/platform']);
+	expect(links((await search('checkout')).results)).toEqual(['epic /roadmap/platform']);
 	expect(links((await search('payments', { sources: ['main-harbor'] })).results)).toEqual(['image /harbor/main-harbor/platform']);
+});
+
+test('leaves a result without a link when no Route shows its content, rather than leaving Vitrine', async () => {
+	expect(links((await search('payments', { sources: ['tools-gitlab'] })).results)).toEqual(['project undefined']);
 });
 
 const MINUTE = 60_000;

@@ -2,13 +2,14 @@
 import type { Group } from '../../sources/gitlab-api.ts';
 
 interface Props {
-	url: string;
+	/** Left out when no Route shows the content, and the title is then no link. */
+	url?: string;
 	group: Group;
 }
 
 const { url, group } = Astro.props;
 ---
 
-<h2><a href={url}>{group.name}</a></h2>
+<h2>{url ? <a href={url}>{group.name}</a> : group.name}</h2>
 <p><code>{group.path}</code></p>
 {group.description && <p>{group.description}</p>}

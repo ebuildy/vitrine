@@ -2,14 +2,15 @@
 import type { Issue } from '../../sources/gitlab-api.ts';
 
 interface Props {
-	url: string;
+	/** Left out when no Route shows the content, and the title is then no link. */
+	url?: string;
 	issue: Issue;
 }
 
 const { url, issue } = Astro.props;
 ---
 
-<h2><a href={url}>{issue.title}</a></h2>
+<h2>{url ? <a href={url}>{issue.title}</a> : issue.title}</h2>
 <p>In <code>{issue.project}</code></p>
 {issue.assignees.length > 0 && <p>Assigned to {issue.assignees.join(', ')}</p>}
 {issue.labels.length > 0 && <p>Labels: {issue.labels.join(', ')}</p>}

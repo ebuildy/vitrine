@@ -137,7 +137,9 @@ routes:
   # Searches every Group, Project, Issue, Member and Epic of every Main Group and every Image of every selected Harbor
   # project from one box, filtered by content type and by Source. It answers from the lists the other pages cache, so a
   # search costs the Sources nothing while they are fresh. A word may have one letter wrong. Results follow the box
-  # as a Visitor types, 2 seconds after the last key.
+  # as a Visitor types, 2 seconds after the last key. Each result opens the Vitrine page that shows it, as declared below:
+  # a Group or Member its Group, a Project its Project, an Issue the Issues of its Group, an Epic the Roadmap of its
+  # Main Group and an Image its Harbor project. A result that no Route shows has no link, as search never leaves Vitrine.
   - url: /search
     controller: search
   # Shows the open Epics of a Main Group and of everything beneath it on a timeline. Any other Group is not found.

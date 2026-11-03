@@ -2,7 +2,8 @@
 import type { Member } from '../../sources/gitlab-api.ts';
 
 interface Props {
-	url: string;
+	/** Left out when no Route shows the content, and the title is then no link. */
+	url?: string;
 	member: Member;
 }
 
@@ -12,7 +13,7 @@ const { url, member } = Astro.props;
 <div class="member">
 	{member.avatarUrl ? <img src={member.avatarUrl} alt="" width="40" height="40" loading="lazy" /> : <span class="avatar" />}
 	<div>
-		<h2><a href={url}>{member.name}</a></h2>
+		<h2>{url ? <a href={url}>{member.name}</a> : member.name}</h2>
 		<p>@{member.username}</p>
 	</div>
 </div>

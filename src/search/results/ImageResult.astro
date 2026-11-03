@@ -2,7 +2,8 @@
 import type { Image } from '../../sources/harbor-api.ts';
 
 interface Props {
-	url: string;
+	/** Left out when no Route shows the content, and the title is then no link. */
+	url?: string;
 	image: Image;
 }
 
@@ -10,6 +11,6 @@ const { url, image } = Astro.props;
 const newest = image.tags.toSorted((first, second) => second.pushedAt.localeCompare(first.pushedAt))[0];
 ---
 
-<h2><a href={url}>{image.name}</a></h2>
+<h2>{url ? <a href={url}>{image.name}</a> : image.name}</h2>
 <p>{image.tags.length} {image.tags.length === 1 ? 'tag' : 'tags'}{newest && `, newest ${newest.name}`}</p>
 {newest && <p><code>docker pull {newest.pullReference}</code></p>}

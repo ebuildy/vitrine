@@ -29,8 +29,8 @@ interface FoundContent {
 	source: string;
 	sourceType: Source['type'];
 	title: string;
-	/** Where the content lives. */
-	url: string;
+	/** The Vitrine page that shows the content, left out when no Route offers one, as results never lead away from Vitrine. */
+	url?: string;
 	/** Whether the content comes from a Stale list. */
 	stale: boolean;
 }
