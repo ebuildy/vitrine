@@ -8,7 +8,7 @@ You configure it with one Settings file, change its look with a Theme and Templa
 
 - [`settings.example.yaml`](settings.example.yaml): every option of Settings, explained, to copy as `settings.yaml`.
 - [Controllers](docs/administrator/controllers.md): the kinds of page a Route can show, and their params.
-- [Components](docs/administrator/components.md): the blocks a Template or a page of a fork places, and their props.
+- [Components](docs/administrator/components.md): the building blocks a Template or a page of a fork places, and their props.
 - [Templates](docs/administrator/templates.md): rearranging a page from Settings.
 - [Cache stores](docs/administrator/cache-stores.md): memory, local files or Redis.
 - [Security](docs/administrator/security.md): **read before you deploy**. Token permissions are the real boundary around private projects, and an installation exposed to the internet shows Member emails, Issue assignments and vulnerability counts to anyone.
@@ -27,18 +27,18 @@ docker run -p 8080:8080 \
 
 Two kinds of tag exist, for `linux/amd64` and `linux/arm64`: `edge` follows `main`, and a release `v1.2.3` is published as `1.2.3`, `1.2` and `1`. There is no `latest`.
 
-The image listens on port 8080, as user `node` (uid 1000), and stops within 5 seconds of `SIGTERM`, letting requests in progress finish. It creates no directory for a `files` cache store, so mount a writable one for that user. It serves no files of its own: host a logo or a stylesheet elsewhere, or put CSS files beside Settings, in the same ConfigMap.
+The Container image listens on port 8080, as user `node` (uid 1000), and stops within 5 seconds of `SIGTERM`, letting requests in progress finish. It creates no directory for a `files` cache store, so mount a writable one for that user. It serves no files of its own: host a logo or a stylesheet elsewhere, or put CSS files beside Settings, in the same ConfigMap.
 
-Startup checks Settings before serving anything, and stops with every problem it finds: an unknown option, a Route to a Source that does not exist, a missing environment variable, a Template that does not compile.
+Startup checks Settings before serving anything, and stops with a list of problems: first a misspelt or misplaced option, then, once Settings read correctly, a Route to a Source that does not exist, a missing environment variable or a Template that does not compile.
 
 ### Environment variables
 
 | Variable | What it does |
 | --- | --- |
-| `VITRINE_SETTINGS` | The Settings file. Defaults to `settings.yaml` in the working directory, and to `/etc/vitrine/settings.yaml` in the image. |
+| `VITRINE_SETTINGS` | The Settings file. Defaults to `settings.yaml` in the working directory, and to `/etc/vitrine/settings.yaml` in the Container image. |
 | `VITRINE_ENV_FILE` | A file of environment variables read at start. Defaults to `.env` in the working directory. Vitrine works without one, and a variable the environment already sets wins. |
 | `VITRINE_TEMPLATE_DISABLE` | Any non-empty value, even `false`, stops Templates from being compiled or run. |
-| `HOST`, `PORT` | Where the server listens. The image sets `0.0.0.0` and `8080`. |
+| `HOST`, `PORT` | Where the server listens. The Container image sets `0.0.0.0` and `8080`. |
 | Those Settings name | Each `tokenEnv`, `passwordEnv` and `urlEnv` in Settings names a variable holding a secret. Startup stops when one is not set. |
 
 ## Run from source
@@ -57,7 +57,7 @@ npm start
 
 ## Fork
 
-Settings change the Sources, Routes, Branding, Menu, Theme and Templates. To add a page, a Controller or a Component, fork Vitrine: a page in `src/pages` wins over the Routes of Settings at the same URL, and can place any Component, as [Components](docs/administrator/components.md#on-a-page-of-a-fork) shows. Then build your own image with `podman build .` or `docker build --file Containerfile .`.
+Settings change the Sources, Routes, Branding, Menu, Theme and Templates. To add a page, a Controller or a Component, fork Vitrine: a page in `src/pages` wins over the Routes of Settings at the same URL, and can place any Component, as [Components](docs/administrator/components.md#on-a-page-of-a-fork) shows. Then build your own Container image with `podman build .` or `docker build --file Containerfile .`.
 
 ## Develop
 

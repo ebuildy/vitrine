@@ -4,12 +4,11 @@ Vitrine has no login. Every Visitor sees the same pages, whoever they are, with 
 
 ## Token permissions are the real boundary
 
-What Settings select, the Main Groups, the `projects` of a Harbor Source and the `repositories` of a Nexus Source, choose what Vitrine shows by default. They are not access control:
+Vitrine knows nothing of private or internal visibility: it shows whatever its credentials read, to everyone. What Settings select narrows that, but only so far:
 
-- The `harbor` Controller lists every Harbor project the Source reports, whatever `projects` select, and a `harbor-images` Route with `:project` in its URL shows the Images of any Harbor project the credentials can read.
-- A Nexus Source with no `repositories` Publishes every Repository its credentials can read.
-- A Template can place any Component on any Group, Project or Harbor project the credentials can read.
-- A Visitor can type any URL a Route accepts.
+- GitLab: Vitrine never reads outside the Main Groups, and leaves out confidential Issues and archived Projects. Inside a Main Group, every Group, Project, Issue, Epic and Member the token can read is shown, private Projects included.
+- Harbor: `projects` only choose what the Images pages and the Navigation page show by default. The `harbor` Controller lists every Harbor project the Source reports, a `harbor-images` Route with `:project` in its URL shows the Images of any Harbor project the credentials can read, and a Visitor can type any such URL.
+- Nexus: a Source with no `repositories` Publishes every Repository its credentials can read.
 
 So give each Source credentials that read only what Visitors may see:
 
@@ -17,7 +16,7 @@ So give each Source credentials that read only what Visitors may see:
 - Harbor: a robot account with pull and read access on the Harbor projects Visitors may see. Leave out `username` and `passwordEnv` to read only projects with anonymous access.
 - Nexus: a user whose role can browse only the Repositories Visitors may see. Leave out `username` and `passwordEnv` for anonymous access.
 
-Vitrine leaves out confidential Issues and archived Projects, and its Routes answer not found outside the Main Groups, but a token that reads more than Visitors should see is one mistake away from showing it.
+A token that reads more than Visitors should see is one Route or one Template away from showing it.
 
 ## An internet-exposed installation shows this to anyone
 

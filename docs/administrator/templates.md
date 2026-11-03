@@ -57,4 +57,4 @@ To go further, fork Vitrine and add a page: see [On a page of a fork](components
 
 ## Templates run as code
 
-A Template runs on the server and can read every environment variable, tokens included. Only let people trusted with the server edit Settings, and set `VITRINE_TEMPLATE_DISABLE` to any non-empty value, even `false`, to refuse Templates: Routes then show their Controller's own page, and the startup warning names them. See [Security](security.md).
+A Template runs on the server and can read every environment variable, tokens included. See [Settings is code](security.md#settings-is-code) for who may edit Settings and how to refuse Templates.

@@ -1,6 +1,6 @@
 # Components
 
-A Component is a self-contained block of a page. It reads its own content from one Source, through the cache, and shows its own warnings and errors: a note when its content is Stale because the Source is down, and an alert when it could not be loaded at all. One Component failing never stops the rest of the page.
+A Component is a self-contained building block of a page. It reads its own content from one Source, through the cache, and shows its own warnings and errors: a note when its content is Stale because the Source is down, and an alert when it could not be loaded at all. One Component failing never stops the rest of the page.
 
 Every Component is in `src/components`, and you use one in two ways.
 
@@ -8,7 +8,7 @@ Every Component is in `src/components`, and you use one in two ways.
 
 ### In a Template
 
-A Template in Settings places Components with no import, under their file name. Startup stops, naming the Route, on an unknown Component, a missing or unknown prop, a Component given a Source of the wrong type, and a fixed `source` that does not exist or a fixed `group` or `project` outside every Main Group. See [Templates](templates.md).
+A Template in Settings places Components with no import, under their file name, and startup checks their props: see [Templates](templates.md).
 
 ```yaml
 routes:
@@ -40,7 +40,7 @@ import Layout from '../layouts/Layout.astro';
 </Layout>
 ```
 
-Each `source` is the `name` of a Source in Settings. On a page of a fork, nothing checks props at startup: a mistake shows when the page is opened, and `npm run build` catches what TypeScript can. The Container image builds `src/pages` in, so build your own image from the fork with `docker build --file Containerfile .` or `podman build .`.
+Each `source` is the `name` of a Source in Settings. On a page of a fork, nothing checks props at startup: a mistake shows when the page is opened, and `npm run build` catches what TypeScript can. The Container image builds `src/pages` in, so build your own Container image from the fork with `docker build --file Containerfile .` or `podman build .`.
 
 Props marked required must be given. The others have the defaults below.
 

@@ -1,8 +1,8 @@
 # Copy this file to settings.yaml, then replace the values with your own.
 # settings.yaml is ignored by git: never commit real hostnames.
 # Environment variables named below can also live in a .env file, see .env.example.
-# docs/administrator explains Controllers, Components, Templates and cache stores. Read docs/administrator/security.md
-# before you deploy: the tokens below decide what every Visitor sees.
+# docs/administrator explains Controllers, Components, Templates and cache stores.
+# Read docs/administrator/security.md before you deploy: the tokens below decide what every Visitor sees.
 
 sources:
   - name: main-harbor

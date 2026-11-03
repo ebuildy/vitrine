@@ -1,6 +1,6 @@
 # Cache stores
 
-Vitrine reads its Sources when a Visitor opens a page, not on a schedule. Content younger than the `allowedAgeMinutes` of its Source, 15 by default, is served from the cache store without asking the Source. Older content is read again. When the Source is down, or takes more than 10 seconds, Vitrine serves the Stale content it still has, with a warning, so that a Source outage does not empty the page. Search answers from the same cached lists, so it costs the Sources nothing while they are fresh.
+Vitrine reads its Sources when a Visitor opens a page, not on a schedule. Content younger than the `allowedAgeMinutes` of its Source, 15 by default, is served from the cache store without asking the Source. Older content is read again. When the Source is down, or takes more than 10 seconds, Vitrine serves the Stale content it still has, with a warning, so that a Source outage does not empty the page. When the Source answers but no longer has the content, as when Epics are not on its tier, Vitrine shows that answer instead. Search answers from the same cached lists, so it costs the Sources nothing while they are fresh.
 
 `allowedAgeMinutes: 0` leaves the cache out for that Source: every page reads it, nothing is kept, and an outage shows an error instead of Stale content.
 

@@ -21,7 +21,7 @@ Some Controllers link to the pages of others. Vitrine finds those pages among th
 
 ## `navigation`
 
-The Navigation page: the latest Releases of every Main Group and the Harbor projects of every Harbor Source, then the Members of every Main Group, then the Main Groups of every GitLab Source, and links to every other Route whose URL has no `:` segment. Declare as many as you like, on any URL.
+The Navigation page: the latest Releases of every Main Group and the Harbor projects selected under `projects` of every Harbor Source, then the Members of every Main Group, then the Main Groups of every GitLab Source, and links to every other Route whose URL has no `:` segment. Declare as many as you like, on any URL.
 
 | Param | Required | What it does |
 | --- | --- | --- |
