@@ -1,5 +1,6 @@
 import type { FakeGitlabMember, FakeGitlabOptions, FakeGitlabProject } from '../tests/support/fake-gitlab.ts';
 import type { FakeArtifact, FakeHarborOptions } from '../tests/support/fake-harbor.ts';
+import type { FakeNexusOptions } from '../tests/support/fake-nexus.ts';
 
 const REPORT_TYPE = 'application/vnd.security.vulnerability.report; version=1.1';
 const MEGABYTE = 1_048_576;
@@ -279,4 +280,18 @@ export const toolsHarborContent: Omit<FakeHarborOptions, 'credentials' | 'port'>
 		'tools/ci-runner': [artifact(430, '2026-10-02T08:00:00.000Z', [tag('17.5', '2026-10-02T08:00:00.000Z')], scanned('2026-10-02T09:00:00.000Z', { High: 2, Low: 4 }))],
 	},
 	projectDetails: { tools: { creation_time: '2025-05-20T08:00:00.000Z', repo_count: 2, summary: { quota: { used: { storage: 1_900 * MEGABYTE } } } } },
+};
+
+// Several formats, and every type: a hosted Repository holds what was pushed to it, a proxy caches another, and a group joins several.
+export const nexusContent: Omit<FakeNexusOptions, 'credentials' | 'port'> = {
+	repositories: [
+		{ name: 'maven-releases', format: 'maven2', type: 'hosted' },
+		{ name: 'maven-central', format: 'maven2', type: 'proxy' },
+		{ name: 'maven-public', format: 'maven2', type: 'group' },
+		{ name: 'npm-hosted', format: 'npm', type: 'hosted' },
+		{ name: 'npmjs', format: 'npm', type: 'proxy' },
+		{ name: 'docker-hosted', format: 'docker', type: 'hosted' },
+		{ name: 'pypi-proxy', format: 'pypi', type: 'proxy' },
+		{ name: 'raw-artifacts', format: 'raw', type: 'hosted' },
+	],
 };

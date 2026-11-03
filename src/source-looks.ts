@@ -1,5 +1,6 @@
 import gitlabIcon from './icons/gitlab.svg?url';
 import harborIcon from './icons/harbor.svg?url';
+import nexusIcon from './icons/nexus.svg?url';
 import type { Source } from './settings.ts';
 
 export interface SourceLook {
@@ -10,12 +11,14 @@ export interface SourceLook {
 }
 
 /**
- * The colour and logo of each kind of Source, so a Visitor tells them apart at a glance, on any page. A Nexus Source
- * would be green. Only code the build bundles may import this, as Node itself cannot load an .svg?url import.
+ * The colour and logo of each kind of Source, so a Visitor tells them apart at a glance, on any page. Only code the
+ * build bundles may import this, as Node itself cannot load an .svg?url import.
  */
 export const SOURCE_LOOKS: Record<Source['type'], SourceLook> = {
 	// GitLab's tanuki, from app/assets/images/logo.svg of gitlab-org/gitlab.
 	gitlab: { colour: '#fc6d26', icon: gitlabIcon },
 	// Harbor's icon, from projects/harbor/icon/color of the CNCF artwork repository.
 	harbor: { colour: '#1d6fd1', icon: harborIcon },
+	// A plain green hexagon, standing in for Sonatype's artwork.
+	nexus: { colour: '#1b8a3a', icon: nexusIcon },
 };

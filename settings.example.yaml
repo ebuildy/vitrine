@@ -34,6 +34,19 @@ sources:
     # Leave it out for a Main Group with anonymous read access.
     tokenEnv: GITLAB_TOKEN
     allowedAgeMinutes: 15
+  - name: main-nexus
+    type: nexus
+    # Where Nexus serves its UI, with its path if it has one, as in https://example.com/nexus.
+    url: https://nexus.example.com
+    # The Published Repositories. Leave it out to show every Repository the credentials can read.
+    repositories:
+      - maven-releases
+      - npm-hosted
+    # Leave out username and passwordEnv for Repositories with anonymous read access.
+    username: vitrine
+    # The name of the environment variable holding the password, never the password itself.
+    passwordEnv: NEXUS_PASSWORD
+    allowedAgeMinutes: 15
 
 # Where content read from Sources is kept. Defaults to memory.
 cacheStore:
@@ -124,6 +137,9 @@ routes:
     controller: harbor
   - url: /harbor/:source/:project
     controller: harbor-images
+  # Lists the Published Repositories of a Nexus Source, each linked to its page in Nexus.
+  - url: /nexus/:source
+    controller: nexus
   # A :group+ segment takes one URL segment or more, as Groups nest. The Source is the first one
   # whose Main Groups hold the Group: when two Sources share a Group path, put :source in the URL too.
   - url: /gitlab/:group+
@@ -134,12 +150,13 @@ routes:
   # Shows the open Issues of a Group and of everything beneath it, read once per Main Group.
   - url: /issues/:group+
     controller: gitlab-issues
-  # Searches every Group, Project, Issue, Member and Epic of every Main Group and every Image of every selected Harbor
-  # project from one box, filtered by content type and by Source. It answers from the lists the other pages cache, so a
-  # search costs the Sources nothing while they are fresh. A word may have one letter wrong. Results follow the box
-  # as a Visitor types, 2 seconds after the last key. Each result opens the Vitrine page that shows it, as declared below:
-  # a Group or Member its Group, a Project its Project, an Issue the Issues of its Group, an Epic the Roadmap of its
-  # Main Group and an Image its Harbor project. A result that no Route shows has no link, as search never leaves Vitrine.
+  # Searches every Group, Project, Issue, Member and Epic of every Main Group, every Image of every selected Harbor
+  # project and every Published Nexus Repository, by name, format or type, from one box, filtered by content type and by
+  # Source. It answers from the lists the other pages cache, so a search costs the Sources nothing while they are fresh.
+  # A word may have one letter wrong. Results follow the box as a Visitor types, 2 seconds after the last key. Each
+  # result opens the Vitrine page that shows it, as declared below: a Group or Member its Group, a Project its Project,
+  # an Issue the Issues of its Group, an Epic the Roadmap of its Main Group, an Image its Harbor project and a Repository
+  # the list of its Nexus Source. A result that no Route shows has no link, as search never leaves Vitrine.
   - url: /search
     controller: search
   # Shows the open Epics of a Main Group and of everything beneath it on a timeline. Any other Group is not found.
@@ -159,7 +176,7 @@ routes:
   #   - source, group and project: the Route's values, undefined where a Route has none
   #   - path: the full Project path, on gitlab-project Routes, as project is only its last segment
   #   - title and description: those of the page, where the Controller has them
-  #   - sources: each Source's name, type, url and projects or mainGroups, with no token or password
+  #   - sources: each Source's name, type, url and projects, mainGroups or repositories, with no token or password
   #   - Astro, as in any Astro file, such as Astro.url
   #
   # Frontmatter, {…} expressions, free HTML, scoped <style> and <script> all work. Startup stops, naming the Route, on

@@ -4,8 +4,9 @@ import { resolve } from 'node:path';
 import { loadEnvFile } from '../src/settings.ts';
 import { startFakeGitlab } from '../tests/support/fake-gitlab.ts';
 import { startFakeHarbor } from '../tests/support/fake-harbor.ts';
+import { startFakeNexus } from '../tests/support/fake-nexus.ts';
 import { freePort } from '../tests/support/free-port.ts';
-import { gitlabContent, mainHarborContent, toolsHarborContent } from './content.ts';
+import { gitlabContent, mainHarborContent, nexusContent, toolsHarborContent } from './content.ts';
 import { withSourceUrls } from './settings.ts';
 
 // Beside demo/settings.yaml, so that files it names resolve the same. Git ignores it.
@@ -25,7 +26,8 @@ const gitlabPort = await freePort();
 const gitlab = await startFakeGitlab({ ...gitlabContent(`http://127.0.0.1:${gitlabPort}`), token: GITLAB_TOKEN, port: gitlabPort });
 const mainHarbor = await startFakeHarbor({ ...mainHarborContent, credentials: { username: 'robot$vitrine', password: HARBOR_PASSWORD } });
 const toolsHarbor = await startFakeHarbor(toolsHarborContent);
-const urls = { 'main-gitlab': gitlab.url, 'main-harbor': mainHarbor.url, 'tools-harbor': toolsHarbor.url };
+const nexus = await startFakeNexus(nexusContent);
+const urls = { 'main-gitlab': gitlab.url, 'main-harbor': mainHarbor.url, 'tools-harbor': toolsHarbor.url, 'main-nexus': nexus.url };
 writeFileSync(SETTINGS, withSourceUrls(readFileSync('demo/settings.yaml', 'utf8'), urls));
 process.on('exit', () => rmSync(SETTINGS, { force: true }));
 for (const [name, url] of Object.entries(urls)) console.log(`Fake Source ${name} on ${url}`);

@@ -27,4 +27,5 @@ export const componentList: Record<string, ComponentEntry> = {
 	GroupRoadmap: onGroup,
 	HarborProjectList: { sourceType: 'harbor', props: { source: true, projects: false, maxItems: false } },
 	ImageList: { sourceType: 'harbor', props: { source: true, project: true } },
+	NexusRepositoryList: { sourceType: 'nexus', props: { source: true, maxItems: false } },
 };

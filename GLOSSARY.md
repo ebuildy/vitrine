@@ -1,6 +1,6 @@
 # Vitrine
 
-A forkable portal that DevOps teams put in front of their GitLab and Harbor, so people can browse content, find it and go to where it can be downloaded.
+A forkable portal that DevOps teams put in front of their GitLab, Harbor and Nexus, so people can browse content, find it and go to where it can be downloaded.
 
 ## Language
 
@@ -31,7 +31,7 @@ Vitrine itself, packaged for an Administrator to run. It is unrelated to any Ima
 _Avoid_: Image, Docker image
 
 **Published**:
-The state of content that belongs to a Main Group or a selected Harbor project and is not confidential.
+The state of content that belongs to a Main Group, a selected Harbor project or a selected Repository, and is not confidential. With no selection, every Repository a Nexus Source's credentials can read is Published.
 _Avoid_: Public, visible, exposed, approved
 
 **Stale**:
@@ -117,3 +117,9 @@ _Avoid_: Planning, schedule
 **Image**:
 An OCI image held in a Harbor repository, together with its tags and their scan results.
 _Avoid_: Container, artifact, Exhibit
+
+### Nexus content
+
+**Repository**:
+A Nexus repository, with its format, such as maven2, npm, docker or raw, and its type: hosted, proxy or group.
+_Avoid_: Registry, feed

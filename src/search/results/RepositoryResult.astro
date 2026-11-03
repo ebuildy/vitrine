@@ -1,0 +1,14 @@
+---
+import type { Repository } from '../../sources/nexus-api.ts';
+
+interface Props {
+	/** Left out when no Route shows the content, and the title is then no link. */
+	url?: string;
+	repository: Repository;
+}
+
+const { url, repository } = Astro.props;
+---
+
+<h2>{url ? <a href={url}>{repository.name}</a> : repository.name}</h2>
+<p>{repository.format}, {repository.type}</p>

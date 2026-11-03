@@ -23,6 +23,10 @@ sources:
       - platform
       - data/analytics
     tokenEnv: GITLAB_TOKEN
+  # Anonymous read access, and no selection of Repositories: every one it reports is shown.
+  - name: main-nexus
+    type: nexus
+    url: http://127.0.0.1:0
 
 # Restarting the demo starts from its seed data. Use `type: redis` with `urlEnv: REDIS_URL` to try the shared store,
 # and a keyPrefix of its own in each worktree, as every worktree shares the Valkey of compose.yaml.
@@ -43,6 +47,8 @@ navigation:
     url: /issues/platform
   - label: Search
     url: /search
+  - label: Repositories
+    url: /nexus/main-nexus
 
 # The naval Theme: a crisp layout in ocean blues, with a sea of drifting waves, boats and submarines at the foot of every page.
 theme:
@@ -102,3 +108,5 @@ routes:
     controller: gitlab-issues
   - url: /search
     controller: search
+  - url: /nexus/:source
+    controller: nexus

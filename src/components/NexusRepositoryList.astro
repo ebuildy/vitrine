@@ -1,0 +1,91 @@
+---
+import { getNexusSource } from '../settings.ts';
+import { listRepositories } from '../sources/nexus.ts';
+
+interface Props {
+	source: string;
+	maxItems?: number;
+}
+
+const { source, maxItems } = Astro.props;
+const { data: repositories, stale } = await listRepositories(getNexusSource(source));
+---
+
+{stale && <p role="status">This list is Stale because {source} is down.</p>}
+{
+	!repositories ? (
+		<p role="alert">Repositories could not be loaded because {source} is down.</p>
+	) : repositories.length > 0 ? (
+		<ul>
+			{repositories.slice(0, maxItems).map((repository) => (
+				<li class="card">
+					<h2>
+						<a href={repository.webUrl}>{repository.name}</a>
+					</h2>
+					<dl>
+						<div>
+							<dt>Format</dt>
+							<dd>{repository.format}</dd>
+						</div>
+						<div>
+							<dt>Type</dt>
+							<dd>{repository.type}</dd>
+						</div>
+					</dl>
+				</li>
+			))}
+		</ul>
+	) : (
+		<p>No Repositories found.</p>
+	)
+}
+
+<style>
+	ul {
+		display: grid;
+		/* Four columns across the page, and fewer in a narrower place. */
+		grid-template-columns: repeat(auto-fill, minmax(max(25% - 1rem, 12rem), 1fr));
+		gap: 1rem;
+		margin: 0;
+		padding: 1rem;
+		list-style: none;
+	}
+
+	li {
+		position: relative;
+		padding: 1rem;
+		border: 1px solid var(--color-border);
+		border-radius: 0.5rem;
+	}
+
+	li:hover {
+		border-color: var(--color-primary);
+	}
+
+	h2 {
+		margin: 0 0 0.75rem;
+		font-size: 1.125rem;
+		overflow-wrap: anywhere;
+	}
+
+	/* Stretches the link over its card, so that a click anywhere opens the Repository in Nexus. */
+	a::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+	}
+
+	dl {
+		margin: 0;
+	}
+
+	dl div {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	dd {
+		margin: 0;
+	}
+</style>

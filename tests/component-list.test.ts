@@ -28,7 +28,8 @@ test.each(files)('the list holds the props of %s', (file) => {
 
 test.each(files)('the list holds the Source type of %s', (file) => {
 	const source = readFileSync(`${DIRECTORY}/${file}`, 'utf8');
-	const reads = source.includes('getHarborSource(') ? 'harbor' : source.includes('getGitlabSource(') ? 'gitlab' : undefined;
+	const readers = { harbor: 'getHarborSource(', gitlab: 'getGitlabSource(', nexus: 'getNexusSource(' };
+	const reads = Object.entries(readers).find(([, reader]) => source.includes(reader))?.[0];
 
 	expect(reads).toBeDefined();
 	expect(componentList[file.replace('.astro', '')].sourceType).toBe(reads);

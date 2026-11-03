@@ -30,7 +30,22 @@ const gitlabSourceSchema = z.strictObject({
 	allowedAgeMinutes: z.number().nonnegative().default(15),
 });
 
-const sourceSchema = z.discriminatedUnion('type', [harborSourceSchema, gitlabSourceSchema]);
+const nexusSourceSchema = z
+	.strictObject({
+		name: z.string().min(1),
+		type: z.literal('nexus'),
+		url: z.url(),
+		// The Published Repositories. Left out, every Repository the credentials can read is Published.
+		repositories: z.array(z.string().min(1)).min(1).optional(),
+		username: z.string().optional(),
+		passwordEnv: z.string().optional(),
+		allowedAgeMinutes: z.number().nonnegative().default(15),
+	})
+	.refine(({ username, passwordEnv }) => Boolean(username) === Boolean(passwordEnv), {
+		message: 'username and passwordEnv must be set together',
+	});
+
+const sourceSchema = z.discriminatedUnion('type', [harborSourceSchema, gitlabSourceSchema, nexusSourceSchema]);
 
 const cacheStoreSchema = z.discriminatedUnion('type', [
 	z.strictObject({ type: z.literal('memory') }),
@@ -100,7 +115,8 @@ const settingsSchema = z.strictObject({
 
 export type HarborSource = z.infer<typeof harborSourceSchema> & { password?: string };
 export type GitlabSource = z.infer<typeof gitlabSourceSchema> & { token?: string };
-export type Source = HarborSource | GitlabSource;
+export type NexusSource = z.infer<typeof nexusSourceSchema> & { password?: string };
+export type Source = HarborSource | GitlabSource | NexusSource;
 export type CacheStoreSettings =
 	| Exclude<z.infer<typeof cacheStoreSchema>, { type: 'redis' }>
 	| (Extract<z.infer<typeof cacheStoreSchema>, { type: 'redis' }> & { url: string });
@@ -151,9 +167,9 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 		theme: { ...theme, css: stylesheets },
 		cacheStore: cacheStore.type === 'redis' ? { ...cacheStore, url: env[cacheStore.urlEnv] as string } : cacheStore,
 		sources: sources.map((source) =>
-			source.type === 'harbor'
-				? { ...source, password: source.passwordEnv ? env[source.passwordEnv] : undefined }
-				: { ...source, token: source.tokenEnv ? env[source.tokenEnv] : undefined },
+			source.type === 'gitlab'
+				? { ...source, token: source.tokenEnv ? env[source.tokenEnv] : undefined }
+				: { ...source, password: source.passwordEnv ? env[source.passwordEnv] : undefined },
 		),
 	};
 }
@@ -186,10 +202,12 @@ function sourceProblems(sources: z.infer<typeof sourceSchema>[], env: Record<str
 		const { name } = source;
 		if (source.type === 'harbor') {
 			problems.push(...duplicates(source.projects).map((project) => `Source "${name}" selects Harbor project "${project}" twice`));
+		} else if (source.type === 'nexus') {
+			problems.push(...duplicates(source.repositories ?? []).map((repository) => `Source "${name}" selects Repository "${repository}" twice`));
 		} else {
 			problems.push(...duplicates(source.mainGroups).map((group) => `Source "${name}" names Main Group "${group}" twice`));
 		}
-		const secretEnv = source.type === 'harbor' ? source.passwordEnv : source.tokenEnv;
+		const secretEnv = source.type === 'gitlab' ? source.tokenEnv : source.passwordEnv;
 		if (secretEnv && !env[secretEnv]) {
 			problems.push(`Source "${name}" needs the environment variable ${secretEnv}`);
 		}
@@ -251,11 +269,12 @@ export function prepareSettings() {
 
 /** What a Template may print of each Source. It names what to keep, so a secret added to a Source later stays out. */
 export function publicSources(sources: Source[]) {
-	return sources.map((source) =>
-		source.type === 'harbor'
-			? { name: source.name, type: source.type, url: source.url, projects: source.projects }
-			: { name: source.name, type: source.type, url: source.url, mainGroups: source.mainGroups },
-	);
+	return sources.map((source) => {
+		const { name, type, url } = source;
+		if (source.type === 'harbor') return { name, type, url, projects: source.projects };
+		if (source.type === 'nexus') return { name, type, url, repositories: source.repositories };
+		return { name, type, url, mainGroups: source.mainGroups };
+	});
 }
 
 export function getHarborSources(): HarborSource[] {
@@ -276,4 +295,14 @@ export function getGitlabSource(name: string): GitlabSource {
 
 export function getGitlabSources(): GitlabSource[] {
 	return getSettings().sources.filter((source) => source.type === 'gitlab');
+}
+
+export function getNexusSources(): NexusSource[] {
+	return getSettings().sources.filter((source) => source.type === 'nexus');
+}
+
+export function getNexusSource(name: string): NexusSource {
+	const source = getNexusSources().find((candidate) => candidate.name === name);
+	if (!source) throw new Error(`Unknown Source "${name}"`);
+	return source;
 }
