@@ -14,6 +14,8 @@ Typecheck with `npm run check`, as CI does: it runs `astro sync` first, which ba
 
 `npm test` needs the Redis from `compose.yaml`: run `docker compose up -d --wait` first. It also needs a Docker engine with BuildKit, for `docker build --output`, and `helm` with network access, to render the chart and fetch its Valkey dependency into a Helm home of its own.
 
+A change under `charts/` runs `.github/workflows/chart.yaml`: `helm lint`, kubeconform and a Trivy scan with the default values and each set of `charts/vitrine/ci/`, then an install on kind with the Container image of the commit. Add a set there for a new feature of the chart, and accept a Trivy finding only in `charts/vitrine/.trivyignore.yaml`, with why.
+
 `npm test` and `npm run test:e2e` also write an HTML report, to `vitest-report/` and `playwright-report/` (with traces of failed tests), and never open a browser. `npm run test:report` and `npm run test:e2e:report` serve them, each on a free port.
 
 To see a page with content, run `npm run demo`: it serves fake Sources to `astro dev` in the foreground, with `demo/settings.yaml` instead of `settings.yaml`. Seed data lives in `demo/content.ts`.

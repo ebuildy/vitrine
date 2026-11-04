@@ -1,0 +1,125 @@
+name: Helm chart
+
+# Only a change to the chart, or to this workflow, runs it. tests/helm-chart.test.ts still runs with every npm test.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'charts/**'
+      - '.github/workflows/chart.yaml'
+  pull_request:
+    paths:
+      - 'charts/**'
+      - '.github/workflows/chart.yaml'
+
+permissions:
+  contents: read
+
+env:
+  KUBECONFORM_VERSION: v0.8.0
+  KUBERNETES_VERSION: 1.33.0
+  TRIVY_VERSION: 0.76.1
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+      - name: Fetch the Valkey chart
+        run: |
+          helm repo add valkey https://valkey.io/valkey-helm/
+          helm dependency build charts/vitrine
+      - name: Install kubeconform
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_VERSION"
+          curl --silent --show-error --fail --location --remote-name "$base/kubeconform-linux-amd64.tar.gz" --remote-name "$base/CHECKSUMS"
+          sha256sum --check --ignore-missing CHECKSUMS
+          tar --extract --gzip --file kubeconform-linux-amd64.tar.gz kubeconform
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      # The default values, then each set of charts/vitrine/ci: a files cache store, Valkey, and Ingress, HTTPRoute and NetworkPolicy.
+      - name: Lint, and check every manifest against the Kubernetes and Gateway API schemas
+        run: |
+          for values in charts/vitrine/values.yaml charts/vitrine/ci/*-values.yaml; do
+            echo "::group::$values"
+            helm lint --strict charts/vitrine --values "$values"
+            helm template vitrine charts/vitrine --values "$values" \
+              | kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
+                  -schema-location default \
+                  -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            echo "::endgroup::"
+          done
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+      - name: Fetch the Valkey chart, which the scan covers too
+        run: |
+          helm repo add valkey https://valkey.io/valkey-helm/
+          helm dependency build charts/vitrine
+      # Fails on a MEDIUM finding or worse. charts/vitrine/.trivyignore.yaml lists those accepted, each with why.
+      - name: Scan the rendered chart for misconfigurations with Trivy
+        run: |
+          for values in charts/vitrine/values.yaml charts/vitrine/ci/*-values.yaml; do
+            echo "::group::$values"
+            docker run --rm --volume "$PWD/charts/vitrine:/chart:ro" "aquasec/trivy:$TRIVY_VERSION" config \
+              --exit-code 1 --severity MEDIUM,HIGH,CRITICAL \
+              --ignorefile /chart/.trivyignore.yaml --helm-values "/chart/${values#charts/vitrine/}" /chart
+            echo "::endgroup::"
+          done
+
+  install:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each a set of charts/vitrine/ci. exposure-values.yaml needs the Gateway API, which kind lacks.
+        values: [files, valkey]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      # The Container image of this commit, so that the chart is tested with what it will deploy.
+      - name: Build the Container image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Containerfile
+          load: true
+          tags: vitrine:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: vitrine
+      - uses: azure/setup-helm@v4
+      - name: Load the Container image into kind
+        run: kind load docker-image vitrine:ci --name vitrine
+      - name: Fetch the Valkey chart
+        run: |
+          helm repo add valkey https://valkey.io/valkey-helm/
+          helm dependency build charts/vitrine
+      # --wait holds until the readiness probe answers: the pod runs on its read-only root as uid 1000.
+      - name: Install the chart
+        run: |
+          helm install vitrine charts/vitrine --namespace vitrine --create-namespace \
+            --values charts/vitrine/ci/${{ matrix.values }}-values.yaml \
+            --set image.repository=vitrine --set image.tag=ci --set image.pullPolicy=Never \
+            --wait --timeout 5m
+      - name: Check Vitrine serves its page, and no pod restarted
+        run: |
+          kubectl --namespace vitrine port-forward service/vitrine 8080:80 &
+          page=$(curl --silent --show-error --fail --retry 20 --retry-all-errors --retry-delay 1 http://localhost:8080/)
+          grep --quiet '<h1>Images</h1>' <<<"$page"
+          restarts=$(kubectl --namespace vitrine get pods --selector app.kubernetes.io/name=vitrine \
+            --output jsonpath='{range .items[*]}{.status.containerStatuses[0].restartCount}{"\n"}{end}')
+          echo "Restarts per pod: $restarts"
+          ! grep --quiet --invert-match '^0$' <<<"$restarts"
+      - name: Show the pods and their logs
+        if: failure()
+        run: |
+          kubectl --namespace vitrine get pods --output wide
+          kubectl --namespace vitrine describe pods
+          kubectl --namespace vitrine logs --selector app.kubernetes.io/instance=vitrine --all-containers --prefix --tail 100

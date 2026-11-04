@@ -2,3 +2,6 @@
 *.tmp
 *.orig
 *~
+# Values of the CI workflow, not of a release.
+ci/
+.trivyignore.yaml
