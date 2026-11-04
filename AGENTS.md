@@ -12,7 +12,9 @@ Commit with `git commit -s`, amends included: the sign-off respects the DCO.
 
 Typecheck with `npm run check`, as CI does: it runs `astro sync` first, which bare `tsc` needs in a fresh worktree.
 
-`npm test` needs the Redis from `compose.yaml`: run `docker compose up -d --wait` first. It also needs a Docker engine with BuildKit, for `docker build --output`.
+`npm test` needs the Redis from `compose.yaml`: run `docker compose up -d --wait` first. It also needs a Docker engine with BuildKit, for `docker build --output`, and `helm` with network access, to render the chart and fetch its Valkey dependency into a Helm home of its own.
+
+A change under `charts/` runs `.github/workflows/chart.yaml`: `helm lint`, kubeconform and a Trivy scan with the default values and each set of `charts/vitrine/ci/`, then an install on kind with the Container image of the chart's `appVersion`. The chart has a version of its own, apart from Vitrine's: a pull request that changes what it ships raises `version` in `charts/vitrine/Chart.yaml`, or the workflow goes red, and `main` publishes that version, once, at `oci://ghcr.io/<owner>/charts/vitrine`. Tags are the Container image's. Add a set there for a new feature of the chart, and accept a Trivy finding only in `charts/vitrine/.trivyignore.yaml`, with why.
 
 `npm test` and `npm run test:e2e` also write an HTML report, to `vitest-report/` and `playwright-report/` (with traces of failed tests), and never open a browser. `npm run test:report` and `npm run test:e2e:report` serve them, each on a free port.
 
@@ -37,8 +39,9 @@ Keep it current: every change an Administrator would notice ships with its docum
 - A cache store: `docs/administrator/cache-stores.md`
 - What Visitors see, or what credentials read: `docs/administrator/security.md`
 - Deployment, the Container image or an environment variable: `README.md`
+- A value of the Helm chart: `charts/vitrine/README.md`
 
-`tests/documentation.test.ts` goes red on a missing option, Controller, param, Component or prop, and on a word `GLOSSARY.md` says to avoid. A description that no longer matches the code passes it, so reread the section of whatever you changed.
+`tests/documentation.test.ts` goes red on a missing option, Controller, param, Component, prop or value of the Helm chart, and on a word `GLOSSARY.md` says to avoid. A description that no longer matches the code passes it, so reread the section of whatever you changed.
 
 ## Documentation
 

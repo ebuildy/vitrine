@@ -1,0 +1,33 @@
+# Everything that reaches Vitrine from outside, for lint, schemas and the security scan. The install job leaves it out: kind has no Gateway API.
+settings:
+  sources: []
+  routes:
+    - url: /
+      controller: harbor-images
+ingress:
+  enabled: true
+  className: nginx
+  tls:
+    - secretName: vitrine-tls
+      hosts:
+        - vitrine.example.com
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: main-gateway
+      namespace: gateway
+  hostnames:
+    - vitrine.example.com
+networkPolicy:
+  enabled: true
+  ingress: |
+    - ports:
+        - port: 8080
+  egress: |
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/name: valkey
+      ports:
+        - port: 6379

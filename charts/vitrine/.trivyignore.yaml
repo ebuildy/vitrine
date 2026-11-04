@@ -1,0 +1,6 @@
+# Findings of `trivy config` that the chart workflow accepts, each with why.
+misconfigurations:
+  - id: KSV-0125
+    statement: >-
+      Trivy trusts only a few registries by default. ghcr.io/ebuildy/vitrine is this project's own Container image,
+      and docker.io/valkey/valkey the Valkey project's official image.

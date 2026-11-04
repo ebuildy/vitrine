@@ -1,0 +1,13 @@
+# A files cache store on the read-only root: what the install job deploys and checks.
+settings:
+  sources: []
+  routes:
+    - url: /
+      controller: harbor-images
+  cacheStore:
+    type: files
+    directory: /var/cache/vitrine
+  warmUp:
+    atStart: true
+filesCache:
+  sizeLimit: 64Mi

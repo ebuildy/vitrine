@@ -1,0 +1,184 @@
+name: Helm chart
+
+# Only a change to the chart, or to this workflow, runs it. tests/helm-chart.test.ts still runs with every npm test.
+# The chart has a life cycle of its own: the version of Chart.yaml, bumped by each pull request that changes the chart,
+# is published from main. Tags stay the Container image's.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'charts/**'
+      - '.github/workflows/chart.yaml'
+  pull_request:
+    paths:
+      - 'charts/**'
+      - '.github/workflows/chart.yaml'
+
+permissions:
+  contents: read
+
+env:
+  KUBECONFORM_VERSION: v0.8.0
+  KUBERNETES_VERSION: 1.33.0
+  TRIVY_VERSION: 0.76.1
+
+jobs:
+  # What `helm package` ships, so a change to ci/ or the Trivy ignore file needs no new version.
+  version:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check a change to the chart bumps its version
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          shipped=(charts/vitrine ':!charts/vitrine/ci' ':!charts/vitrine/.trivyignore.yaml')
+          if git diff --quiet "$BASE" HEAD -- "${shipped[@]}"; then
+            echo 'Nothing the chart ships changed.'
+            exit 0
+          fi
+          new=$(sed -n 's/^version: *//p' charts/vitrine/Chart.yaml)
+          old=$(git show "$BASE:charts/vitrine/Chart.yaml" 2>/dev/null | sed -n 's/^version: *//p' || true)
+          echo "Chart version: ${old:-none} → $new"
+          if [ -n "$old" ] && { [ "$new" = "$old" ] || [ "$(printf '%s\n' "$old" "$new" | sort --version-sort | tail -1)" != "$new" ]; }; then
+            echo "::error file=charts/vitrine/Chart.yaml::The chart changed: raise its version above $old, a patch for a fix, a minor for a new value, a major for a value renamed or removed."
+            exit 1
+          fi
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+      - name: Fetch the Valkey chart
+        run: |
+          helm repo add valkey https://valkey.io/valkey-helm/
+          helm dependency build charts/vitrine
+      - name: Install kubeconform
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_VERSION"
+          curl --silent --show-error --fail --location --remote-name "$base/kubeconform-linux-amd64.tar.gz" --remote-name "$base/CHECKSUMS"
+          sha256sum --check --ignore-missing CHECKSUMS
+          tar --extract --gzip --file kubeconform-linux-amd64.tar.gz kubeconform
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      # The default values, then each set of charts/vitrine/ci: a files cache store, Valkey, and Ingress, HTTPRoute and NetworkPolicy.
+      - name: Lint, and check every manifest against the Kubernetes and Gateway API schemas
+        run: |
+          for values in charts/vitrine/values.yaml charts/vitrine/ci/*-values.yaml; do
+            echo "::group::$values"
+            helm lint --strict charts/vitrine --values "$values"
+            helm template vitrine charts/vitrine --values "$values" \
+              | kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
+                  -schema-location default \
+                  -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            echo "::endgroup::"
+          done
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+      - name: Fetch the Valkey chart, which the scan covers too
+        run: |
+          helm repo add valkey https://valkey.io/valkey-helm/
+          helm dependency build charts/vitrine
+      # Fails on a MEDIUM finding or worse. charts/vitrine/.trivyignore.yaml lists those accepted, each with why.
+      - name: Scan the rendered chart for misconfigurations with Trivy
+        run: |
+          for values in charts/vitrine/values.yaml charts/vitrine/ci/*-values.yaml; do
+            echo "::group::$values"
+            docker run --rm --volume "$PWD/charts/vitrine:/chart:ro" "aquasec/trivy:$TRIVY_VERSION" config \
+              --exit-code 1 --severity MEDIUM,HIGH,CRITICAL \
+              --ignorefile /chart/.trivyignore.yaml --helm-values "/chart/${values#charts/vitrine/}" /chart
+            echo "::endgroup::"
+          done
+
+  install:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each a set of charts/vitrine/ci. exposure-values.yaml needs the Gateway API, which kind lacks.
+        values: [files, valkey]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: vitrine
+      - uses: azure/setup-helm@v4
+      - name: Fetch the Valkey chart
+        run: |
+          helm repo add valkey https://valkey.io/valkey-helm/
+          helm dependency build charts/vitrine
+      # The Container image of the chart's appVersion, as a release deploys it. --wait holds until the readiness
+      # probe answers: the pod runs on its read-only root as uid 1000.
+      - name: Install the chart
+        run: |
+          helm install vitrine charts/vitrine --namespace vitrine --create-namespace \
+            --values charts/vitrine/ci/${{ matrix.values }}-values.yaml \
+            --wait --timeout 5m
+      - name: Check Vitrine serves its page, and no pod restarted
+        run: |
+          kubectl --namespace vitrine port-forward service/vitrine 8080:80 &
+          page=$(curl --silent --show-error --fail --retry 20 --retry-all-errors --retry-delay 1 http://localhost:8080/)
+          grep --quiet '<h1>Images</h1>' <<<"$page"
+          restarts=$(kubectl --namespace vitrine get pods --selector app.kubernetes.io/name=vitrine \
+            --output jsonpath='{range .items[*]}{.status.containerStatuses[0].restartCount}{"\n"}{end}')
+          echo "Restarts per pod: $restarts"
+          ! grep --quiet --invert-match '^0$' <<<"$restarts"
+      - name: Show the pods and their logs
+        if: failure()
+        run: |
+          kubectl --namespace vitrine get pods --output wide
+          kubectl --namespace vitrine describe pods
+          kubectl --namespace vitrine logs --selector app.kubernetes.io/instance=vitrine --all-containers --prefix --tail 100
+
+  # The version of Chart.yaml, at oci://ghcr.io/<owner>/charts/vitrine, once. A published version never changes.
+  publish:
+    if: github.event_name == 'push'
+    needs: [lint, security, install]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+      - name: Check whether this version is published
+        id: published
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(sed -n 's/^version: *//p' charts/vitrine/Chart.yaml)
+          repository="${GITHUB_REPOSITORY_OWNER,,}/charts/vitrine"
+          token=$(curl --silent --show-error --fail --user "${{ github.actor }}:$GITHUB_TOKEN" \
+            "https://ghcr.io/token?service=ghcr.io&scope=repository:$repository:pull,push" | jq --raw-output .token)
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' --head \
+            --header "Authorization: Bearer $token" --header 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json' \
+            "https://ghcr.io/v2/$repository/manifests/$version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$status" in
+            200) echo "Version $version is already published." ; echo 'published=true' >> "$GITHUB_OUTPUT" ;;
+            404) echo "Version $version is new." ; echo 'published=false' >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::ghcr.io answered $status for $repository:$version" ; exit 1 ;;
+          esac
+      - name: Package the chart, with the Valkey chart inside
+        if: steps.published.outputs.published == 'false'
+        run: |
+          helm repo add valkey https://valkey.io/valkey-helm/
+          helm dependency build charts/vitrine
+          helm package charts/vitrine --destination "$RUNNER_TEMP"
+      - name: Push the chart to ghcr.io
+        if: steps.published.outputs.published == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GITHUB_TOKEN" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+          helm push "$RUNNER_TEMP/vitrine-${{ steps.published.outputs.version }}.tgz" "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"

@@ -32,7 +32,7 @@ cacheStore:
 
 One JSON file per entry, written so that a crash never leaves half a file. Content survives a restart when `directory` is on a persistent volume, such as a Kubernetes PersistentVolumeClaim. Nothing removes old files, so give the volume room, or clear it while Vitrine is stopped.
 
-The Container image creates no directory, so mount a writable one for uid 1000. Replicas must not share one directory over a network file system: each replica writes its own.
+The Container image creates no directory, so mount a writable one for uid 1000. Replicas must not share one directory over a network file system: each replica writes its own. The [Helm chart](../../charts/vitrine/README.md#cache-stores) mounts an `emptyDir` there, whose content goes with the pod.
 
 ## `redis`
 

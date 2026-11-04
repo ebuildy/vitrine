@@ -1,0 +1,163 @@
+# Values of the Vitrine chart. README.md beside this file explains them, with examples.
+
+# -- Settings, as settings.example.yaml of the repository shows them, written here as YAML.
+# They are rendered into a ConfigMap, mounted read-only at /etc/vitrine/settings.yaml, and a change rolls the pods.
+# Keep secrets out: each tokenEnv, passwordEnv and urlEnv names an environment variable, set with extraEnvs.
+settings:
+  sources: []
+  routes: []
+
+# -- More files to place beside Settings in /etc/vitrine, by file name, such as a stylesheet that theme.css lists.
+extraFiles: {}
+#   brand.css: |
+#     :root { --accent: #0b5cad; }
+
+# -- The emptyDir mounted at settings.cacheStore.directory when settings.cacheStore.type is files.
+# It is lost with the pod: the cache fills again from the Sources, or from a warm-up.
+filesCache: {}
+#   sizeLimit: 1Gi
+
+# -- Environment variables, as Kubernetes EnvVar entries: a value, or a valueFrom such as a secretKeyRef.
+extraEnvs: []
+#   - name: GITLAB_TOKEN
+#     valueFrom:
+#       secretKeyRef:
+#         name: vitrine-secrets
+#         key: gitlab-token
+
+# -- Every key of a Secret or a ConfigMap as an environment variable, as Kubernetes EnvFromSource entries.
+extraEnvFrom: []
+#   - secretRef:
+#       name: vitrine-secrets
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/ebuildy/vitrine
+  # -- Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  # -- Vitrine never calls the Kubernetes API.
+  automount: false
+  annotations: {}
+  # -- Defaults to the full name of the release when create is true.
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+# The Container image runs as user node, uid 1000, and writes nowhere but /tmp and a files cache store.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+# -- A legacy Ingress, networking.k8s.io/v1.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: vitrine.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #   - secretName: vitrine-tls
+  #     hosts:
+  #       - vitrine.example.com
+
+# -- A Gateway API HTTPRoute, gateway.networking.k8s.io/v1.
+httpRoute:
+  enabled: false
+  annotations: {}
+  # -- The Gateways the HTTPRoute attaches to.
+  parentRefs: []
+  #   - name: main-gateway
+  #     namespace: gateway
+  #     sectionName: https
+  hostnames: []
+  #   - vitrine.example.com
+  # -- Defaults to every path, sent to the Service.
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+
+# -- A NetworkPolicy around Vitrine's pods. ingress and egress are YAML strings, rendered with tpl, each a list of rules.
+networkPolicy:
+  enabled: false
+  ingress: ""
+  #   - from:
+  #       - namespaceSelector:
+  #           matchLabels:
+  #             kubernetes.io/metadata.name: ingress-nginx
+  #     ports:
+  #       - port: 8080
+  egress: ""
+  #   - to:
+  #       - podSelector:
+  #           matchLabels:
+  #             app.kubernetes.io/instance: {{ .Release.Name }}
+  #             app.kubernetes.io/name: valkey
+  #     ports:
+  #       - port: 6379
+
+# -- Both probes ask for /, which shows the page of the Route to /, from the cache once filled.
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+resources: {}
+#   requests:
+#     cpu: 100m
+#     memory: 256Mi
+#   limits:
+#     memory: 512Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# -- The Valkey chart, https://github.com/valkey-io/valkey-helm, for a redis cache store. README.md shows how to point Settings at it.
+valkey:
+  enabled: false

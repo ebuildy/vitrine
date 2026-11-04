@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import type { z } from 'zod';
+import { parse } from 'yaml';
 import { componentList } from '../src/component-list.ts';
 import { controllerParamsSchemas } from '../src/router.ts';
 import { settingsSchema } from '../src/settings.ts';
@@ -101,8 +102,27 @@ const avoidedWords: [RegExp, string][] = [
 	[/\bwork items?\b/i, 'Issue or Epic'],
 ];
 
+/** Values the chart passes on as they are, documented as a whole: Settings, and Kubernetes objects. */
+const passedOnValues = new Set(['settings', 'podSecurityContext', 'securityContext', 'livenessProbe', 'readinessProbe', 'resources', 'affinity']);
+
+/** The dotted path of every value of the chart, such as `image.tag`; a group such as `image` counts by its values. */
+function valuePaths(values: Record<string, unknown>, prefix = ''): string[] {
+	return Object.entries(values).flatMap(([key, value]) =>
+		value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0 && !passedOnValues.has(key)
+			? valuePaths(value as Record<string, unknown>, `${prefix}${key}.`)
+			: [prefix + key],
+	);
+}
+
+const chartReadme = readFileSync('charts/vitrine/README.md', 'utf8');
+
+test.each(valuePaths(parse(readFileSync('charts/vitrine/values.yaml', 'utf8'))))('the Helm chart documents the value %s', (path) => {
+	expect(chartReadme).toContain(`\`${path}\``);
+});
+
 const administratorDocs = [
 	'README.md',
+	'charts/vitrine/README.md',
 	'settings.example.yaml',
 	...readdirSync('docs/administrator').map((file) => `docs/administrator/${file}`),
 ];

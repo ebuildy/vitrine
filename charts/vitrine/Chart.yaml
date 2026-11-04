@@ -1,0 +1,21 @@
+apiVersion: v2
+name: vitrine
+description: A portal in front of GitLab, Harbor and Nexus, to browse their content and find where to download it.
+type: application
+# The chart's own version, apart from Vitrine's: each pull request that changes what the chart ships raises it,
+# and main publishes it, once, to oci://ghcr.io/ebuildy/charts/vitrine. See .github/workflows/chart.yaml.
+version: 0.1.0
+# The tag of ghcr.io/ebuildy/vitrine that image.tag defaults to. edge follows main, until a release of Vitrine:
+# then a pull request sets it, and raises version.
+appVersion: edge
+home: https://github.com/ebuildy/vitrine
+sources:
+  - https://github.com/ebuildy/vitrine
+annotations:
+  artifacthub.io/license: MIT
+dependencies:
+  # The official chart of the Valkey project, for a redis cache store. Bitnami no longer publishes free images.
+  - name: valkey
+    version: 0.12.1
+    repository: https://valkey.io/valkey-helm/
+    condition: valkey.enabled

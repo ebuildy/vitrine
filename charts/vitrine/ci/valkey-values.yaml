@@ -1,0 +1,15 @@
+# A redis cache store on the Valkey of the chart, as README.md shows it, for a release named vitrine.
+settings:
+  sources: []
+  routes:
+    - url: /
+      controller: harbor-images
+  cacheStore:
+    type: redis
+    urlEnv: VALKEY_URL
+extraEnvs:
+  - name: VALKEY_URL
+    value: redis://vitrine-valkey:6379
+replicaCount: 2
+valkey:
+  enabled: true
