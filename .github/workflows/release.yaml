@@ -9,6 +9,8 @@ permissions: {}
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    # RELEASE_PLEASE_TOKEN is a secret of this environment, which only main may use.
+    environment: prod
     steps:
       # A fine-grained PAT, not GITHUB_TOKEN: a tag pushed with GITHUB_TOKEN does not trigger image.yaml.
       - uses: googleapis/release-please-action@v5

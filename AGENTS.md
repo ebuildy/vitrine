@@ -34,7 +34,7 @@ release-please makes releases from commit messages, so write them as Conventiona
 
 Never bump `package.json`, edit `CHANGELOG.md` or push a `v*` tag by hand. Every push to `main` updates one Release PR. Merging it tags `vX.Y.Z` and creates the GitHub Release, and the tag makes `image.yaml` publish the Container image as `X.Y.Z`, `X.Y` and `X`.
 
-`release.yaml` runs with the repository secret `RELEASE_PLEASE_TOKEN`, a fine-grained personal access token: with `GITHUB_TOKEN` instead, the tag would not trigger `image.yaml`. [`CONTRIBUTING.md`](CONTRIBUTING.md#setting-up-the-repository) explains how to create it and set up the repository, and stays current with `release.yaml`, `image.yaml` and `release-please-config.json`.
+`release.yaml` runs in the environment `prod`, with its secret `RELEASE_PLEASE_TOKEN`, a fine-grained personal access token: with `GITHUB_TOKEN` instead, the tag would not trigger `image.yaml`. [`CONTRIBUTING.md`](CONTRIBUTING.md#setting-up-the-repository) explains how to create it and set up the repository, and stays current with `release.yaml`, `image.yaml` and `release-please-config.json`.
 
 ## Administrator documentation
 

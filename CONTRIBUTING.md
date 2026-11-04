@@ -61,24 +61,42 @@ On GitHub, as the account that owns the repository or a collaborator with write 
    Leave every other permission at **No access**, account permissions included.
 7. **Generate token**, and copy it: GitHub shows it once.
 
-### 2. Store it as a repository secret
+### 2. Create the `prod` environment
 
-`release.yaml` reads the token from the secret `RELEASE_PLEASE_TOKEN`. In the repository, open **Settings** → **Secrets and variables** → **Actions** → **New repository secret**, name it `RELEASE_PLEASE_TOKEN`, and paste the token.
+The token can push to `main`, so it is a secret of the environment `prod` rather than of the whole repository. Only a workflow on `main` can use it, so a pull request's workflows never see it, even from a branch of the repository itself. The release job of `release.yaml` declares `environment: prod`.
 
-Or, with the [GitHub CLI](https://cli.github.com/), which reads the token from the prompt so that it stays out of the shell history:
+In the repository, open **Settings** → **Environments** → **New environment**, name it `prod`, then **Configure environment**:
+
+- **Deployment branches and tags**: **Selected branches and tags**, then **Add deployment branch or tag rule** → **Branch** `main`.
+- **Required reviewers**: leave it off. The release job runs on every push to `main`, and with it on, each push would wait for an approval before the Release PR updates.
+
+Or, with the [GitHub CLI](https://cli.github.com/):
 
 ```sh
-gh secret set RELEASE_PLEASE_TOKEN --repo ebuildy/vitrine
+gh api --method PUT repos/ebuildy/vitrine/environments/prod \
+  --input - <<<'{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}'
+gh api --method POST repos/ebuildy/vitrine/environments/prod/deployment-branch-policies \
+  -f name=main -f type=branch
 ```
 
-### 3. Check the Actions settings
+### 3. Store the token as a secret of `prod`
+
+In **Settings** → **Environments** → **prod** → **Environment secrets** → **Add environment secret**, name it `RELEASE_PLEASE_TOKEN`, and paste the token. Do not make it a repository secret as well: every workflow would see it then.
+
+Or, with the GitHub CLI, which reads the token from the prompt so that it stays out of the shell history:
+
+```sh
+gh secret set RELEASE_PLEASE_TOKEN --env prod --repo ebuildy/vitrine
+```
+
+### 4. Check the Actions settings
 
 In **Settings** → **Actions** → **General**:
 
 - **Actions permissions** allow GitHub Actions, and the actions `release.yaml` and `image.yaml` use: `googleapis/release-please-action`, `docker/*` and `actions/*`.
 - **Workflow permissions** can stay at **Read repository contents and packages permissions**: `image.yaml` asks for `packages: write` itself, and release-please uses the token, not `GITHUB_TOKEN`. **Allow GitHub Actions to create and approve pull requests** can stay off for the same reason.
 
-### 4. Make the Container image public
+### 5. Make the Container image public
 
 The first push of `image.yaml` creates the package `ghcr.io/<owner>/vitrine`, private and linked to the repository. Once it exists, open it from the repository's **Packages**, then **Package settings**:
 
@@ -87,14 +105,20 @@ The first push of `image.yaml` creates the package `ghcr.io/<owner>/vitrine`, pr
 
 A fork pushes to its own owner: change `images:` in `image.yaml` from `ghcr.io/ebuildy/vitrine` to its own.
 
-### 5. Check the first release
+### 6. Check the first release
 
 After the setup, the next push to `main` runs **Release** in the **Actions** tab, which opens a pull request titled `chore(main): release 0.1.0`. With no tag yet, its changelog lists every `feat` and `fix` since the first commit: edit the PR description before merging it if that is too long.
 
 Merging it tags `v0.1.0`, which runs **Container image** on the tag and publishes `0.1.0`, `0.1` and `0`. The image prints `Vitrine 0.1.0+<commit>` first when it starts.
 
-If **Release** fails with `Bad credentials` or `Resource not accessible by personal access token`, the secret is missing, expired or lacks a permission of step 1. If the tag exists but **Container image** did not run on it, the tag was pushed with `GITHUB_TOKEN`: check that `release.yaml` passes `secrets.RELEASE_PLEASE_TOKEN` as `token`. Then delete the tag and its GitHub Release, and run **Release** again from the **Actions** tab, or push the tag again from a laptop.
+If **Release** fails:
+
+- With `Input required and not supplied: token`, the job found no `RELEASE_PLEASE_TOKEN`: the secret is named differently, or belongs to another environment than `prod`.
+- Waiting, or with `Branch "<name>" is not allowed to deploy to prod`, the rules of `prod` do not let `main` use it, or ask for a reviewer: see step 2.
+- With `Bad credentials` or `Resource not accessible by personal access token`, the token expired or lacks a permission of step 1.
+
+If the tag exists but **Container image** did not run on it, the tag was pushed with `GITHUB_TOKEN`, which happens only when `release.yaml` no longer passes the token. Fix that, then delete the tag and push it again from a laptop, which starts **Container image**.
 
 ### Renewing the token
 
-GitHub emails the token owner before the token expires. Regenerate it from the same page, with the same settings, then update the secret as in step 2. Until then, **Release** fails and no release is made. Nothing else breaks: `edge` keeps following `main`.
+GitHub emails the token owner before the token expires. Regenerate it from the same page, with the same settings, then update the secret as in step 3. Until then, **Release** fails and no release is made. Nothing else breaks: `edge` keeps following `main`.
