@@ -34,7 +34,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/ebuildy/vitrine
-  # -- Defaults to the chart's appVersion: the release of a published chart, edge from a checkout.
+  # -- Defaults to the chart's appVersion.
   tag: ""
   pullPolicy: IfNotPresent
 

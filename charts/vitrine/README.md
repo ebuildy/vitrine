@@ -6,14 +6,17 @@ Read [Security](../../docs/administrator/security.md) before you deploy: token p
 
 ## Install
 
-Each release of Vitrine publishes the chart at `oci://ghcr.io/ebuildy/charts/vitrine`, at the version of the release, such as `1.2.3`, which deploys the Container image of that release. The Valkey chart is inside.
+The chart is published at `oci://ghcr.io/ebuildy/charts/vitrine`, with the Valkey chart inside. It has versions of its own, apart from Vitrine's: each deploys the Container image of its `appVersion`, which `helm show chart` prints.
 
 ```sh
-helm install vitrine oci://ghcr.io/ebuildy/charts/vitrine --version 1.2.3 \
+helm show chart oci://ghcr.io/ebuildy/charts/vitrine --version 0.1.0
+helm install vitrine oci://ghcr.io/ebuildy/charts/vitrine --version 0.1.0 \
   --namespace portal --create-namespace --values my-values.yaml
 ```
 
-Between releases, or from a fork, install it from a checkout, which deploys the Container image `edge` unless `image.tag` says otherwise:
+Version `0.1.0` is a preview: its `appVersion` is `edge`, which follows `main` and changes under it. Until a release of Vitrine, pin `image.tag` to the digest of an `edge` you tested, such as `edge@sha256:…`.
+
+From a fork, install it from a checkout:
 
 ```sh
 helm repo add valkey https://valkey.io/valkey-helm/   # once, for the Valkey dependency
@@ -178,7 +181,7 @@ The ServiceAccount mounts no token: Vitrine never calls the Kubernetes API.
 | `extraEnvFrom` | `[]` | Environment variables from every key of a Secret or a ConfigMap. |
 | `replicaCount` | `1` | Pods. Above 1, use a `redis` cache store. |
 | `image.repository` | `ghcr.io/ebuildy/vitrine` | The Container image. |
-| `image.tag` | the chart's `appVersion` | The release of a published chart, such as `1.2.3`, and `edge`, which follows `main`, from a checkout. |
+| `image.tag` | the chart's `appVersion` | A Vitrine release, such as `1.2.3`, or `edge`, which follows `main`. |
 | `image.pullPolicy` | `IfNotPresent` | |
 | `imagePullSecrets` | `[]` | For a Container image in a private registry, such as one a fork builds. |
 | `nameOverride` | `""` | Replaces the chart name in resource names. |

@@ -1,9 +1,9 @@
 name: Helm chart
 
 # Only a change to the chart, or to this workflow, runs it. tests/helm-chart.test.ts still runs with every npm test.
-# A release tag runs it through image.yaml, before the chart is published: GitHub ignores paths on a tag.
+# The chart has a life cycle of its own: the version of Chart.yaml, bumped by each pull request that changes the chart,
+# is published from main. Tags stay the Container image's.
 on:
-  workflow_call:
   push:
     branches: [main]
     paths:
@@ -23,6 +23,31 @@ env:
   TRIVY_VERSION: 0.76.1
 
 jobs:
+  # What `helm package` ships, so a change to ci/ or the Trivy ignore file needs no new version.
+  version:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check a change to the chart bumps its version
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          shipped=(charts/vitrine ':!charts/vitrine/ci' ':!charts/vitrine/.trivyignore.yaml')
+          if git diff --quiet "$BASE" HEAD -- "${shipped[@]}"; then
+            echo 'Nothing the chart ships changed.'
+            exit 0
+          fi
+          new=$(sed -n 's/^version: *//p' charts/vitrine/Chart.yaml)
+          old=$(git show "$BASE:charts/vitrine/Chart.yaml" 2>/dev/null | sed -n 's/^version: *//p' || true)
+          echo "Chart version: ${old:-none} → $new"
+          if [ -n "$old" ] && { [ "$new" = "$old" ] || [ "$(printf '%s\n' "$old" "$new" | sort --version-sort | tail -1)" != "$new" ]; }; then
+            echo "::error file=charts/vitrine/Chart.yaml::The chart changed: raise its version above $old, a patch for a fix, a minor for a new value, a major for a value renamed or removed."
+            exit 1
+          fi
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -82,33 +107,20 @@ jobs:
         values: [files, valkey]
     steps:
       - uses: actions/checkout@v6
-      - uses: docker/setup-buildx-action@v4
-      # The Container image of this commit, so that the chart is tested with what it will deploy.
-      - name: Build the Container image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: Containerfile
-          load: true
-          tags: vitrine:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
       - uses: helm/kind-action@v1
         with:
           cluster_name: vitrine
       - uses: azure/setup-helm@v4
-      - name: Load the Container image into kind
-        run: kind load docker-image vitrine:ci --name vitrine
       - name: Fetch the Valkey chart
         run: |
           helm repo add valkey https://valkey.io/valkey-helm/
           helm dependency build charts/vitrine
-      # --wait holds until the readiness probe answers: the pod runs on its read-only root as uid 1000.
+      # The Container image of the chart's appVersion, as a release deploys it. --wait holds until the readiness
+      # probe answers: the pod runs on its read-only root as uid 1000.
       - name: Install the chart
         run: |
           helm install vitrine charts/vitrine --namespace vitrine --create-namespace \
             --values charts/vitrine/ci/${{ matrix.values }}-values.yaml \
-            --set image.repository=vitrine --set image.tag=ci --set image.pullPolicy=Never \
             --wait --timeout 5m
       - name: Check Vitrine serves its page, and no pod restarted
         run: |
@@ -125,3 +137,48 @@ jobs:
           kubectl --namespace vitrine get pods --output wide
           kubectl --namespace vitrine describe pods
           kubectl --namespace vitrine logs --selector app.kubernetes.io/instance=vitrine --all-containers --prefix --tail 100
+
+  # The version of Chart.yaml, at oci://ghcr.io/<owner>/charts/vitrine, once. A published version never changes.
+  publish:
+    if: github.event_name == 'push'
+    needs: [lint, security, install]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+      - name: Check whether this version is published
+        id: published
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(sed -n 's/^version: *//p' charts/vitrine/Chart.yaml)
+          repository="${GITHUB_REPOSITORY_OWNER,,}/charts/vitrine"
+          token=$(curl --silent --show-error --fail --user "${{ github.actor }}:$GITHUB_TOKEN" \
+            "https://ghcr.io/token?service=ghcr.io&scope=repository:$repository:pull,push" | jq --raw-output .token)
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' --head \
+            --header "Authorization: Bearer $token" --header 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json' \
+            "https://ghcr.io/v2/$repository/manifests/$version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$status" in
+            200) echo "Version $version is already published." ; echo 'published=true' >> "$GITHUB_OUTPUT" ;;
+            404) echo "Version $version is new." ; echo 'published=false' >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::ghcr.io answered $status for $repository:$version" ; exit 1 ;;
+          esac
+      - name: Package the chart, with the Valkey chart inside
+        if: steps.published.outputs.published == 'false'
+        run: |
+          helm repo add valkey https://valkey.io/valkey-helm/
+          helm dependency build charts/vitrine
+          helm package charts/vitrine --destination "$RUNNER_TEMP"
+      - name: Push the chart to ghcr.io
+        if: steps.published.outputs.published == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GITHUB_TOKEN" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+          helm push "$RUNNER_TEMP/vitrine-${{ steps.published.outputs.version }}.tgz" "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"

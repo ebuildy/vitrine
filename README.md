@@ -33,7 +33,7 @@ Startup checks Settings before serving anything, and stops with a list of proble
 
 ### Helm chart
 
-[`charts/vitrine`](charts/vitrine/README.md), published with each release at `oci://ghcr.io/ebuildy/charts/vitrine`, deploys the Container image on Kubernetes: Settings as Helm values, rendered into a ConfigMap, secrets from Secrets through `extraEnvs`, a pod on a read-only root, and, when enabled, an Ingress, a Gateway API HTTPRoute, a NetworkPolicy and a Valkey for a `redis` cache store.
+[`charts/vitrine`](charts/vitrine/README.md), published at `oci://ghcr.io/ebuildy/charts/vitrine` with versions of its own, deploys the Container image on Kubernetes: Settings as Helm values, rendered into a ConfigMap, secrets from Secrets through `extraEnvs`, a pod on a read-only root, and, when enabled, an Ingress, a Gateway API HTTPRoute, a NetworkPolicy and a Valkey for a `redis` cache store.
 
 ### Environment variables
 

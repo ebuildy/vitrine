@@ -2,9 +2,11 @@ apiVersion: v2
 name: vitrine
 description: A portal in front of GitLab, Harbor and Nexus, to browse their content and find where to download it.
 type: application
+# The chart's own version, apart from Vitrine's: each pull request that changes what the chart ships raises it,
+# and main publishes it, once, to oci://ghcr.io/ebuildy/charts/vitrine. See .github/workflows/chart.yaml.
 version: 0.1.0
-# The tag of ghcr.io/ebuildy/vitrine that image.tag defaults to: edge, which follows main, from a checkout.
-# A release tag publishes the chart with its own version as both version and appVersion, in image.yaml.
+# The tag of ghcr.io/ebuildy/vitrine that image.tag defaults to. edge follows main, until a release of Vitrine:
+# then a pull request sets it, and raises version.
 appVersion: edge
 home: https://github.com/ebuildy/vitrine
 sources:
