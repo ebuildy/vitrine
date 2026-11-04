@@ -3,7 +3,8 @@ name: vitrine
 description: A portal in front of GitLab, Harbor and Nexus, to browse their content and find where to download it.
 type: application
 version: 0.1.0
-# The tag of ghcr.io/ebuildy/vitrine that image.tag defaults to. No release is published yet, so it follows main.
+# The tag of ghcr.io/ebuildy/vitrine that image.tag defaults to: edge, which follows main, from a checkout.
+# A release tag publishes the chart with its own version as both version and appVersion, in image.yaml.
 appVersion: edge
 home: https://github.com/ebuildy/vitrine
 sources:

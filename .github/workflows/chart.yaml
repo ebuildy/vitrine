@@ -1,7 +1,9 @@
 name: Helm chart
 
 # Only a change to the chart, or to this workflow, runs it. tests/helm-chart.test.ts still runs with every npm test.
+# A release tag runs it through image.yaml, before the chart is published: GitHub ignores paths on a tag.
 on:
+  workflow_call:
   push:
     branches: [main]
     paths:

@@ -34,7 +34,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/ebuildy/vitrine
-  # -- Defaults to the chart's appVersion. Pin a release, such as 1.2.3, once one is published.
+  # -- Defaults to the chart's appVersion: the release of a published chart, edge from a checkout.
   tag: ""
   pullPolicy: IfNotPresent
 

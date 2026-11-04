@@ -75,3 +75,38 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  # A release tag runs the chart workflow too, which no path of a tag push triggers.
+  chart-tests:
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+    uses: ./.github/workflows/chart.yaml
+
+  # The Helm chart of a release, at oci://ghcr.io/<owner>/charts/vitrine, once its Container image is pushed.
+  # Its version and appVersion are those of the tag, so that image.tag defaults to the image of the same release.
+  chart:
+    needs: [image, chart-tests]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+      - name: Package the chart, with the Valkey chart inside
+        run: |
+          helm repo add valkey https://valkey.io/valkey-helm/
+          helm dependency build charts/vitrine
+          version="${GITHUB_REF_NAME#v}"
+          helm package charts/vitrine --version "$version" --app-version "$version" --destination "$RUNNER_TEMP"
+          echo "PACKAGE=$RUNNER_TEMP/vitrine-$version.tgz" >> "$GITHUB_ENV"
+      - name: Push the chart to ghcr.io
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GITHUB_TOKEN" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+          helm push "$PACKAGE" "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"

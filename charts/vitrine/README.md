@@ -6,7 +6,14 @@ Read [Security](../../docs/administrator/security.md) before you deploy: token p
 
 ## Install
 
-The chart is not published to a chart repository yet: install it from a checkout of Vitrine.
+Each release of Vitrine publishes the chart at `oci://ghcr.io/ebuildy/charts/vitrine`, at the version of the release, such as `1.2.3`, which deploys the Container image of that release. The Valkey chart is inside.
+
+```sh
+helm install vitrine oci://ghcr.io/ebuildy/charts/vitrine --version 1.2.3 \
+  --namespace portal --create-namespace --values my-values.yaml
+```
+
+Between releases, or from a fork, install it from a checkout, which deploys the Container image `edge` unless `image.tag` says otherwise:
 
 ```sh
 helm repo add valkey https://valkey.io/valkey-helm/   # once, for the Valkey dependency
@@ -171,7 +178,7 @@ The ServiceAccount mounts no token: Vitrine never calls the Kubernetes API.
 | `extraEnvFrom` | `[]` | Environment variables from every key of a Secret or a ConfigMap. |
 | `replicaCount` | `1` | Pods. Above 1, use a `redis` cache store. |
 | `image.repository` | `ghcr.io/ebuildy/vitrine` | The Container image. |
-| `image.tag` | the chart's `appVersion`, `edge` | `edge` follows `main`. Pin a release, such as `1.2.3`, once one is published. |
+| `image.tag` | the chart's `appVersion` | The release of a published chart, such as `1.2.3`, and `edge`, which follows `main`, from a checkout. |
 | `image.pullPolicy` | `IfNotPresent` | |
 | `imagePullSecrets` | `[]` | For a Container image in a private registry, such as one a fork builds. |
 | `nameOverride` | `""` | Replaces the chart name in resource names. |
