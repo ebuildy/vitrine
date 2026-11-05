@@ -110,7 +110,7 @@ describe('/metrics', () => {
 		expect(sample(text, 'vitrine_warmup_runs_total')).toBe(1);
 		expect(sample(text, 'vitrine_warmup_duration_seconds_count')).toBe(1);
 		expect(sample(text, 'vitrine_warmup_urls_found_total')).toBeGreaterThanOrEqual(1);
-		expect(sample(text, 'vitrine_warmup_pages_with_problems')).toBe(0);
+		expect(sample(text, 'vitrine_warmup_pages_with_problems_total')).toBe(0);
 	});
 
 	test('is open without METRICS_TOKEN', async () => {

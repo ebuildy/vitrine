@@ -41,7 +41,7 @@ Only the warm-ups the server runs from `warmUp` in Settings are measured, not th
 | `vitrine_warmup_runs_total` | counter | Warm-ups run. |
 | `vitrine_warmup_duration_seconds` | histogram | How long each took. |
 | `vitrine_warmup_urls_found_total` | counter | Distinct URLs of Vitrine that warm-ups saw. |
-| `vitrine_warmup_pages_with_problems` | counter | Pages whose list of problems was not empty. |
+| `vitrine_warmup_pages_with_problems_total` | counter | Pages whose list of problems was not empty. |
 
 ## Source HTTP calls
 

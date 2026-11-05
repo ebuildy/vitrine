@@ -83,7 +83,7 @@ function createMetrics(buckets: number[]): Metrics {
 		warmUpRuns: new Counter({ name: 'vitrine_warmup_runs_total', help: 'Warm-ups the server ran.', registers: [registry] }),
 		warmUpDuration: new Histogram({ name: 'vitrine_warmup_duration_seconds', help: 'How long each warm-up took.', buckets, registers: [registry] }),
 		warmUpUrlsFound: new Counter({ name: 'vitrine_warmup_urls_found_total', help: 'Distinct URLs of Vitrine that warm-ups saw.', registers: [registry] }),
-		warmUpPagesWithProblems: new Counter({ name: 'vitrine_warmup_pages_with_problems', help: 'Pages that warm-ups found with problems.', registers: [registry] }),
+		warmUpPagesWithProblems: new Counter({ name: 'vitrine_warmup_pages_with_problems_total', help: 'Pages that warm-ups found with problems.', registers: [registry] }),
 		sourceCacheLookups: new Counter({
 			name: 'vitrine_source_cache_lookups_total',
 			help: 'Reads of a Source through the cache: a hit was answered from a fresh entry, a miss called the Source.',
