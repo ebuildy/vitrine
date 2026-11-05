@@ -139,11 +139,11 @@ describe('/metrics', () => {
 		expect(output).toContain('Route "/metrics": Vitrine serves this URL itself');
 	});
 
-	test('allows a Route at /metrics with metrics.enabled: false', async () => {
+	test('stops startup on a Route at /metrics even with metrics.enabled: false', async () => {
 		const { exitCode, output } = await startupFailure({ sources: [], routes: [{ url: '/metrics', controller: 'search' }], metrics: { enabled: false } });
 
-		expect(output).not.toContain('Vitrine serves this URL itself');
-		expect(exitCode).not.toBe(1);
+		expect(exitCode).toBe(1);
+		expect(output).toContain('Route "/metrics": Vitrine serves this URL itself');
 	});
 
 	test('is not served with metrics.enabled: false', async () => {
