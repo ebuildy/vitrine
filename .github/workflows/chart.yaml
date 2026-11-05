@@ -27,6 +27,7 @@ jobs:
   version:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
@@ -50,6 +51,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: azure/setup-helm@v4
@@ -80,6 +82,7 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: azure/setup-helm@v4
@@ -100,6 +103,7 @@ jobs:
 
   install:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -143,6 +147,7 @@ jobs:
     if: github.event_name == 'push'
     needs: [lint, security, install]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     permissions:
       contents: read
