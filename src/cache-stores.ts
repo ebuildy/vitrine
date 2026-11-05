@@ -95,15 +95,10 @@ function redisStore(url: string, keyPrefix: string): CacheStore {
 		},
 		stats: async () => {
 			let entries = 0;
-			let bytes = 0;
-			// SCAN, not KEYS, which would block a Redis the replicas share.
+			// SCAN, not KEYS, which would block a Redis the replicas share. No size: that takes a command per key.
 			const pattern = `${keyPrefix.replace(/[\\*?[\]]/g, '\\$&')}*`;
-			for await (const keys of redis.scanStream({ match: pattern, count: 500 })) {
-				const lengths = await Promise.all((keys as string[]).map((key) => redis.strlen(key)));
-				entries += lengths.length;
-				bytes += lengths.reduce((total, length) => total + length, 0);
-			}
-			return { entries, bytes };
+			for await (const keys of redis.scanStream({ match: pattern, count: 500 })) entries += (keys as string[]).length;
+			return { entries };
 		},
 	};
 }

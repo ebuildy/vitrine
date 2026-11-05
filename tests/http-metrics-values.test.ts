@@ -1,4 +1,5 @@
-import { readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { startFakeNexus } from './support/fake-nexus.ts';
@@ -213,13 +214,14 @@ describe.each(cacheStores)('the cache values with the $name store', ({ empty }) 
 
 		const empty0 = await scrape();
 		expect(empty0.get(`vitrine_cache_entries{store="${store}"}`)).toBe(0);
-		expect(empty0.get(`vitrine_cache_bytes{store="${store}"}`)).toBe(0);
+		if (store !== 'redis') expect(empty0.get(`vitrine_cache_bytes{store="${store}"}`)).toBe(0);
 
 		await (await fetch(`${vitrine.url}/nexus/main-nexus`)).text();
 		const filled = await scrape();
 		const entries = filled.get(`vitrine_cache_entries{store="${store}"}`)!;
 		expect(entries).toBeGreaterThanOrEqual(1);
-		expect(filled.get(`vitrine_cache_bytes{store="${store}"}`)).toBeGreaterThan(entries);
+		if (store === 'redis') expect(filled.has('vitrine_cache_bytes{store="redis"}')).toBe(false);
+		else expect(filled.get(`vitrine_cache_bytes{store="${store}"}`)).toBeGreaterThan(entries);
 		const hitsBefore = filled.get(`vitrine_cache_hits_total{store="${store}"}`) ?? 0;
 		const missesBefore = filled.get(`vitrine_cache_misses_total{store="${store}"}`)!;
 		expect(missesBefore).toBeGreaterThanOrEqual(entries);
@@ -238,5 +240,29 @@ describe.each(cacheStores)('the cache values with the $name store', ({ empty }) 
 			expect(entries).toBe(files.length);
 			expect(again.get(`vitrine_cache_bytes{store="files"}`)).toBe(files.reduce((total, name) => total + statSync(join(directory, name)).size, 0));
 		}
+	});
+
+	test('measures the store once for scrapes close together, and again after a write', async () => {
+		const nexus = await startFakeNexus({ repositories });
+		nexusStop = nexus.stop;
+		const cacheStore = { type: 'files', directory: join(mkdtempSync(join(tmpdir(), 'vitrine-cache-')), 'cache') };
+		vitrine = await startVitrine({
+			sources: [{ name: 'main-nexus', type: 'nexus', url: nexus.url }],
+			routes: [{ url: '/nexus/:source', controller: 'nexus' }, { url: '/search', controller: 'search' }],
+			cacheStore,
+		});
+		const entriesOf = async () => (await (await fetch(`${vitrine.url}/metrics`)).text()).match(/^vitrine_cache_entries\{store="files"\} (\d+)$/m)?.[1];
+		await (await fetch(`${vitrine.url}/nexus/main-nexus`)).text();
+		const measured = await entriesOf();
+		expect(Number(measured)).toBeGreaterThanOrEqual(1);
+
+		// Not a write by Vitrine, so the second scrape still has the first measure.
+		const jsonFiles = () => readdirSync(cacheStore.directory).filter((name) => name.endsWith('.json'));
+		for (const file of jsonFiles()) rmSync(join(cacheStore.directory, file));
+		expect(await entriesOf()).toBe(measured);
+
+		// A write by Vitrine measures anew, and the count follows the disk again.
+		await (await fetch(`${vitrine.url}/nexus/main-nexus`)).text();
+		expect(Number(await entriesOf())).toBe(jsonFiles().length);
 	});
 });

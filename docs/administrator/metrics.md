@@ -18,11 +18,13 @@ Labelled with `store`: `memory`, `files` or `redis`.
 
 | Metric | Type | What it counts |
 | --- | --- | --- |
-| `vitrine_cache_entries` | gauge | Entries the store holds, measured on each scrape. `files` counts the entries in its directory, and `redis` the keys under its `keyPrefix`. |
-| `vitrine_cache_bytes` | gauge | Their size in bytes, measured on each scrape. `memory` sums the JSON length of its entries. |
+| `vitrine_cache_entries` | gauge | Entries the store holds. `files` counts the entries in its directory, and `redis` the keys under its `keyPrefix`. |
+| `vitrine_cache_bytes` | gauge | Their size in bytes. `memory` sums the JSON length of its entries, and `files` the size of its files. `redis` does not report it, as that takes a command per key. |
 | `vitrine_cache_hits_total` | counter | Reads that found an entry, fresh or Stale. |
 | `vitrine_cache_misses_total` | counter | Reads that found no entry, or failed. |
 | `vitrine_cache_write_errors_total` | counter | Writes that failed. |
+
+The two gauges walk the whole store: every file of `files` is read for its size, and `redis` scans every key of the server with `SCAN`, keeping those under its `keyPrefix`. So Vitrine measures at most every 30 seconds however often Prometheus scrapes, and measures again at the next scrape after it writes an entry itself. A Redis that other installations share, or a big cache, still pays that cost every 30 seconds.
 
 ## Source cache
 

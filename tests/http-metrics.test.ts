@@ -55,7 +55,9 @@ describe.each(cacheStores)('/metrics with the $name cache store', ({ name, empty
 		const misses = sample(text, `vitrine_cache_misses_total{store="${store}"}`);
 		expect(misses).toBeGreaterThanOrEqual(1);
 		expect(sample(text, `vitrine_cache_entries{store="${store}"}`)).toBeGreaterThanOrEqual(1);
-		expect(sample(text, `vitrine_cache_bytes{store="${store}"}`)).toBeGreaterThan(0);
+		// Redis reports no size, which would take a command per key.
+		if (store === 'redis') expect(sample(text, `vitrine_cache_bytes{store="redis"}`)).toBeUndefined();
+		else expect(sample(text, `vitrine_cache_bytes{store="${store}"}`)).toBeGreaterThan(0);
 		expect(sample(text, `vitrine_cache_hits_total{store="${store}"}`)).toBeGreaterThanOrEqual(1);
 	});
 });
