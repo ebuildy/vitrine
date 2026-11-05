@@ -186,7 +186,7 @@ describe('the values of /metrics', () => {
 		expect(metrics.get('vitrine_warmup_runs_total')).toBe(1);
 		expect(metrics.get('vitrine_warmup_duration_seconds_count')).toBe(1);
 		expect(metrics.get('vitrine_warmup_urls_found_total')).toBe(1);
-		expect(metrics.get('vitrine_warmup_pages_with_problems')).toBe(1);
+		expect(metrics.get('vitrine_warmup_pages_with_problems_total')).toBe(1);
 	});
 });
 
