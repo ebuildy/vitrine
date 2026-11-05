@@ -60,6 +60,35 @@ describe('the values of /metrics', () => {
 		expect(afterThree.get(`vitrine_source_http_call_duration_seconds_count{source="nexus",method="GET",outcome="2xx"}`)).toBe(nexus.requests.length);
 	});
 
+	test('count a read of a Source as a miss the first time and a hit after, by Source', async () => {
+		const { visit, scrape } = await start();
+
+		await visit('/nexus/main-nexus');
+		const first = await scrape();
+		await visit('/nexus/main-nexus');
+		await visit('/nexus/main-nexus');
+		const third = await scrape();
+
+		const hit = 'vitrine_source_cache_lookups_total{source="nexus",status="hit"}';
+		const miss = 'vitrine_source_cache_lookups_total{source="nexus",status="miss"}';
+		// The page reads the repositories once per visit.
+		expect(first.get(miss)).toBe(1);
+		expect(first.has(hit)).toBe(false);
+		expect(third.get(miss)).toBe(1);
+		expect(third.get(hit)).toBe(2);
+	});
+
+	test('count every read as a miss when the Source is not cached', async () => {
+		const { visit, scrape } = await start({}, {}, { allowedAgeMinutes: 0 });
+
+		await visit('/nexus/main-nexus');
+		await visit('/nexus/main-nexus');
+
+		const metrics = await scrape();
+		expect(metrics.get('vitrine_source_cache_lookups_total{source="nexus",status="miss"}')).toBe(2);
+		expect(metrics.has('vitrine_source_cache_lookups_total{source="nexus",status="hit"}')).toBe(false);
+	});
+
 	test('count every call again when the Source is not cached', async () => {
 		const { nexus, visit, scrape } = await start({}, {}, { allowedAgeMinutes: 0 });
 

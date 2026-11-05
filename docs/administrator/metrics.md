@@ -22,6 +22,14 @@ Labelled with `store`: `memory`, `files` or `redis`.
 | `vitrine_cache_misses_total` | counter | Reads that found no entry, or failed. |
 | `vitrine_cache_write_errors_total` | counter | Writes that failed. |
 
+## Source cache
+
+Labelled with `source` (`gitlab`, `harbor` or `nexus`) and `status`: `hit` or `miss`.
+
+| Metric | Type | What it counts |
+| --- | --- | --- |
+| `vitrine_source_cache_lookups_total` | counter | Reads of a Source through the cache. A `hit` was answered from a fresh entry. A `miss` called the Source, because the entry was missing or too old, or because `allowedAgeMinutes` is `0`. Visitors reading the same content at once share one read, which counts once. |
+
 ## Warm-up
 
 Only the warm-ups the server runs from `warmUp` in Settings are measured, not those of `npm run warm-up`.

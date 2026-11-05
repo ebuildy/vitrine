@@ -38,6 +38,7 @@ interface Metrics {
 	warmUpDuration: Histogram;
 	warmUpUrlsFound: Counter;
 	warmUpPagesWithProblems: Counter;
+	sourceCacheLookups: Counter<'source' | 'status'>;
 	sourceCalls: Counter<'source' | 'method' | 'outcome'>;
 	sourceDuration: Histogram<'source' | 'method' | 'outcome'>;
 	renderDuration: Histogram<'route'>;
@@ -83,6 +84,12 @@ function createMetrics(buckets: number[]): Metrics {
 		warmUpDuration: new Histogram({ name: 'vitrine_warmup_duration_seconds', help: 'How long each warm-up took.', buckets, registers: [registry] }),
 		warmUpUrlsFound: new Counter({ name: 'vitrine_warmup_urls_found_total', help: 'Distinct URLs of Vitrine that warm-ups saw.', registers: [registry] }),
 		warmUpPagesWithProblems: new Counter({ name: 'vitrine_warmup_pages_with_problems', help: 'Pages that warm-ups found with problems.', registers: [registry] }),
+		sourceCacheLookups: new Counter({
+			name: 'vitrine_source_cache_lookups_total',
+			help: 'Reads of a Source through the cache: a hit was answered from a fresh entry, a miss called the Source.',
+			labelNames: ['source', 'status'],
+			registers: [registry],
+		}),
 		sourceCalls: new Counter({ name: 'vitrine_source_http_calls_total', help: 'HTTP calls to Sources.', labelNames: ['source', 'method', 'outcome'], registers: [registry] }),
 		sourceDuration: new Histogram({
 			name: 'vitrine_source_http_call_duration_seconds',
@@ -117,6 +124,11 @@ export function countCacheRead(store: CacheStoreType, hit: boolean) {
 
 export function countCacheWriteError(store: CacheStoreType) {
 	metrics().cacheWriteErrors.inc({ store });
+}
+
+/** A read of a Source: a hit when a fresh entry answered it, a miss when the Source had to be called. */
+export function countSourceCacheLookup(source: SourceType, status: 'hit' | 'miss') {
+	metrics().sourceCacheLookups.inc({ source, status });
 }
 
 export function recordWarmUp({ durationMs, urlsFound, pagesWithProblems }: { durationMs: number; urlsFound: number; pagesWithProblems: number }) {

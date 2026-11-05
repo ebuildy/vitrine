@@ -1,6 +1,7 @@
 import { getCacheStore } from './cache-stores.ts';
 import type { Entry } from './cache-stores.ts';
-import { countCacheRead, countCacheWriteError } from './metrics.ts';
+import { countCacheRead, countCacheWriteError, countSourceCacheLookup } from './metrics.ts';
+import type { SourceType } from './metrics.ts';
 import { getSettings } from './settings.ts';
 
 export const SOURCE_TIMEOUT_MS = 10_000;
@@ -16,8 +17,8 @@ export type Loader<T> = (signal: AbortSignal) => Promise<T>;
 
 const inFlightReads = new Map<string, Promise<CachedContent<unknown>>>();
 
-export async function readThrough<T>(key: string, allowedAgeMs: number, loader: Loader<T>): Promise<CachedContent<T>> {
-	return shared(key, () => readStoreThenSource(key, allowedAgeMs, loader));
+export async function readThrough<T>(source: SourceType, key: string, allowedAgeMs: number, loader: Loader<T>): Promise<CachedContent<T>> {
+	return shared(key, () => readStoreThenSource(source, key, allowedAgeMs, loader));
 }
 
 function shared<T>(key: string, start: () => Promise<CachedContent<T>>): Promise<CachedContent<T>> {
@@ -30,8 +31,12 @@ function shared<T>(key: string, start: () => Promise<CachedContent<T>>): Promise
 }
 
 /** Reads a Source the way it is set up to be read, where an allowed age of zero leaves the cache out. */
-export function readSource<T>({ allowedAgeMinutes }: { allowedAgeMinutes: number }, key: string, loader: Loader<T>): Promise<CachedContent<T>> {
-	return allowedAgeMinutes === 0 ? shared(key, () => readUncached(key, loader)) : readThrough(key, allowedAgeMinutes * 60_000, loader);
+export function readSource<T>({ type, allowedAgeMinutes }: { type: SourceType; allowedAgeMinutes: number }, key: string, loader: Loader<T>): Promise<CachedContent<T>> {
+	if (allowedAgeMinutes !== 0) return readThrough(type, key, allowedAgeMinutes * 60_000, loader);
+	return shared(key, () => {
+		countSourceCacheLookup(type, 'miss');
+		return readUncached(key, loader);
+	});
 }
 
 /** Reads a Source with the cache left out, so it never stores or falls back on anything. */
@@ -44,9 +49,13 @@ export async function readUncached<T>(key: string, loader: Loader<T>): Promise<C
 	}
 }
 
-async function readStoreThenSource<T>(key: string, allowedAgeMs: number, loader: Loader<T>): Promise<CachedContent<T>> {
+async function readStoreThenSource<T>(source: SourceType, key: string, allowedAgeMs: number, loader: Loader<T>): Promise<CachedContent<T>> {
 	const entry = await readEntry(key);
-	if (entry && Date.now() - entry.loadedAt < allowedAgeMs) return { data: entry.data as T, stale: false };
+	if (entry && Date.now() - entry.loadedAt < allowedAgeMs) {
+		countSourceCacheLookup(source, 'hit');
+		return { data: entry.data as T, stale: false };
+	}
+	countSourceCacheLookup(source, 'miss');
 
 	const result = await readUncached(key, loader);
 	if (result.error) return entry && !(result.error instanceof ContentUnavailableError) ? { data: entry.data as T, stale: true } : result;
