@@ -222,8 +222,10 @@ routes:
         .overview { text-transform: uppercase; }
       </style>
 
-# Prometheus metrics, served at /metrics on the same port as the pages. METRICS_TOKEN, an environment variable, protects them
+# Prometheus metrics, served at /metrics by default on the same port as the pages. METRICS_TOKEN, an environment variable, protects them
 # with a bearer token, and METRICS_BUCKETS sets the histogram buckets. docs/administrator/metrics.md lists every metric.
 metrics:
   # false stops serving /metrics. Defaults to true.
   enabled: true
+  # The URL they are served at, which no Route may use while they are enabled. Defaults to /metrics.
+  path: /metrics

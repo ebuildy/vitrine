@@ -11,7 +11,7 @@ spec:
       {{- include "vitrine.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: http
-      path: /metrics
+      path: {{ dig "metrics" "path" "/metrics" .Values.settings | quote }}
       {{- with .Values.metrics.serviceMonitor.bearerTokenSecret }}
       authorization:
         type: Bearer

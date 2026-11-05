@@ -1,11 +1,12 @@
 # Metrics
 
-Vitrine serves Prometheus metrics at `GET /metrics`, in Prometheus text format, on the same port as its pages. They show how well the cache works, how long warm-ups take, how slow the Sources are, and how long pages take to render.
+Vitrine serves Prometheus metrics at `GET /metrics`, or at `metrics.path`, in Prometheus text format, on the same port as its pages. They show how well the cache works, how long warm-ups take, how slow the Sources are, and how long pages take to render.
 
 ## Endpoint
 
-- `metrics.enabled` in Settings, `true` by default. With `false`, `/metrics` is not served and answers 404.
-- A Route at `/metrics` stops startup while `metrics.enabled` is `true`, as Vitrine serves that URL itself. With `false`, Vitrine leaves the URL to your Routes, and answers 404 when none uses it.
+- `metrics.enabled` in Settings, `true` by default. With `false`, the metrics are not served.
+- `metrics.path` in Settings, `/metrics` by default: the URL they are served at. It must start with `/`, have no query, and not be `/` nor `/sitemap.xml`.
+- A Route at `metrics.path` stops startup while `metrics.enabled` is `true`, as Vitrine serves that URL itself. With `false`, Vitrine leaves the URL to your Routes, and answers 404 when none uses it.
 - `METRICS_TOKEN`, an environment variable. When it is set, a request without the header `Authorization: Bearer <token>` gets `401` with `WWW-Authenticate: Bearer`. When it is empty or unset, the endpoint is open. See [Security](security.md#metrics).
 - `METRICS_BUCKETS`, an environment variable: the buckets of every histogram, in seconds, ascending and separated by commas. It defaults to `0.1, 0.5, 1, 5, 10, 30`. An invalid value, such as `5,1` or `fast`, stops startup with an error.
 
