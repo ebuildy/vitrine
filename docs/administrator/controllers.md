@@ -1,6 +1,6 @@
 # Controllers
 
-A Route in Settings joins a URL to a Controller, which is responsible for one kind of page. Startup stops, naming the Route, on a Controller that does not exist or a param it does not take, and on a Route at `/sitemap.xml`, which Vitrine serves itself, or at `/metrics`, even with `metrics.enabled` set to `false`.
+A Route in Settings joins a URL to a Controller, which is responsible for one kind of page. Startup stops, naming the Route, on a Controller that does not exist or a param it does not take, and on a Route at `/sitemap.xml`, which Vitrine serves itself, or at `/metrics` while `metrics.enabled` is `true`. With `metrics.enabled` set to `false`, a Route may use `/metrics`.
 
 ```yaml
 routes:

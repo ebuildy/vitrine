@@ -1,8 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
-import type { APIRoute } from 'astro';
-import { getCacheStore } from '../cache-stores.ts';
-import { metricsContentType, metricsText } from '../metrics.ts';
-import { getSettings } from '../settings.ts';
+import { getCacheStore } from './cache-stores.ts';
+import { metricsContentType, metricsText } from './metrics.ts';
 
 function sameSecret(given: string, expected: string) {
 	const a = Buffer.from(given);
@@ -10,10 +8,8 @@ function sameSecret(given: string, expected: string) {
 	return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/** Serves the metrics in Prometheus text format, to whoever bears METRICS_TOKEN when it is set, and to anyone when it is not. */
-export const GET: APIRoute = async ({ request }) => {
-	if (!getSettings().metrics.enabled) return new Response(null, { status: 404 });
-
+/** The metrics in Prometheus text format, for whoever bears METRICS_TOKEN when it is set, and for anyone when it is not. */
+export async function metricsResponse(request: Request): Promise<Response> {
 	const token = process.env.METRICS_TOKEN;
 	if (token) {
 		const given = /^Bearer (.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1];
@@ -22,4 +18,4 @@ export const GET: APIRoute = async ({ request }) => {
 	// Creates the cache store if no page has yet, so that its gauges are there from the first scrape.
 	getCacheStore();
 	return new Response(await metricsText(), { headers: { 'content-type': metricsContentType(), 'cache-control': 'no-store' } });
-};
+}
