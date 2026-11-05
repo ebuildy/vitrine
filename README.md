@@ -11,6 +11,7 @@ You configure it with one Settings file, change its look with a Theme and Templa
 - [Components](docs/administrator/components.md): what a Template or a page of a fork places on a page, and their props.
 - [Templates](docs/administrator/templates.md): rearranging a page from Settings.
 - [Cache stores](docs/administrator/cache-stores.md): memory, local files or Redis, warm-ups and `/sitemap.xml`.
+- [Metrics](docs/administrator/metrics.md): the Prometheus metrics at `/metrics`, and how to protect them.
 - [Security](docs/administrator/security.md): **read before you deploy**. Token permissions are the real boundary around private projects, and an installation exposed to the internet shows Member emails, Issue assignments and vulnerability counts to anyone.
 - [`GLOSSARY.md`](GLOSSARY.md): the words these documents use, and [`docs/adr`](docs/adr): the decisions behind them.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md): making a change, how releases are made, and setting up a fork so that it releases its own Container image.
@@ -44,6 +45,8 @@ Startup checks Settings before serving anything, and stops with a list of proble
 | --- | --- |
 | `VITRINE_SETTINGS` | The Settings file. Defaults to `settings.yaml` in the working directory, and to `/etc/vitrine/settings.yaml` in the Container image. |
 | `VITRINE_ENV_FILE` | A file of environment variables read at start. Defaults to `.env` in the working directory. Vitrine works without one, and a variable the environment already sets wins. |
+| `METRICS_TOKEN` | A bearer token that `/metrics` then requires. Empty or unset, the endpoint is open. |
+| `METRICS_BUCKETS` | The buckets of the metrics' histograms, in seconds, ascending and separated by commas. Defaults to `0.1, 0.5, 1, 5, 10, 30`. An invalid value stops startup. |
 | `VITRINE_TEMPLATE_DISABLE` | Any non-empty value, even `false`, stops Templates from being compiled or run. |
 | `HOST`, `PORT` | Where the server listens. The Container image sets `0.0.0.0` and `8080`. |
 | `VITRINE_VERSION` | The version Vitrine prints when it starts. The Container image sets it, and it is `dev` from source. |

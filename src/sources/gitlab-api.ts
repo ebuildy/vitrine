@@ -1,4 +1,5 @@
 import { ContentUnavailableError } from '../content-cache.ts';
+import { sourceFetch } from '../metrics.ts';
 import type { GitlabSource } from '../settings.ts';
 
 const PAGE_SIZE = 100;
@@ -420,7 +421,7 @@ async function inBatches<T, R>(items: T[], size: number, read: (item: T) => Prom
 
 async function fetchGraphql<T>(source: GitlabSource, query: string, variables: Record<string, unknown>, signal: AbortSignal): Promise<T> {
 	const path = '/api/graphql';
-	const response = await fetch(`${baseUrl(source)}${path}`, {
+	const response = await sourceFetch('gitlab', `${baseUrl(source)}${path}`, {
 		method: 'POST',
 		headers: { 'content-type': 'application/json', ...(source.token ? { authorization: `Bearer ${source.token}` } : {}) },
 		body: JSON.stringify({ query, variables }),
@@ -473,7 +474,7 @@ function request(source: GitlabSource, path: string, query: Record<string, strin
 	const url = new URL(`${baseUrl(source)}/api/v4${path}`);
 	url.search = new URLSearchParams(query).toString();
 
-	return fetch(url, { headers: source.token ? { 'private-token': source.token } : {}, signal });
+	return sourceFetch('gitlab', url, { headers: source.token ? { 'private-token': source.token } : {}, signal });
 }
 
 /** A GitLab can live under a path of its own, which a URL built from a leading slash would lose. */

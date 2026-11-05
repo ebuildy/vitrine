@@ -1,4 +1,5 @@
 // Runs in `npm run warm-up` as well as in the server, so it reads no Settings: what it needs comes as arguments.
+import { recordWarmUp } from './metrics.ts';
 import type { Settings } from './settings.ts';
 
 /** Longer than a page takes with every Source timing out, which is the slowest a page can be. */
@@ -145,6 +146,7 @@ export function scheduleWarmUps(baseUrl: string, { atStart, everyMinutes, concur
 		running = true;
 		try {
 			const report = await warmUp(baseUrl, { concurrency, startPaths });
+			recordWarmUp({ durationMs: report.durationMs, urlsFound: report.pages.length, pagesWithProblems: failedPages(report).length });
 			(failedPages(report).length > 0 ? console.error : console.log)(formatReport(report));
 		} catch (error) {
 			console.error('The warm-up stopped:', error);

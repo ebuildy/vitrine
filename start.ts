@@ -1,5 +1,6 @@
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
+import { MetricsError } from './src/metrics.ts';
 import { fixedUrls } from './src/router.ts';
 import { getSettings, prepareSettings, SettingsError } from './src/settings.ts';
 import { scheduleWarmUps } from './src/warm-up.ts';
@@ -10,7 +11,7 @@ console.log(`Vitrine ${process.env.VITRINE_VERSION ?? 'dev'}`);
 try {
 	prepareSettings();
 } catch (error) {
-	console.error(error instanceof SettingsError ? error.message : error);
+	console.error(error instanceof SettingsError || error instanceof MetricsError ? error.message : error);
 	process.exit(1);
 }
 

@@ -46,6 +46,7 @@ const Controller = controllers[match.route.controller];
 const { source, group, project } = match.params;
 const subject = await subjectReaders[match.route.controller]?.(match.params);
 if (subject && !subject.error && !subject.data) return new Response(null, { status: 404 });
+Astro.locals.routeTemplate = match.route.url;
 Astro.locals.showsTemplate = Boolean(match.route.compiled) && !subject?.error;
 ---
 
