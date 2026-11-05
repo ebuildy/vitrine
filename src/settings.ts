@@ -218,7 +218,7 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 	const { sources, cacheStore, branding, navigation, theme, warmUp, metrics } = parsed.data;
 	const { routes, problems: compileProblems } = templatesDisabled(env) ? { routes: parsed.data.routes, problems: [] } : compileRoutes(parsed.data.routes, sources);
 	const { stylesheets, problems: cssProblems } = readStylesheets(theme.css, dirname(path));
-	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources), ...cacheStoreProblems(cacheStore, env), ...compileProblems, ...cssProblems];
+	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources, metrics.enabled), ...cacheStoreProblems(cacheStore, env), ...compileProblems, ...cssProblems];
 	if (problems.length > 0) throw new SettingsError(path, problems);
 
 	return {

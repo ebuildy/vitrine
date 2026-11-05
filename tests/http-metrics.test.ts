@@ -139,11 +139,17 @@ describe('/metrics', () => {
 		expect(output).toContain('Route "/metrics": Vitrine serves this URL itself');
 	});
 
-	test('stops startup on a Route at /metrics even with metrics.enabled: false', async () => {
-		const { exitCode, output } = await startupFailure({ sources: [], routes: [{ url: '/metrics', controller: 'search' }], metrics: { enabled: false } });
+	test('serves a Route at /metrics instead, with metrics.enabled: false', async () => {
+		const nexus = await startFakeNexus({ repositories });
+		cleanups.push(nexus.stop);
+		const vitrine = await startVitrine(settingsFor(nexus, { type: 'memory' }, { routes: [{ url: '/metrics', controller: 'search' }], metrics: { enabled: false } }));
+		cleanups.push(() => vitrine.stop());
 
-		expect(exitCode).toBe(1);
-		expect(output).toContain('Route "/metrics": Vitrine serves this URL itself');
+		const { response, text } = await scrape(vitrine);
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('content-type')).toMatch(/^text\/html/);
+		expect(text).not.toContain('vitrine_cache_hits_total');
 	});
 
 	test('is not served with metrics.enabled: false', async () => {
