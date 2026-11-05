@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { cacheStores } from './support/cache-stores.ts';
@@ -608,6 +609,20 @@ describe('invalid Settings stop startup', () => {
 
 		expect(exitCode).toBe(0);
 		expect(output).not.toContain('Server listening');
+	});
+});
+
+describe('no Settings file', () => {
+	test('starts with the default Settings, and warns', async () => {
+		const missing = join(mkdtempSync(join(tmpdir(), 'vitrine-')), 'settings.yaml');
+		const vitrine = await startVitrine({}, { VITRINE_SETTINGS: missing });
+
+		const response = await fetch(`${vitrine.url}/no-route`);
+		const stderr = vitrine.stderr();
+		await vitrine.stop();
+
+		expect(response.status).toBe(404);
+		expect(stderr).toContain('no settings found, using defaults');
 	});
 });
 
