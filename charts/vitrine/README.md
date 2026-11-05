@@ -166,7 +166,7 @@ networkPolicy:
 
 ## Metrics
 
-Vitrine serves Prometheus metrics at `/metrics`, on the Service's port, as [the metrics documentation](../../docs/administrator/metrics.md) lists. Protect them with a token: set `METRICS_TOKEN` from a Secret with `extraEnvs`, and give the same Secret to `metrics.serviceMonitor.bearerTokenSecret`, which renders a Prometheus Operator `ServiceMonitor` that sends it:
+Vitrine serves Prometheus metrics at `/metrics`, on the Service's port, as [the metrics documentation](../../docs/administrator/metrics.md) lists. Protect them with a token: set `METRICS_TOKEN` from a Secret with `extraEnvs`, and give the same Secret to `metrics.serviceMonitor.bearerTokenSecret`, which renders a Prometheus Operator `ServiceMonitor` that sends it. It scrapes `settings.metrics.path`, `/metrics` by default:
 
 ```yaml
 extraEnvs:

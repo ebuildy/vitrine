@@ -225,6 +225,12 @@ describe('the Helm chart', () => {
 		expect(monitor.spec.endpoints).toEqual([{ port: 'http', path: '/metrics', authorization: { type: 'Bearer', credentials: { name: 'vitrine-metrics', key: 'token' } } }]);
 	});
 
+	test('scrapes the metrics at the path of the Settings', () => {
+		const monitor = find(render({ settings: { ...SETTINGS, metrics: { path: '/stats' } }, metrics: { serviceMonitor: { enabled: true } } }), 'ServiceMonitor')!;
+
+		expect(monitor.spec.endpoints[0].path).toBe('/stats');
+	});
+
 	test('renders a ServiceMonitor without a token when no Secret is given', () => {
 		const monitor = find(render({ metrics: { serviceMonitor: { enabled: true } } }), 'ServiceMonitor')!;
 

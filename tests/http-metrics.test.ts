@@ -152,6 +152,42 @@ describe('/metrics', () => {
 		expect(text).not.toContain('vitrine_cache_hits_total');
 	});
 
+	test('serves the metrics at metrics.path instead of /metrics', async () => {
+		const { vitrine } = await start({ metrics: { path: '/stats/prometheus' } });
+
+		const moved = await fetch(`${vitrine.url}/stats/prometheus`);
+		const old = await fetch(`${vitrine.url}/metrics`);
+
+		expect(moved.status).toBe(200);
+		expect(await moved.text()).toContain('vitrine_cache_');
+		expect(old.status).toBe(404);
+	});
+
+	test('stops startup on a Route at metrics.path, and no more at /metrics', async () => {
+		const reserved = await startupFailure({ sources: [], routes: [{ url: '/stats', controller: 'search' }], metrics: { path: '/stats' } });
+
+		expect(reserved.exitCode).toBe(1);
+		expect(reserved.output).toContain('Route "/stats": Vitrine serves this URL itself');
+	});
+
+	test('serves a Route at /metrics when metrics.path moved', async () => {
+		const nexus = await startFakeNexus({ repositories });
+		cleanups.push(nexus.stop);
+		const vitrine = await startVitrine(settingsFor(nexus, { type: 'memory' }, { routes: [{ url: '/metrics', controller: 'search' }], metrics: { path: '/stats' } }));
+		cleanups.push(() => vitrine.stop());
+
+		const { response } = await scrape(vitrine);
+
+		expect(response.headers.get('content-type')).toMatch(/^text\/html/);
+	});
+
+	test.each(['metrics', '/', '/sitemap.xml', '/a?b', '/a b'])('stops startup on the invalid metrics.path %j', async (path) => {
+		const { exitCode, output } = await startupFailure({ sources: [], routes: [], metrics: { path } });
+
+		expect(exitCode).toBe(1);
+		expect(output).toContain('metrics.path');
+	});
+
 	test('is not served with metrics.enabled: false', async () => {
 		const { vitrine } = await start({ metrics: { enabled: false } });
 
