@@ -25,10 +25,22 @@ export function parseBuckets(value: string | undefined): number[] {
 	return buckets;
 }
 
-/** What a cache store reports on each scrape. */
+/** What a cache store reports. Left out, `bytes` is a size the store cannot give without reading every entry, such as Redis's. */
 export interface CacheStats {
 	entries: number;
-	bytes: number;
+	bytes?: number;
+}
+
+/** Measuring walks the whole store, which a scrape every few seconds must not do each time. A write by this process measures anew. */
+const CACHE_STATS_MAX_AGE_MS = 30_000;
+
+interface MeasuredCacheStore {
+	store: CacheStoreType;
+	read: () => Promise<CacheStats>;
+	/** Counts writes, so that a measure started before one is not kept. */
+	version: number;
+	cached?: { at: number; version: number; stats: CacheStats };
+	pending?: Promise<CacheStats>;
 }
 
 interface Metrics {
@@ -36,7 +48,7 @@ interface Metrics {
 	cacheHits: Counter<'store'>;
 	cacheMisses: Counter<'store'>;
 	cacheWriteErrors: Counter<'store'>;
-	cacheStats: { current?: { store: CacheStoreType; read: () => Promise<CacheStats> } };
+	cacheStats: { current?: MeasuredCacheStore };
 	warmUpRuns: Counter;
 	warmUpDuration: Histogram;
 	warmUpUrlsFound: Counter;
@@ -59,7 +71,7 @@ function createMetrics(buckets: number[]): Metrics {
 	const registry = new Registry();
 	collectDefaultMetrics({ register: registry });
 	const cacheStats: Metrics['cacheStats'] = {};
-	const scraped = (name: string, help: string, pick: (stats: CacheStats) => number) =>
+	const scraped = (name: string, help: string, pick: (stats: CacheStats) => number | undefined) =>
 		new Gauge({
 			name,
 			help,
@@ -68,14 +80,15 @@ function createMetrics(buckets: number[]): Metrics {
 			async collect() {
 				if (!cacheStats.current) return;
 				try {
-					this.set({ store: cacheStats.current.store }, pick(await cacheStats.current.read()));
+					const value = pick(await measure(cacheStats.current));
+					if (value !== undefined) this.set({ store: cacheStats.current.store }, value);
 				} catch (error) {
 					console.error('Cache store could not be measured:', error);
 				}
 			},
 		});
-	scraped('vitrine_cache_entries', 'Entries the cache store holds, measured on each scrape.', ({ entries }) => entries);
-	scraped('vitrine_cache_bytes', 'Bytes the cache store holds, measured on each scrape.', ({ bytes }) => bytes);
+	scraped('vitrine_cache_entries', 'Entries the cache store holds, measured at most every 30 seconds.', ({ entries }) => entries);
+	scraped('vitrine_cache_bytes', 'Bytes the cache store holds, measured at most every 30 seconds. Not reported for redis.', ({ bytes }) => bytes);
 	const cacheCounter = (name: string, help: string) => new Counter({ name, help, labelNames: ['store'], registers: [registry] });
 	return {
 		registry,
@@ -118,7 +131,31 @@ export const metricsContentType = () => metrics().registry.contentType;
 
 /** Tells the metrics which cache store to measure on each scrape. */
 export function measureCacheStore(store: CacheStoreType, read: () => Promise<CacheStats>) {
-	metrics().cacheStats.current = { store, read };
+	metrics().cacheStats.current = { store, read, version: 0 };
+}
+
+/** The cache store has changed, so the next scrape measures it anew. */
+export function cacheStoreChanged() {
+	const current = metrics().cacheStats.current;
+	if (current) current.version++;
+}
+
+/** One measure at a time, shared by both gauges and kept for CACHE_STATS_MAX_AGE_MS unless a write came since. */
+async function measure(measured: MeasuredCacheStore): Promise<CacheStats> {
+	const { cached, version } = measured;
+	if (cached && cached.version === version && Date.now() - cached.at < CACHE_STATS_MAX_AGE_MS) return cached.stats;
+	measured.pending ??= measured.read().then(
+		(stats) => {
+			measured.cached = { at: Date.now(), version, stats };
+			measured.pending = undefined;
+			return stats;
+		},
+		(error) => {
+			measured.pending = undefined;
+			throw error;
+		},
+	);
+	return measured.pending;
 }
 
 export function countCacheRead(store: CacheStoreType, hit: boolean) {

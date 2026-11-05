@@ -1,7 +1,7 @@
 import { getCacheStore } from './cache-stores.ts';
 import { logger } from './logger.mjs';
 import type { Entry } from './cache-stores.ts';
-import { countCacheRead, countCacheWriteError, countSourceCacheLookup } from './metrics.ts';
+import { cacheStoreChanged, countCacheRead, countCacheWriteError, countSourceCacheLookup } from './metrics.ts';
 import type { SourceType } from './metrics.ts';
 import { getSettings } from './settings.ts';
 
@@ -78,6 +78,7 @@ export async function readEntry(key: string): Promise<Entry | undefined> {
 export async function writeEntry(key: string, entry: Entry): Promise<void> {
 	try {
 		await withTimeout(CACHE_STORE_TIMEOUT_MS, () => getCacheStore().set(key, entry));
+		cacheStoreChanged();
 	} catch (error) {
 		logger.error('Cache store could not write', { key, error });
 		countCacheWriteError(getSettings().cacheStore.type);
