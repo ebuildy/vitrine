@@ -69,10 +69,11 @@ describe('a warm-up in Settings', () => {
 	test('logs its report, naming a Source that is down', async () => {
 		const { vitrine } = await start({ atStart: true }, { behaviour: 'down' });
 
-		await until(() => vitrine.stderr().includes('Warm-up of'));
+		await until(() => vitrine.messages().some(({ msg }) => msg === 'Warm-up finished'));
 
-		expect(vitrine.stderr()).toContain('failed /nexus/main-nexus: Repositories could not be loaded because main-nexus is down.');
-		expect(vitrine.stderr()).toMatch(/visited 2 pages, 1 failed, in/);
+		const messages = vitrine.messages();
+		expect(messages).toContainEqual(expect.objectContaining({ level: 'error', msg: 'Warm-up page failed', path: '/nexus/main-nexus', problems: ['Repositories could not be loaded because main-nexus is down.'] }));
+		expect(messages).toContainEqual(expect.objectContaining({ level: 'error', msg: 'Warm-up finished', pages: 2, failed: 1 }));
 	});
 
 	test('runs again on its interval', async () => {
@@ -89,9 +90,9 @@ describe('invalid warm-up Settings stop startup', () => {
 		['a concurrency that is no whole number', { concurrency: 1.5 }, 'warmUp.concurrency'],
 		['an unknown key', { atstart: true }, 'warmUp'],
 	])('with %s', async (_, warmUp, expectedError) => {
-		const { exitCode, output } = await startupFailure({ sources: [], routes: [{ url: '/search', controller: 'search' }], warmUp });
+		const { exitCode, problems } = await startupFailure({ sources: [], routes: [{ url: '/search', controller: 'search' }], warmUp });
 
 		expect(exitCode).toBe(1);
-		expect(output).toContain(expectedError);
+		expect(problems).toContainEqual(expect.stringContaining(expectedError));
 	});
 });

@@ -1129,9 +1129,9 @@ describe('invalid GitLab Settings stop startup', () => {
 		['a Route taking two lists of segments', { sources: [source], routes: [{ url: '/:group+/:project+', controller: 'gitlab-project' }] }, ':name+'],
 		['a Harbor Controller on a GitLab Source', { sources: [source], routes: [{ url: '/harbor', controller: 'harbor', params: { source: 'main-gitlab' } }] }, 'unknown Source'],
 	])('with %s', async (_, settings, expectedError) => {
-		const { exitCode, output } = await startupFailure(settings);
+		const { exitCode, problems } = await startupFailure(settings);
 
 		expect(exitCode).toBe(1);
-		expect(output).toContain(expectedError);
+		expect(problems).toContainEqual(expect.stringContaining(expectedError));
 	});
 });

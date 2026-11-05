@@ -100,9 +100,9 @@ describe.each(cacheStores)('with the $name cache store', ({ survivesRestart, emp
 
 describe('a Route at /sitemap.xml', () => {
 	test('stops startup, as Vitrine serves that URL itself', async () => {
-		const { exitCode, output } = await startupFailure({ sources: [], routes: [{ url: '/sitemap.xml', controller: 'search' }] });
+		const { exitCode, problems } = await startupFailure({ sources: [], routes: [{ url: '/sitemap.xml', controller: 'search' }] });
 
 		expect(exitCode).toBe(1);
-		expect(output).toContain('Route "/sitemap.xml": Vitrine serves this URL itself');
+		expect(problems).toContainEqual(expect.stringContaining('Route "/sitemap.xml": Vitrine serves this URL itself'));
 	});
 });

@@ -175,10 +175,10 @@ describe('startup', () => {
 		['a CSS item that is neither CSS, a URL nor a file', { theme: { css: ['brand.css'] } }, 'theme.css.0: must be CSS'],
 		['a CSS file that does not exist', { theme: { css: ['./missing.css'] } }, 'theme.css.0: cannot read'],
 	])('stops on %s', async (_, settings, problem) => {
-		const { exitCode, output } = await startupFailure({ sources: [], routes: [], ...settings });
+		const { exitCode, problems } = await startupFailure({ sources: [], routes: [], ...settings });
 
 		expect(exitCode).toBe(1);
-		expect(output).toContain(problem);
+		expect(problems).toContainEqual(expect.stringContaining(problem));
 	});
 });
 

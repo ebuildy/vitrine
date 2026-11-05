@@ -45,8 +45,9 @@ Startup checks Settings before serving anything, and stops with a list of proble
 | `VITRINE_SETTINGS` | The Settings file. Defaults to `settings.yaml` in the working directory, and to `/etc/vitrine/settings.yaml` in the Container image. With no file at that path, a mistyped one included, Vitrine starts with the defaults and only warns. |
 | `VITRINE_ENV_FILE` | A file of environment variables read at start. Defaults to `.env` in the working directory. Vitrine works without one, and a variable the environment already sets wins. |
 | `VITRINE_TEMPLATE_DISABLE` | Any non-empty value, even `false`, stops Templates from being compiled or run. |
+| `LOG_LEVEL` | What Vitrine logs: `debug`, `info`, `warn`, `error` or `silent`. Defaults to `info`, as does an empty value, and any other value stops startup. Every message, Astro's included, is one JSON object per line on stdout, with `time`, `level` and `msg`, then fields such as `label`, `path` or `error`. A `LOG_LEVEL` in the env file applies to the server and to `astro dev`, not to `warm-up.ts`. Astro filters its own `debug` messages itself, so `debug` shows Vitrine's but not Astro's. |
 | `HOST`, `PORT` | Where the server listens. The Container image sets `0.0.0.0` and `8080`. |
-| `VITRINE_VERSION` | The version Vitrine prints when it starts. The Container image sets it, and it is `dev` from source. |
+| `VITRINE_VERSION` | The version Vitrine logs when it starts. The Container image sets it, and it is `dev` from source. |
 | Those Settings name | Each `tokenEnv`, `passwordEnv` and `urlEnv` in Settings names a variable holding a secret. Startup stops when one is not set. |
 
 ### Cache warm-up
@@ -57,7 +58,7 @@ A warm-up crawls Vitrine's pages so that the cache holds their content before th
 docker run --rm ghcr.io/ebuildy/vitrine:edge node warm-up.ts https://vitrine.example.com --concurrency 4
 ```
 
-It exits with 1 when a page failed, so that the CronJob shows it, and with 2 on wrong arguments.
+It logs the same report as the server, one JSON message per page, and exits with 1 when a page failed, so that the CronJob shows it, and with 2 on wrong arguments.
 
 ## Run from source
 

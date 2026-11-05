@@ -180,10 +180,10 @@ describe('invalid Nexus Settings stop startup', () => {
 		['a nexus Route with no Source', { sources: [source], routes: [{ url: '/nexus', controller: 'nexus' }] }, 'source'],
 		['a nexus Route to a Source of another type', { sources: [{ name: 'main-harbor', type: 'harbor', url: 'http://harbor.test', projects: ['p'] }], routes: [{ ...route, url: '/nexus', params: { source: 'main-harbor' } }] }, 'unknown Source "main-harbor"'],
 	])('with %s', async (_, settings, expectedError) => {
-		const { exitCode, output } = await startupFailure(settings);
+		const { exitCode, problems } = await startupFailure(settings);
 
 		expect(exitCode).toBe(1);
-		expect(output).toContain(expectedError);
+		expect(problems).toContainEqual(expect.stringContaining(expectedError));
 	});
 
 	test('accepts several Nexus Sources', async () => {

@@ -1,16 +1,31 @@
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
+import { checkLogLevel, logger } from './src/logger.mjs';
 import { fixedUrls } from './src/router.ts';
-import { getSettings, prepareSettings, SettingsError } from './src/settings.ts';
+import { getSettings, loadEnvFile, prepareSettings, SettingsError } from './src/settings.ts';
 import { scheduleWarmUps } from './src/warm-up.ts';
 
-// First, so that a log of a failed start still says which Vitrine it was.
-console.log(`Vitrine ${process.env.VITRINE_VERSION ?? 'dev'}`);
+// A LOG_LEVEL kept in the env file applies from the first message.
+loadEnvFile();
+try {
+	checkLogLevel();
+} catch (error) {
+	// Not through the logger, which cannot tell what to keep.
+	console.error(error instanceof Error ? error.message : error);
+	process.exit(1);
+}
+
+// Before Settings, so that a log of a failed start still says which Vitrine it was.
+logger.info('Starting Vitrine', { version: process.env.VITRINE_VERSION ?? 'dev' });
 
 try {
 	prepareSettings();
 } catch (error) {
-	console.error(error instanceof SettingsError ? error.message : error);
+	if (error instanceof SettingsError) {
+		for (const problem of error.problems) logger.error('Invalid Settings', { path: error.path, problem });
+	} else {
+		logger.error('Could not start', { error });
+	}
 	process.exit(1);
 }
 

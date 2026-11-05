@@ -154,9 +154,9 @@ describe('invalid navigation Routes stop startup', () => {
 		['a maxItems taken from the URL', { url: '/:maxItems', controller: 'navigation' }, 'maxItems'],
 		['a Source', { url: '/', controller: 'navigation', params: { source: 'main-gitlab' } }, 'source'],
 	])('with %s', async (_, route, expectedError) => {
-		const { exitCode, output } = await startupFailure({ sources: [], routes: [route] });
+		const { exitCode, problems } = await startupFailure({ sources: [], routes: [route] });
 
 		expect(exitCode).toBe(1);
-		expect(output).toContain(expectedError);
+		expect(problems).toContainEqual(expect.stringContaining(expectedError));
 	});
 });

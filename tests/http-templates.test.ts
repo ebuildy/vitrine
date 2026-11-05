@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { startFakeGitlab } from './support/fake-gitlab.ts';
 import type { FakeGitlab } from './support/fake-gitlab.ts';
 import { startFakeHarbor } from './support/fake-harbor.ts';
-import { startDevVitrine, startupFailure, startVitrine, writeEnvFile } from './support/vitrine.ts';
+import { startDevVitrine, startupFailure, startVitrine, textOf, writeEnvFile } from './support/vitrine.ts';
 import type { RunningVitrine } from './support/vitrine.ts';
 
 const groups = [{ path: 'platform', name: 'The Platform', description: 'Everything we run' }, { path: 'platform/backend' }];
@@ -262,7 +262,7 @@ describe('a Template that fails on a page', () => {
 		expect(html).toMatch(/<\/header><p role="alert">This page could not be shown\.<\/p><\/body>/);
 		expect(html).not.toContain(error);
 		expect(html).not.toContain(hidden);
-		expect(vitrine.stderr()).toContain(error);
+		expect(textOf(vitrine.messages())).toContain(error);
 	});
 
 	test('leaves other pages alone', async () => {
@@ -335,17 +335,17 @@ describe('a Template stops startup', () => {
 		['with a fixed Group in an expression', onGroup(`<GitlabGroupList source={source} group={'hidden'} />`), '"hidden" is outside every Main Group'],
 		['with a fixed Group as a plain template string', onGroup('<GitlabGroupList source={source} group={`hidden`} />'), '"hidden" is outside every Main Group'],
 	])('%s', async (_, settings, expectedError) => {
-		const { exitCode, output } = await startupFailure(settings);
+		const { exitCode, problems } = await startupFailure(settings);
 
 		expect(exitCode).toBe(1);
-		expect(output).toContain('Route "');
-		expect(output).toContain(expectedError);
+		expect(problems).toContainEqual(expect.stringContaining('Route "'));
+		expect(problems).toContainEqual(expect.stringContaining(expectedError));
 	});
 
 	test('and names the Route at fault', async () => {
-		const { output } = await startupFailure(onGroup('<GitlabNope />'));
+		const { problems } = await startupFailure(onGroup('<GitlabNope />'));
 
-		expect(output).toContain('Route "/gitlab/:group+"');
+		expect(problems).toContainEqual(expect.stringContaining('Route "/gitlab/:group+"'));
 	});
 });
 
@@ -414,14 +414,14 @@ describe('the warning that Templates run as code', () => {
 	const disabledPage = async (settings: unknown, env: Record<string, string>) => {
 		const vitrine = await startVitrine(settings, env);
 		const html = await (await fetch(`${vitrine.url}/images`)).text();
-		const stderr = vitrine.stderr();
+		const stderr = textOf(vitrine.messages());
 		await vitrine.stop();
 		return { html, stderr };
 	};
 
 	test('is logged when Vitrine compiles Templates', async () => {
 		const vitrine = await startVitrine(withTemplates);
-		const stderr = vitrine.stderr();
+		const stderr = textOf(vitrine.messages());
 
 		await vitrine.stop();
 		expect(stderr).toContain('run as code');
@@ -431,7 +431,7 @@ describe('the warning that Templates run as code', () => {
 
 	test('stays away when there is no Template', async () => {
 		const vitrine = await startVitrine(withoutTemplates);
-		const stderr = vitrine.stderr();
+		const stderr = textOf(vitrine.messages());
 
 		await vitrine.stop();
 		expect(stderr).not.toContain('Template');
@@ -439,7 +439,7 @@ describe('the warning that Templates run as code', () => {
 
 	test('is logged once under astro dev', async () => {
 		const vitrine = await startDevVitrine(withTemplates);
-		const stderr = vitrine.stderr();
+		const stderr = textOf(vitrine.messages());
 
 		await vitrine.stop();
 		expect(stderr.match(/run as code/g)).toHaveLength(1);

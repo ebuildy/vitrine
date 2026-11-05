@@ -1,4 +1,5 @@
 // Runs in `npm run warm-up` as well as in the server, so it reads no Settings: what it needs comes as arguments.
+import { logger } from './logger.mjs';
 import type { Settings } from './settings.ts';
 
 /** Longer than a page takes with every Source timing out, which is the slowest a page can be. */
@@ -129,11 +130,16 @@ export function failedPages(report: WarmUpReport): PageReport[] {
 	return report.pages.filter(({ problems }) => problems.length > 0);
 }
 
-/** One line per page, then a summary, as an Administrator reads it in a terminal or a log. */
-export function formatReport(report: WarmUpReport): string {
-	const lines = report.pages.map(({ path, problems }) => (problems.length > 0 ? `  failed ${path}: ${problems.join(' ')}` : `  ok ${path}`));
-	const seconds = (report.durationMs / 1000).toFixed(1);
-	return [...lines, `Warm-up of ${report.baseUrl}: visited ${report.pages.length} pages, ${failedPages(report).length} failed, in ${seconds} s`].join('\n');
+/** One message per page, then a summary, as an Administrator reads them in a log. */
+export function logReport(report: WarmUpReport) {
+	for (const { path, problems } of report.pages) {
+		if (problems.length > 0) logger.error('Warm-up page failed', { path, problems });
+		else logger.info('Warm-up page ok', { path });
+	}
+	const failed = failedPages(report).length;
+	const fields = { baseUrl: report.baseUrl, pages: report.pages.length, failed, seconds: Math.round(report.durationMs / 100) / 10 };
+	if (failed > 0) logger.error('Warm-up finished', fields);
+	else logger.info('Warm-up finished', fields);
 }
 
 /** Runs the warm-ups Settings ask for in the background, logging each report, and returns what stops them. */
@@ -145,9 +151,9 @@ export function scheduleWarmUps(baseUrl: string, { atStart, everyMinutes, concur
 		running = true;
 		try {
 			const report = await warmUp(baseUrl, { concurrency, startPaths });
-			(failedPages(report).length > 0 ? console.error : console.log)(formatReport(report));
+			logReport(report);
 		} catch (error) {
-			console.error('The warm-up stopped:', error);
+			logger.error('The warm-up stopped', { error });
 		} finally {
 			running = false;
 		}
