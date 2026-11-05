@@ -1,6 +1,8 @@
 import { getCacheStore } from './cache-stores.ts';
 import { logger } from './logger.mjs';
 import type { Entry } from './cache-stores.ts';
+import { countCacheRead, countCacheWriteError } from './metrics.ts';
+import { getSettings } from './settings.ts';
 
 export const SOURCE_TIMEOUT_MS = 10_000;
 const CACHE_STORE_TIMEOUT_MS = 1_000;
@@ -54,12 +56,14 @@ async function readStoreThenSource<T>(key: string, allowedAgeMs: number, loader:
 }
 
 export async function readEntry(key: string): Promise<Entry | undefined> {
+	let entry: Entry | undefined;
 	try {
-		return await withTimeout(CACHE_STORE_TIMEOUT_MS, () => getCacheStore().get(key));
+		entry = await withTimeout(CACHE_STORE_TIMEOUT_MS, () => getCacheStore().get(key));
 	} catch (error) {
 		logger.error('Cache store could not read', { key, error });
-		return undefined;
 	}
+	countCacheRead(getSettings().cacheStore.type, entry !== undefined);
+	return entry;
 }
 
 export async function writeEntry(key: string, entry: Entry): Promise<void> {
@@ -67,6 +71,7 @@ export async function writeEntry(key: string, entry: Entry): Promise<void> {
 		await withTimeout(CACHE_STORE_TIMEOUT_MS, () => getCacheStore().set(key, entry));
 	} catch (error) {
 		logger.error('Cache store could not write', { key, error });
+		countCacheWriteError(getSettings().cacheStore.type);
 	}
 }
 

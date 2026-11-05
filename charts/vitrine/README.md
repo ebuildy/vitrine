@@ -164,6 +164,39 @@ networkPolicy:
         - port: 6379
 ```
 
+## Metrics
+
+Vitrine serves Prometheus metrics at `/metrics`, on the Service's port, as [the metrics documentation](../../docs/administrator/metrics.md) lists. Protect them with a token: set `METRICS_TOKEN` from a Secret with `extraEnvs`, and give the same Secret to `metrics.serviceMonitor.bearerTokenSecret`, which renders a Prometheus Operator `ServiceMonitor` that sends it:
+
+```yaml
+extraEnvs:
+  - name: METRICS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: vitrine-metrics
+        key: token
+metrics:
+  serviceMonitor:
+    enabled: true
+    bearerTokenSecret:
+      name: vitrine-metrics
+      key: token
+```
+
+When `networkPolicy` is enabled, Prometheus needs an ingress rule to the pods' port 8080, such as from the namespace that runs it:
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingress: |
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 8080
+```
+
 ## Security
 
 The pod runs as the Container image's user, uid and gid 1000, with `fsGroup` 1000, on a read-only root, without privilege escalation or any capability, under the `RuntimeDefault` seccomp profile. An `emptyDir` at `/tmp` and the one of a `files` cache store are the only places it writes. `podSecurityContext` and `securityContext` change this.
@@ -207,6 +240,8 @@ The ServiceAccount mounts no token: Vitrine never calls the Kubernetes API.
 | `httpRoute.parentRefs` | `[]` | The Gateways to attach to. Needed when enabled. |
 | `httpRoute.hostnames` | `[]` | |
 | `httpRoute.rules` | every path | Rules without `backendRefs`: each sends to the Service. |
+| `metrics.serviceMonitor.enabled` | `false` | Renders a Prometheus Operator ServiceMonitor, which needs the Operator's CRDs. |
+| `metrics.serviceMonitor.bearerTokenSecret` | `{}` | The Secret `name` and `key` that hold the token Prometheus sends, the one `METRICS_TOKEN` reads. |
 | `networkPolicy.enabled` | `false` | Renders a NetworkPolicy. |
 | `networkPolicy.ingress` | `""` | Ingress rules, as a YAML string. |
 | `networkPolicy.egress` | `""` | Egress rules, as a YAML string. |

@@ -29,6 +29,10 @@ Vitrine shows the content of private Projects to every Visitor, with no login. O
 
 Keep Vitrine on an internal network, or behind an authenticating proxy such as oauth2-proxy, unless all of this may be public.
 
+## Metrics
+
+`/metrics` shows any Visitor who can reach it the counts and timings of the cache, the warm-ups, the calls to each Source and the rendering of each Route, with the Node process metrics. It shows no content, nor a credential, but its `route` labels name the Routes of Settings, and the metrics tell how busy Vitrine is. Set `METRICS_TOKEN` and have Prometheus send it as a bearer token, so that a request without it gets `401`, or set `metrics.enabled` to `false`. Without a token the endpoint is open, to whoever reaches Vitrine. Keep the token in a Secret, as with any other secret. See [Metrics](metrics.md).
+
 ## Settings is code
 
 A Template runs on the server and can read every environment variable, tokens included. Custom CSS under `theme.css` runs in every Visitor's browser. Only let people trusted with the server edit Settings. Set `VITRINE_TEMPLATE_DISABLE` to any non-empty value, even `false`, to refuse Templates: their Routes then show their Controller's own page, and startup logs a warning naming them.
