@@ -59,10 +59,11 @@ export type Route = z.infer<typeof routeSchema> & { compiled?: CompiledTemplate 
 /** The URLs of Vitrine's own pages under src/pages, which Astro prefers over any Route, kept in step with them. */
 const SERVED_BY_VITRINE = ['/sitemap.xml'];
 
-export function routeProblems(routes: Route[], sources: Source[]) {
+/** `metricsPath` is where Vitrine serves the metrics, which no Route may use. It is left out when the metrics are disabled. */
+export function routeProblems(routes: Route[], sources: Source[], metricsPath?: string) {
 	const problems = duplicates(routes.map((route) => route.url)).map((url) => `Route "${url}" is declared twice`);
 	for (const { url, controller, params } of routes) {
-		if (SERVED_BY_VITRINE.includes(url)) {
+		if (SERVED_BY_VITRINE.includes(url) || url === metricsPath) {
 			problems.push(`Route "${url}": Vitrine serves this URL itself`);
 			continue;
 		}

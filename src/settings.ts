@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { nameToEmoji } from 'gemoji';
 import { parse } from 'yaml';
 import { z } from 'zod';
+import { prepareMetrics } from './metrics.ts';
 import { duplicates, routeProblems, routeSchema } from './router.ts';
 import type { Route } from './router.ts';
 import { templateProblems } from './template-checks.ts';
@@ -142,6 +143,17 @@ const warmUpSchema = z.strictObject({
 	concurrency: z.number().int().positive().default(DEFAULT_CONCURRENCY),
 });
 
+const metricsSchema = z.strictObject({
+	// Serves the metrics, which METRICS_TOKEN can protect.
+	enabled: z.boolean().default(true),
+	// The URL they are served at. Vitrine keeps it from the Routes while enabled.
+	path: z
+		.string()
+		.regex(/^\/[^\s?#]*$/, 'must be a URL path starting with /, without a query or a fragment')
+		.refine((path) => path !== '/' && path !== '/sitemap.xml', 'must not be / nor /sitemap.xml, which Vitrine uses itself')
+		.default('/metrics'),
+});
+
 /** A stylesheet the browser loads, or CSS the page carries, read from a file when Settings name one. */
 export type Stylesheet = { href: string } | { code: string };
 
@@ -154,6 +166,7 @@ export const settingsSchema = z.strictObject({
 	navigation: z.array(navigationItemSchema).default([]),
 	theme: themeSchema.prefault({}),
 	warmUp: warmUpSchema.prefault({}),
+	metrics: metricsSchema.prefault({}),
 });
 
 export type HarborSource = z.infer<typeof harborSourceSchema> & { password?: string };
@@ -171,6 +184,7 @@ export interface Settings {
 	navigation: z.infer<typeof navigationItemSchema>[];
 	theme: Omit<z.infer<typeof themeSchema>, 'css'> & { css: Stylesheet[] };
 	warmUp: z.infer<typeof warmUpSchema>;
+	metrics: z.infer<typeof metricsSchema>;
 }
 
 export class SettingsError extends Error {
@@ -201,10 +215,10 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 		);
 	}
 
-	const { sources, cacheStore, branding, navigation, theme, warmUp } = parsed.data;
+	const { sources, cacheStore, branding, navigation, theme, warmUp, metrics } = parsed.data;
 	const { routes, problems: compileProblems } = templatesDisabled(env) ? { routes: parsed.data.routes, problems: [] } : compileRoutes(parsed.data.routes, sources);
 	const { stylesheets, problems: cssProblems } = readStylesheets(theme.css, dirname(path));
-	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources), ...cacheStoreProblems(cacheStore, env), ...compileProblems, ...cssProblems];
+	const problems = [...sourceProblems(sources, env), ...routeProblems(routes, sources, metrics.enabled ? metrics.path : undefined), ...cacheStoreProblems(cacheStore, env), ...compileProblems, ...cssProblems];
 	if (problems.length > 0) throw new SettingsError(path, problems);
 
 	return {
@@ -212,6 +226,7 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 		branding,
 		navigation,
 		warmUp,
+		metrics,
 		theme: { ...theme, css: stylesheets },
 		cacheStore: cacheStore.type === 'redis' ? { ...cacheStore, url: env[cacheStore.urlEnv] as string } : cacheStore,
 		sources: sources.map((source) =>
@@ -310,6 +325,8 @@ export function getSettings(): Settings {
 /** Reads and checks Settings once, before anything is served. Throws a SettingsError, and warns about Templates, which run as code. */
 export function prepareSettings() {
 	loadEnvFile();
+	// After the environment file, which can hold METRICS_BUCKETS. Throws a MetricsError.
+	prepareMetrics();
 	const urls = getSettings()
 		.routes.filter(({ template }) => template)
 		.map(({ url }) => `"${url}"`)
