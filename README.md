@@ -17,7 +17,7 @@ You configure it with one Settings file, change its look with a Theme and Templa
 
 ## Deploy the Container image
 
-`ghcr.io/ebuildy/vitrine` runs from a Settings file mounted at `/etc/vitrine/settings.yaml`, such as a Kubernetes ConfigMap, with secrets in environment variables, such as a Kubernetes Secret. It holds no Settings of its own and stops with a clear error without one.
+`ghcr.io/ebuildy/vitrine` runs from a Settings file mounted at `/etc/vitrine/settings.yaml`, such as a Kubernetes ConfigMap, with secrets in environment variables, such as a Kubernetes Secret. It holds no Settings of its own. Without that file it starts with the defaults, which declare no Source and no Route, and warns `no settings found, using defaults`. Any other problem with the file, such as one it cannot read, an empty file or invalid YAML, stops it with a clear error.
 
 ```sh
 docker run -p 8080:8080 \
@@ -42,7 +42,7 @@ Startup checks Settings before serving anything, and stops with a list of proble
 
 | Variable | What it does |
 | --- | --- |
-| `VITRINE_SETTINGS` | The Settings file. Defaults to `settings.yaml` in the working directory, and to `/etc/vitrine/settings.yaml` in the Container image. |
+| `VITRINE_SETTINGS` | The Settings file. Defaults to `settings.yaml` in the working directory, and to `/etc/vitrine/settings.yaml` in the Container image. With no file at that path, a mistyped one included, Vitrine starts with the defaults and only warns. |
 | `VITRINE_ENV_FILE` | A file of environment variables read at start. Defaults to `.env` in the working directory. Vitrine works without one, and a variable the environment already sets wins. |
 | `VITRINE_TEMPLATE_DISABLE` | Any non-empty value, even `false`, stops Templates from being compiled or run. |
 | `HOST`, `PORT` | Where the server listens. The Container image sets `0.0.0.0` and `8080`. |

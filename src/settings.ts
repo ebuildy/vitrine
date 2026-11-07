@@ -185,7 +185,10 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 	try {
 		raw = parse(readFileSync(path, 'utf8'));
 	} catch (error) {
-		throw new SettingsError(path, [error instanceof Error ? error.message : String(error)]);
+		// Only a missing file starts with defaults: a file there but unreadable is a mistake to show.
+		if (!isMissingFile(error)) throw new SettingsError(path, [error instanceof Error ? error.message : String(error)]);
+		console.warn(`no settings found, using defaults: ${path} does not exist`);
+		raw = DEFAULT_SETTINGS;
 	}
 
 	if (raw === null) throw new SettingsError(path, ['the file is empty, see settings.example.yaml']);
@@ -217,6 +220,13 @@ export function loadSettings(path: string, env: Record<string, string | undefine
 				: { ...source, password: source.passwordEnv ? env[source.passwordEnv] : undefined },
 		),
 	};
+}
+
+/** What a missing Settings file stands for. A file must still name both sections, so that one left out by mistake is reported. */
+const DEFAULT_SETTINGS = { sources: [], routes: [] };
+
+function isMissingFile(error: unknown) {
+	return error instanceof Error && 'code' in error && error.code === 'ENOENT';
 }
 
 /** Any value counts, even `false`, so that a mistyped value never leaves Templates on. */
