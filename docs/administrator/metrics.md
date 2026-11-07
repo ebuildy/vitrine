@@ -58,6 +58,9 @@ Labelled with `source` (`gitlab`, `harbor` or `nexus`), `method` and `outcome`: 
 
 | Metric | Type | What it counts |
 | --- | --- | --- |
-| `vitrine_render_duration_seconds` | histogram | How long a page took to render, labelled with `route`: the URL of its Route in Settings, such as `/nexus/:source`, never the URL requested. A page with a Template is timed until it is complete; any other page streams, so it is timed until its response starts. |
+| `vitrine_http_requests_total` | counter | Pages requested, labelled with `route` and `status_class` (`2xx`, `3xx`, `4xx` or `5xx`). |
+| `vitrine_render_duration_seconds` | histogram | How long a page took to render, with the same labels. A page with a Template is timed until it is complete; any other page streams, so it is timed until its response starts. |
+
+`route` is the URL of the Route in Settings, such as `/nexus/:source`, never the URL requested. A request that matches no Route has `route="unmatched"`, which no Route URL can be, as they start with `/`. Vitrine's own pages, `/sitemap.xml` and the metrics, count for none. With these, `sum(rate(vitrine_http_requests_total{status_class="5xx"}[5m])) / sum(rate(vitrine_http_requests_total[5m]))` is the ratio of 5xx.
 
 The default Node process metrics of `@prometheus-io/client` are served too, such as `process_cpu_user_seconds_total` and `nodejs_eventloop_lag_seconds`.

@@ -123,7 +123,7 @@ describe('the values of /metrics', () => {
 		const metrics = await scrape();
 
 		for (const le of ['0.1', '0.5', '1', '5', '10', '30', '+Inf']) {
-			expect(metrics.has(`vitrine_render_duration_seconds_bucket{le="${le}",route="/nexus/:source"}`)).toBe(true);
+			expect(metrics.has(`vitrine_render_duration_seconds_bucket{le="${le}",route="/nexus/:source",status_class="2xx"}`)).toBe(true);
 			expect(metrics.has(`vitrine_warmup_duration_seconds_bucket{le="${le}"}`)).toBe(true);
 		}
 	});
@@ -161,10 +161,30 @@ describe('the values of /metrics', () => {
 		await visit('/nexus/other');
 
 		const metrics = await scrape();
-		expect(metrics.get('vitrine_render_duration_seconds_count{route="/search"}')).toBe(1);
-		// "other" is not a Source, so its page is not found and is not a render of the Route.
-		expect(metrics.get('vitrine_render_duration_seconds_count{route="/nexus/:source"}')).toBeGreaterThanOrEqual(2);
+		expect(metrics.get('vitrine_render_duration_seconds_count{route="/search",status_class="2xx"}')).toBe(1);
+		expect(metrics.get('vitrine_http_requests_total{route="/search",status_class="2xx"}')).toBe(1);
+		expect(metrics.get('vitrine_http_requests_total{route="/nexus/:source",status_class="2xx"}')).toBe(2);
+		expect(metrics.get('vitrine_render_duration_seconds_count{route="/nexus/:source",status_class="2xx"}')).toBe(2);
 		expect([...metrics.keys()].some((key) => key.includes('main-nexus') && key.startsWith('vitrine_render'))).toBe(false);
+	});
+
+	test('count the pages by status class, and a request matching no Route as unmatched', async () => {
+		const { visit, scrape } = await start();
+		// The readiness probes of startVitrine request / too, which matches no Route here.
+		const before = (await scrape()).get('vitrine_http_requests_total{route="unmatched",status_class="4xx"}') ?? 0;
+		await visit('/nowhere');
+		await visit('/nowhere/else');
+		await visit('/nexus/main-nexus');
+		await visit('/sitemap.xml');
+
+		const metrics = await scrape();
+
+		expect(metrics.get('vitrine_http_requests_total{route="unmatched",status_class="4xx"}')).toBe(before + 2);
+		expect(metrics.get('vitrine_render_duration_seconds_count{route="unmatched",status_class="4xx"}')).toBe(before + 2);
+		expect(metrics.get('vitrine_http_requests_total{route="/nexus/:source",status_class="2xx"}')).toBe(1);
+		// Vitrine's own pages and the metrics count for no Route.
+		const routes = [...metrics.keys()].filter((key) => key.startsWith('vitrine_http_requests_total')).map((key) => /route="([^"]*)"/.exec(key)?.[1]);
+		expect(new Set(routes)).toEqual(new Set(['unmatched', '/nexus/:source']));
 	});
 
 	test('count the warm-up runs, URLs and pages with problems of a Source that is down', async () => {

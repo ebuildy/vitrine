@@ -56,7 +56,8 @@ interface Metrics {
 	sourceCacheLookups: Counter<'source' | 'status'>;
 	sourceCalls: Counter<'source' | 'method' | 'outcome'>;
 	sourceDuration: Histogram<'source' | 'method' | 'outcome'>;
-	renderDuration: Histogram<'route'>;
+	requests: Counter<'route' | 'status_class'>;
+	renderDuration: Histogram<'route' | 'status_class'>;
 }
 
 // The server entry and start.ts each bundle this file, and both must count into the same registry.
@@ -114,7 +115,14 @@ function createMetrics(buckets: number[]): Metrics {
 			buckets,
 			registers: [registry],
 		}),
-		renderDuration: new Histogram({ name: 'vitrine_render_duration_seconds', help: 'How long pages took to render, by Route.', labelNames: ['route'], buckets, registers: [registry] }),
+		requests: new Counter({ name: 'vitrine_http_requests_total', help: 'Pages requested, by Route and status class.', labelNames: ['route', 'status_class'], registers: [registry] }),
+		renderDuration: new Histogram({
+			name: 'vitrine_render_duration_seconds',
+			help: 'How long pages took to render, by Route and status class.',
+			labelNames: ['route', 'status_class'],
+			buckets,
+			registers: [registry],
+		}),
 	};
 }
 
@@ -179,8 +187,14 @@ export function recordWarmUp({ durationMs, urlsFound, pagesWithProblems }: { dur
 	warmUpPagesWithProblems.inc(pagesWithProblems);
 }
 
-export function recordRender(route: string, seconds: number) {
-	metrics().renderDuration.observe({ route }, seconds);
+/** The `route` of a request that matched no Route. Route URLs start with /, so it cannot be one. */
+export const UNMATCHED_ROUTE = 'unmatched';
+
+/** Counts a request and times its render, for the rate, errors and duration of each Route. */
+export function recordRequest(route: string, status: number, seconds: number) {
+	const labels = { route, status_class: outcomeOf(status) };
+	metrics().requests.inc(labels);
+	metrics().renderDuration.observe(labels, seconds);
 }
 
 function outcomeOf(status: number) {

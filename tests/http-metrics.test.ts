@@ -84,7 +84,7 @@ describe('/metrics', () => {
 
 		expect(sample(text, 'vitrine_source_http_calls_total{source="nexus",method="GET",outcome="2xx"}')).toBe(1);
 		expect(sample(text, 'vitrine_source_http_call_duration_seconds_count{source="nexus",method="GET",outcome="2xx"}')).toBe(1);
-		expect(sample(text, 'vitrine_render_duration_seconds_count{route="/nexus/:source"}')).toBe(1);
+		expect(sample(text, 'vitrine_render_duration_seconds_count{route="/nexus/:source",status_class="2xx"}')).toBe(1);
 		expect(text).toContain('process_cpu_user_seconds_total');
 	});
 
@@ -202,8 +202,8 @@ describe('/metrics', () => {
 
 		const { text } = await scrape(vitrine);
 
-		expect(sample(text, 'vitrine_render_duration_seconds_bucket{le="0.25",route="/nexus/:source"}')).toBeDefined();
-		expect(sample(text, 'vitrine_render_duration_seconds_bucket{le="2",route="/nexus/:source"}')).toBeDefined();
+		expect(sample(text, 'vitrine_render_duration_seconds_bucket{le="0.25",route="/nexus/:source",status_class="2xx"}')).toBeDefined();
+		expect(sample(text, 'vitrine_render_duration_seconds_bucket{le="2",route="/nexus/:source",status_class="2xx"}')).toBeDefined();
 		expect(text).not.toContain('le="30"');
 	});
 
