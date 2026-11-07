@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/ebuildy/vitrine/compare/v0.1.0...v0.1.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* start with default Settings when the Settings file is missing ([70d16e8](https://github.com/ebuildy/vitrine/commit/70d16e870b414788ed3a57239ddcffe840be9db7))
+* start with default Settings when the Settings file is missing ([a81a331](https://github.com/ebuildy/vitrine/commit/a81a331b4009e34fc312fe6daf4e1d1371dc70b7)), closes [#55](https://github.com/ebuildy/vitrine/issues/55)
+
 ## [0.1.0](https://github.com/ebuildy/vitrine/compare/v0.0.1...v0.1.0) (2026-11-04)
 
 
