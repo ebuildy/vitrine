@@ -1,4 +1,5 @@
 import { getCacheStore } from './cache-stores.ts';
+import { logger } from './logger.mjs';
 import type { Entry } from './cache-stores.ts';
 
 export const SOURCE_TIMEOUT_MS = 10_000;
@@ -37,7 +38,7 @@ export async function readUncached<T>(key: string, loader: Loader<T>): Promise<C
 	try {
 		return { data: await withTimeout(SOURCE_TIMEOUT_MS, loader), stale: false };
 	} catch (error) {
-		console.error(`Could not load "${key}":`, error);
+		logger.error('Could not load a Source', { key, error });
 		return { error: error instanceof Error ? error : new Error(String(error)) };
 	}
 }
@@ -56,7 +57,7 @@ export async function readEntry(key: string): Promise<Entry | undefined> {
 	try {
 		return await withTimeout(CACHE_STORE_TIMEOUT_MS, () => getCacheStore().get(key));
 	} catch (error) {
-		console.error(`Cache store could not read "${key}":`, error);
+		logger.error('Cache store could not read', { key, error });
 		return undefined;
 	}
 }
@@ -65,7 +66,7 @@ export async function writeEntry(key: string, entry: Entry): Promise<void> {
 	try {
 		await withTimeout(CACHE_STORE_TIMEOUT_MS, () => getCacheStore().set(key, entry));
 	} catch (error) {
-		console.error(`Cache store could not write "${key}":`, error);
+		logger.error('Cache store could not write', { key, error });
 	}
 }
 

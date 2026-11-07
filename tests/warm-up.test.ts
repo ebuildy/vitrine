@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { withSourceUrls } from '../demo/settings.ts';
 import { startDemoSources } from '../demo/sources.ts';
-import { startVitrine } from './support/vitrine.ts';
+import { messagesOf, startVitrine } from './support/vitrine.ts';
 import type { RunningVitrine } from './support/vitrine.ts';
 
 const secrets = { GITLAB_TOKEN: 'demo-token', HARBOR_PASSWORD: 'demo-password' };
@@ -24,11 +24,16 @@ async function warmUp(...args: string[]) {
 
 /** The pages a report lists, by how each one ended. */
 function pagesOf(output: string) {
-	const lines = output.split('\n');
+	const messages = messagesOf(output);
 	return {
-		ok: lines.flatMap((line) => line.match(/^ {2}ok (\S+)$/)?.[1] ?? []),
-		failed: lines.flatMap((line) => line.match(/^ {2}failed (\S+): (.*)$/)?.slice(1, 3).join(': ') ?? []),
+		ok: messages.filter(({ msg }) => msg === 'Warm-up page ok').map(({ path }) => String(path)),
+		failed: messages.filter(({ msg }) => msg === 'Warm-up page failed').map(({ path, problems }) => `${path}: ${(problems as string[]).join(' ')}`),
 	};
+}
+
+/** The one message that ends a report. */
+function summaryOf(output: string) {
+	return messagesOf(output).filter(({ msg }) => msg === 'Warm-up finished');
 }
 
 describe('npm run warm-up against the demo', () => {
@@ -53,7 +58,7 @@ describe('npm run warm-up against the demo', () => {
 		expect(failed).toEqual([EPICS_UNAVAILABLE]);
 		expect(ok).toEqual(expect.arrayContaining(['/', '/images', '/nexus/main-nexus', '/gitlab/platform', '/gitlab/platform/backend/billing', '/gitlab/platform/backend/-/worker', '/harbor/main-harbor', '/roadmap/platform']));
 		expect(new Set(ok).size).toBe(ok.length);
-		expect(output).toMatch(new RegExp(`^Warm-up of ${vitrine.url}: visited ${ok.length + 1} pages, 1 failed, in \\d+(\\.\\d)? s$`, 'm'));
+		expect(summaryOf(output)).toEqual([{ time: expect.any(String), level: 'error', msg: 'Warm-up finished', baseUrl: vitrine.url, pages: ok.length + 1, failed: 1, seconds: expect.any(Number) }]);
 	});
 
 	test('never follows a link out of Vitrine, nor one with a query', async () => {
@@ -95,7 +100,7 @@ describe('npm run warm-up against the demo', () => {
 		const { ok, failed } = pagesOf(output);
 		expect(failed).toContain('/nexus/main-nexus: Repositories could not be loaded because main-nexus is down.');
 		expect(ok).toEqual(expect.arrayContaining(['/gitlab/platform', '/images']));
-		expect(output).toMatch(new RegExp(`visited ${ok.length + failed.length} pages, ${failed.length} failed, in`));
+		expect(summaryOf(output)).toMatchObject([{ pages: ok.length + failed.length, failed: failed.length }]);
 	});
 
 	test('requests as many pages at once as --concurrency allows', async () => {
@@ -123,5 +128,6 @@ describe('npm run warm-up with wrong arguments', () => {
 
 		expect(exitCode).toBe(1);
 		expect(pagesOf(output).failed[0]).toMatch(/^\/: /);
+		expect(messagesOf(output).every(({ msg }) => !msg.includes('\n'))).toBe(true);
 	});
 });

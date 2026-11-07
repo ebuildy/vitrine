@@ -62,7 +62,7 @@ warmUp:
   concurrency: 4    # pages requested at once, 4 by default
 ```
 
-It starts from every Route with a fixed URL, every Menu link and every page of `/sitemap.xml`, and logs a report: a line per page, then how many it visited, how many failed and how long it took. `npm run dev` runs none. With `SERVER_CERT_PATH`, the server crawls `https://127.0.0.1`, so the certificate must hold that address.
+It starts from every Route with a fixed URL, every Menu link and every page of `/sitemap.xml`, and logs a report: a `Warm-up page ok` or `Warm-up page failed` message per page, with its `path` and, for a failure, its `problems`, then a `Warm-up finished` message with how many pages it visited (`pages`), how many failed (`failed`) and how long it took (`seconds`). `npm run dev` runs none. With `SERVER_CERT_PATH`, the server crawls `https://127.0.0.1`, so the certificate must hold that address.
 
 `npm run warm-up -- <base URL> [path...] [--concurrency N]`, or `node warm-up.ts` in the Container image, does the same from outside, as a cron. It reads no Settings, so it starts from `/`, or the paths given, and from `/sitemap.xml`. It exits with 1 when a page failed and with 2 on wrong arguments.
 

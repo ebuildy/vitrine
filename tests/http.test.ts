@@ -7,7 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { cacheStores } from './support/cache-stores.ts';
 import { startFakeHarbor } from './support/fake-harbor.ts';
 import type { FakeHarbor } from './support/fake-harbor.ts';
-import { devStartupFailure, runBuiltEntryDirectly, startDevVitrine, startupFailure, startVitrine, writeEnvFile, writeSettings } from './support/vitrine.ts';
+import { devStartupFailure, messagesOf, runBuiltEntryDirectly, startDevVitrine, startupFailure, startVitrine, writeEnvFile, writeSettings } from './support/vitrine.ts';
 import type { RunningVitrine } from './support/vitrine.ts';
 
 const redisCacheStore = cacheStores.find(({ name }) => name === 'Redis') as (typeof cacheStores)[number];
@@ -544,7 +544,7 @@ describe('a failing cache store', () => {
 		};
 		const first = await images();
 		const second = await images();
-		const stderr = vitrine.stderr();
+		const messages = vitrine.messages();
 
 		await vitrine.stop();
 		await harbor.stop();
@@ -555,7 +555,7 @@ describe('a failing cache store', () => {
 			expect(elapsed).toBeLessThan(5_000);
 		}
 		expect(harbor.repositoryListRequests()).toHaveLength(2);
-		expect(stderr).toContain('Cache store');
+		expect(messages).toContainEqual(expect.objectContaining({ level: 'error', msg: expect.stringContaining('Cache store') }));
 	});
 });
 
@@ -564,7 +564,7 @@ describe('invalid Settings stop startup', () => {
 	const route = { url: '/images', controller: 'harbor-images', params: { source: 'main-harbor' } };
 
 	test.each([
-		['malformed YAML', 'sources: [', 'settings.yaml'],
+		['malformed YAML', 'sources: [', 'Flow sequence in block collection'],
 		['a missing section', { sources: [source] }, 'routes'],
 		['an unknown section', { sources: [source], routes: [route], extra: true }, 'extra'],
 		['a misspelt key', { sources: [{ ...source, passwrodEnv: 'HARBOR_PASSWORD' }], routes: [route] }, 'passwrodEnv'],
@@ -592,10 +592,10 @@ describe('invalid Settings stop startup', () => {
 		['an unset Redis URL', { sources: [], routes: [], cacheStore: { type: 'redis', urlEnv: 'VITRINE_UNSET' } }, 'VITRINE_UNSET'],
 		['an unset secret', { sources: [{ ...source, username: 'robot', passwordEnv: 'VITRINE_UNSET' }], routes: [route] }, 'VITRINE_UNSET'],
 	])('with %s', async (_, settings, expectedError) => {
-		const { exitCode, output } = await startupFailure(settings);
+		const { exitCode, problems } = await startupFailure(settings);
 
 		expect(exitCode).toBe(1);
-		expect(output).toContain(expectedError);
+		expect(problems).toContainEqual(expect.stringContaining(expectedError));
 	});
 
 	test('with astro dev', async () => {
@@ -724,4 +724,70 @@ test('the example Settings file starts Vitrine', async () => {
 
 	await vitrine.stop();
 	expect(response.status).toBe(404);
+});
+
+describe('logging', () => {
+	const settings = { sources: [], routes: [] };
+
+	test('writes one JSON message per line on stdout, saying which Vitrine started', async () => {
+		const vitrine = await startVitrine(settings, { VITRINE_VERSION: '1.2.3' });
+		await vitrine.stop();
+
+		expect(vitrine.messages()).toContainEqual({ time: expect.any(String), level: 'info', msg: 'Starting Vitrine', version: '1.2.3' });
+		expect(vitrine.stderr()).toBe('');
+	});
+
+	test('reports each problem of Settings as an error message with its path', async () => {
+		const { exitCode, messages } = await startupFailure({ sources: [], routes: [{ url: '/a/', controller: 'nope' }, { url: '/b/', controller: 'nope' }] });
+
+		const invalid = messages.filter(({ msg }) => msg === 'Invalid Settings');
+		expect(exitCode).toBe(1);
+		expect(invalid.length).toBeGreaterThan(1);
+		for (const message of invalid) {
+			expect(message).toMatchObject({ level: 'error', path: expect.stringMatching(/settings\.yaml$/), problem: expect.any(String) });
+			expect(message.problem).not.toContain('\n');
+		}
+	});
+
+	test('keeps only the messages from LOG_LEVEL up', async () => {
+		const vitrine = await startVitrine(settings, { LOG_LEVEL: 'warn' });
+		await vitrine.stop();
+
+		expect(vitrine.messages()).toEqual([]);
+	});
+
+	test('prints nothing at LOG_LEVEL=silent, even a Settings problem', async () => {
+		const { exitCode, output } = await startupFailure({ sources: [] }, { LOG_LEVEL: 'silent' });
+
+		expect(exitCode).toBe(1);
+		expect(messagesOf(output)).toEqual([]);
+	});
+
+	test('stops on a LOG_LEVEL that is not a level, naming the valid ones', async () => {
+		const { exitCode, output } = await startupFailure(settings, { LOG_LEVEL: 'loud' });
+
+		expect(exitCode).toBe(1);
+		expect(output).toContain('LOG_LEVEL "loud" is not valid, use debug, info, warn, error or silent');
+	});
+
+	test('reads LOG_LEVEL from the env file, where the environment wins', async () => {
+		const fromFile = await startVitrine(settings, { VITRINE_ENV_FILE: writeEnvFile('LOG_LEVEL=error\n') });
+		await fromFile.stop();
+		const overridden = await startVitrine(settings, { VITRINE_ENV_FILE: writeEnvFile('LOG_LEVEL=error\n'), LOG_LEVEL: 'info' });
+		await overridden.stop();
+
+		expect(fromFile.messages()).toEqual([]);
+		expect(overridden.messages().map(({ msg }) => msg)).toContain('Starting Vitrine');
+	});
+
+	test('writes the messages of Astro in the same format, with its label', async () => {
+		const vitrine = await startDevVitrine(settings);
+		await vitrine.stop();
+
+		const messages = vitrine.messages();
+		expect(messages.length).toBeGreaterThan(0);
+		for (const message of messages) expect(message).toMatchObject({ time: expect.any(String), level: expect.any(String), msg: expect.any(String) });
+		expect(messages.some(({ label }) => label)).toBe(true);
+		expect(JSON.stringify(messages)).not.toContain('\\u001b');
+	});
 });

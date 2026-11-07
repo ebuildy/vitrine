@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { nameToEmoji } from 'gemoji';
 import { parse } from 'yaml';
 import { z } from 'zod';
+import { logger } from './logger.mjs';
 import { duplicates, routeProblems, routeSchema } from './router.ts';
 import type { Route } from './router.ts';
 import { templateProblems } from './template-checks.ts';
@@ -174,9 +175,14 @@ export interface Settings {
 }
 
 export class SettingsError extends Error {
+	readonly path: string;
+	readonly problems: string[];
+
 	constructor(path: string, problems: string[]) {
 		super(`Invalid Settings in ${path}:\n${problems.map((problem) => `  - ${problem}`).join('\n')}`);
 		this.name = 'SettingsError';
+		this.path = path;
+		this.problems = problems;
 	}
 }
 
@@ -315,7 +321,7 @@ export function prepareSettings() {
 		.map(({ url }) => `"${url}"`)
 		.join(', ');
 	if (!urls) return;
-	console.warn(
+	logger.warn(
 		templatesDisabled(process.env)
 			? `VITRINE_TEMPLATE_DISABLE is set, so these Routes ignore their Template: ${urls}`
 			: `The Templates of these Routes run as code on the server, so only people trusted with the server may edit Settings: ${urls}`,
