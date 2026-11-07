@@ -28,7 +28,7 @@ The two gauges walk the whole store: every file of `files` is read for its size,
 
 ## Source cache
 
-Labelled with `source` (`gitlab`, `harbor` or `nexus`) and `status`: `hit` or `miss`.
+Labelled with `source` (the type: `gitlab`, `harbor` or `nexus`), `name` (the name of the Source in Settings, so that two GitLabs, or a prod and a staging Nexus, can be told apart) and `status`: `hit` or `miss`.
 
 | Metric | Type | What it counts |
 | --- | --- | --- |
@@ -47,7 +47,7 @@ Only the warm-ups the server runs from `warmUp` in Settings are measured, not th
 
 ## Source HTTP calls
 
-Labelled with `source` (`gitlab`, `harbor` or `nexus`), `method` and `outcome`: `2xx`, `3xx`, `4xx`, `5xx`, or `error` for a call that failed without an answer, such as a timeout. The path is not a label.
+Labelled with `source` (the type: `gitlab`, `harbor` or `nexus`), `name` (the name of the Source in Settings), `method` and `outcome`: `2xx`, `3xx`, `4xx`, `5xx`, or `error` for a call that failed without an answer, such as a timeout. The path is not a label.
 
 | Metric | Type | What it counts |
 | --- | --- | --- |

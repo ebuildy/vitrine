@@ -10,7 +10,7 @@ import { startVitrine } from './support/vitrine.ts';
 import type { RunningVitrine } from './support/vitrine.ts';
 
 const repositories = [{ name: 'maven-releases', format: 'maven2', type: 'hosted' }];
-const NEXUS_CALLS = (outcome: string) => `vitrine_source_http_calls_total{source="nexus",method="GET",outcome="${outcome}"}`;
+const NEXUS_CALLS = (outcome: string) => `vitrine_source_http_calls_total{source="nexus",name="main-nexus",method="GET",outcome="${outcome}"}`;
 
 /** Every sample of a scrape, by its name and labels as written. */
 function samples(text: string): Map<string, number> {
@@ -58,7 +58,7 @@ describe('the values of /metrics', () => {
 		expect(nexus.requests.length).toBeGreaterThan(0);
 		expect(afterFirst.get(NEXUS_CALLS('2xx'))).toBe(nexus.requests.length);
 		expect(afterThree.get(NEXUS_CALLS('2xx'))).toBe(nexus.requests.length);
-		expect(afterThree.get(`vitrine_source_http_call_duration_seconds_count{source="nexus",method="GET",outcome="2xx"}`)).toBe(nexus.requests.length);
+		expect(afterThree.get(`vitrine_source_http_call_duration_seconds_count{source="nexus",name="main-nexus",method="GET",outcome="2xx"}`)).toBe(nexus.requests.length);
 	});
 
 	test('count a read of a Source as a miss the first time and a hit after, by Source', async () => {
@@ -70,8 +70,8 @@ describe('the values of /metrics', () => {
 		await visit('/nexus/main-nexus');
 		const third = await scrape();
 
-		const hit = 'vitrine_source_cache_lookups_total{source="nexus",status="hit"}';
-		const miss = 'vitrine_source_cache_lookups_total{source="nexus",status="miss"}';
+		const hit = 'vitrine_source_cache_lookups_total{source="nexus",name="main-nexus",status="hit"}';
+		const miss = 'vitrine_source_cache_lookups_total{source="nexus",name="main-nexus",status="miss"}';
 		// The page reads the repositories once per visit.
 		expect(first.get(miss)).toBe(1);
 		expect(first.has(hit)).toBe(false);
@@ -86,8 +86,8 @@ describe('the values of /metrics', () => {
 		await visit('/nexus/main-nexus');
 
 		const metrics = await scrape();
-		expect(metrics.get('vitrine_source_cache_lookups_total{source="nexus",status="miss"}')).toBe(2);
-		expect(metrics.has('vitrine_source_cache_lookups_total{source="nexus",status="hit"}')).toBe(false);
+		expect(metrics.get('vitrine_source_cache_lookups_total{source="nexus",name="main-nexus",status="miss"}')).toBe(2);
+		expect(metrics.has('vitrine_source_cache_lookups_total{source="nexus",name="main-nexus",status="hit"}')).toBe(false);
 	});
 
 	test('count every call again when the Source is not cached', async () => {
@@ -107,7 +107,7 @@ describe('the values of /metrics', () => {
 
 		const metrics = await scrape();
 
-		const labels = 'source="nexus",method="GET",outcome="2xx"';
+		const labels = 'source="nexus",name="main-nexus",method="GET",outcome="2xx"';
 		const count = metrics.get(`vitrine_source_http_call_duration_seconds_count{${labels}}`)!;
 		expect(count).toBeGreaterThan(0);
 		expect(metrics.get(`vitrine_source_http_call_duration_seconds_sum{${labels}}`)).toBeGreaterThan(0);
@@ -166,6 +166,30 @@ describe('the values of /metrics', () => {
 		expect(metrics.get('vitrine_http_requests_total{route="/nexus/:source",status_class="2xx"}')).toBe(2);
 		expect(metrics.get('vitrine_render_duration_seconds_count{route="/nexus/:source",status_class="2xx"}')).toBe(2);
 		expect([...metrics.keys()].some((key) => key.includes('main-nexus') && key.startsWith('vitrine_render'))).toBe(false);
+	});
+
+	test('tell two Sources of one type apart by their name', async () => {
+		const prod = await startFakeNexus({ repositories });
+		const staging = await startFakeNexus({ repositories });
+		staging.behave('down');
+		cleanups.push(prod.stop, staging.stop);
+		const vitrine = await startVitrine({
+			sources: [
+				{ name: 'prod-nexus', type: 'nexus', url: prod.url },
+				{ name: 'staging-nexus', type: 'nexus', url: staging.url },
+			],
+			routes: [{ url: '/nexus/:source', controller: 'nexus' }],
+		});
+		cleanups.push(() => vitrine.stop());
+		await (await fetch(`${vitrine.url}/nexus/prod-nexus`)).text();
+		await (await fetch(`${vitrine.url}/nexus/staging-nexus`)).text();
+
+		const metrics = samples(await (await fetch(`${vitrine.url}/metrics`)).text());
+
+		expect(metrics.get('vitrine_source_http_calls_total{source="nexus",name="prod-nexus",method="GET",outcome="2xx"}')).toBe(prod.requests.length);
+		expect(metrics.get('vitrine_source_http_calls_total{source="nexus",name="staging-nexus",method="GET",outcome="5xx"}')).toBe(staging.requests.length);
+		expect(metrics.get('vitrine_source_cache_lookups_total{source="nexus",name="prod-nexus",status="miss"}')).toBe(1);
+		expect(metrics.get('vitrine_source_cache_lookups_total{source="nexus",name="staging-nexus",status="miss"}')).toBe(1);
 	});
 
 	test('count the pages by status class, and a request matching no Route as unmatched', async () => {

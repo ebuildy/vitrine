@@ -22,7 +22,7 @@ const REPOSITORIES_PATH = '/service/rest/v1/repositories';
 /** Every Repository the credentials can read. Nexus answers the whole list at once. */
 export async function listRepositories(source: NexusSource, signal: AbortSignal): Promise<Repository[]> {
 	// Relative, so that a Nexus served under a path, such as https://example.com/nexus/, keeps it.
-	const response = await sourceFetch('nexus', new URL(REPOSITORIES_PATH.slice(1), withTrailingSlash(source.url)), { headers: authHeaders(source), signal });
+	const response = await sourceFetch(source, new URL(REPOSITORIES_PATH.slice(1), withTrailingSlash(source.url)), { headers: authHeaders(source), signal });
 	if (!response.ok) throw new Error(`Nexus "${source.name}" answered ${response.status} for ${REPOSITORIES_PATH}`);
 	const repositories: NexusRepository[] = await response.json();
 	return repositories.map(({ name, format, type }) => ({

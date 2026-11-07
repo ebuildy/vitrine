@@ -2,7 +2,7 @@ import { getCacheStore } from './cache-stores.ts';
 import { logger } from './logger.mjs';
 import type { Entry } from './cache-stores.ts';
 import { cacheStoreChanged, countCacheRead, countCacheWriteError, countSourceCacheLookup } from './metrics.ts';
-import type { SourceType } from './metrics.ts';
+import type { MeteredSource } from './metrics.ts';
 import { getSettings } from './settings.ts';
 
 export const SOURCE_TIMEOUT_MS = 10_000;
@@ -18,7 +18,7 @@ export type Loader<T> = (signal: AbortSignal) => Promise<T>;
 
 const inFlightReads = new Map<string, Promise<CachedContent<unknown>>>();
 
-export async function readThrough<T>(source: SourceType, key: string, allowedAgeMs: number, loader: Loader<T>): Promise<CachedContent<T>> {
+export async function readThrough<T>(source: MeteredSource, key: string, allowedAgeMs: number, loader: Loader<T>): Promise<CachedContent<T>> {
 	return shared(key, () => readStoreThenSource(source, key, allowedAgeMs, loader));
 }
 
@@ -32,10 +32,11 @@ function shared<T>(key: string, start: () => Promise<CachedContent<T>>): Promise
 }
 
 /** Reads a Source the way it is set up to be read, where an allowed age of zero leaves the cache out. */
-export function readSource<T>({ type, allowedAgeMinutes }: { type: SourceType; allowedAgeMinutes: number }, key: string, loader: Loader<T>): Promise<CachedContent<T>> {
-	if (allowedAgeMinutes !== 0) return readThrough(type, key, allowedAgeMinutes * 60_000, loader);
+export function readSource<T>(source: MeteredSource & { allowedAgeMinutes: number }, key: string, loader: Loader<T>): Promise<CachedContent<T>> {
+	const { allowedAgeMinutes } = source;
+	if (allowedAgeMinutes !== 0) return readThrough(source, key, allowedAgeMinutes * 60_000, loader);
 	return shared(key, () => {
-		countSourceCacheLookup(type, 'miss');
+		countSourceCacheLookup(source, 'miss');
 		return readUncached(key, loader);
 	});
 }
@@ -50,7 +51,7 @@ export async function readUncached<T>(key: string, loader: Loader<T>): Promise<C
 	}
 }
 
-async function readStoreThenSource<T>(source: SourceType, key: string, allowedAgeMs: number, loader: Loader<T>): Promise<CachedContent<T>> {
+async function readStoreThenSource<T>(source: MeteredSource, key: string, allowedAgeMs: number, loader: Loader<T>): Promise<CachedContent<T>> {
 	const entry = await readEntry(key);
 	if (entry && Date.now() - entry.loadedAt < allowedAgeMs) {
 		countSourceCacheLookup(source, 'hit');

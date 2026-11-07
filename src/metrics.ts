@@ -6,6 +6,12 @@ export const DEFAULT_BUCKETS = [0.1, 0.5, 1, 5, 10, 30];
 export type CacheStoreType = 'memory' | 'files' | 'redis';
 export type SourceType = 'gitlab' | 'harbor' | 'nexus';
 
+/** What labels a metric of a Source: its type, and its name in Settings, which tells two Sources of one type apart. */
+export interface MeteredSource {
+	type: SourceType;
+	name: string;
+}
+
 export class MetricsError extends Error {
 	readonly value: string;
 
@@ -53,9 +59,9 @@ interface Metrics {
 	warmUpDuration: Histogram;
 	warmUpUrlsFound: Counter;
 	warmUpPagesWithProblems: Counter;
-	sourceCacheLookups: Counter<'source' | 'status'>;
-	sourceCalls: Counter<'source' | 'method' | 'outcome'>;
-	sourceDuration: Histogram<'source' | 'method' | 'outcome'>;
+	sourceCacheLookups: Counter<'source' | 'name' | 'status'>;
+	sourceCalls: Counter<'source' | 'name' | 'method' | 'outcome'>;
+	sourceDuration: Histogram<'source' | 'name' | 'method' | 'outcome'>;
 	requests: Counter<'route' | 'status_class'>;
 	renderDuration: Histogram<'route' | 'status_class'>;
 }
@@ -104,14 +110,14 @@ function createMetrics(buckets: number[]): Metrics {
 		sourceCacheLookups: new Counter({
 			name: 'vitrine_source_cache_lookups_total',
 			help: 'Reads of a Source through the cache: a hit was answered from a fresh entry, a miss called the Source.',
-			labelNames: ['source', 'status'],
+			labelNames: ['source', 'name', 'status'],
 			registers: [registry],
 		}),
-		sourceCalls: new Counter({ name: 'vitrine_source_http_calls_total', help: 'HTTP calls to Sources.', labelNames: ['source', 'method', 'outcome'], registers: [registry] }),
+		sourceCalls: new Counter({ name: 'vitrine_source_http_calls_total', help: 'HTTP calls to Sources.', labelNames: ['source', 'name', 'method', 'outcome'], registers: [registry] }),
 		sourceDuration: new Histogram({
 			name: 'vitrine_source_http_call_duration_seconds',
 			help: 'How long HTTP calls to Sources took to answer.',
-			labelNames: ['source', 'method', 'outcome'],
+			labelNames: ['source', 'name', 'method', 'outcome'],
 			buckets,
 			registers: [registry],
 		}),
@@ -175,8 +181,8 @@ export function countCacheWriteError(store: CacheStoreType) {
 }
 
 /** A read of a Source: a hit when a fresh entry answered it, a miss when the Source had to be called. */
-export function countSourceCacheLookup(source: SourceType, status: 'hit' | 'miss') {
-	metrics().sourceCacheLookups.inc({ source, status });
+export function countSourceCacheLookup({ type, name }: MeteredSource, status: 'hit' | 'miss') {
+	metrics().sourceCacheLookups.inc({ source: type, name, status });
 }
 
 export function recordWarmUp({ durationMs, urlsFound, pagesWithProblems }: { durationMs: number; urlsFound: number; pagesWithProblems: number }) {
@@ -202,7 +208,7 @@ function outcomeOf(status: number) {
 }
 
 /** `fetch` for a call to a Source, counted and timed until the Source answers. A call that throws counts as `error`. */
-export async function sourceFetch(source: SourceType, input: string | URL, init?: RequestInit): Promise<Response> {
+export async function sourceFetch({ type, name }: MeteredSource, input: string | URL, init?: RequestInit): Promise<Response> {
 	const { sourceCalls, sourceDuration } = metrics();
 	const method = (init?.method ?? 'GET').toUpperCase();
 	const started = performance.now();
@@ -212,7 +218,7 @@ export async function sourceFetch(source: SourceType, input: string | URL, init?
 		outcome = outcomeOf(response.status);
 		return response;
 	} finally {
-		const labels = { source, method, outcome };
+		const labels = { source: type, name, method, outcome };
 		sourceCalls.inc(labels);
 		sourceDuration.observe(labels, (performance.now() - started) / 1000);
 	}
