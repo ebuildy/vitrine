@@ -1,4 +1,4 @@
-import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom-client';
+import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from '@prometheus-io/client';
 
 export const DEFAULT_BUCKETS = [0.1, 0.5, 1, 5, 10, 30];
 

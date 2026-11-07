@@ -60,4 +60,4 @@ Labelled with `source` (`gitlab`, `harbor` or `nexus`), `method` and `outcome`: 
 | --- | --- | --- |
 | `vitrine_render_duration_seconds` | histogram | How long a page took to render, labelled with `route`: the URL of its Route in Settings, such as `/nexus/:source`, never the URL requested. A page with a Template is timed until it is complete; any other page streams, so it is timed until its response starts. |
 
-The default Node process metrics of `prom-client` are served too, such as `process_cpu_user_seconds_total` and `nodejs_eventloop_lag_seconds`.
+The default Node process metrics of `@prometheus-io/client` are served too, such as `process_cpu_user_seconds_total` and `nodejs_eventloop_lag_seconds`.
