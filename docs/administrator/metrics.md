@@ -12,6 +12,12 @@ Vitrine serves Prometheus metrics at `GET /metrics`, or at `metrics.path`, in Pr
 
 On Kubernetes, the [Helm chart](../../charts/vitrine/README.md#metrics) renders a Prometheus Operator `ServiceMonitor`.
 
+## Build
+
+| Metric | Type | What it counts |
+| --- | --- | --- |
+| `vitrine_build_info` | gauge | Always `1`, labelled with `version`: the `VITRINE_VERSION` the Container image sets, and `dev` from source. Graph a metric against it to tie a regression to a deploy, such as `rate(vitrine_http_requests_total{status_class="5xx"}[5m]) * on() group_left(version) vitrine_build_info`. |
+
 ## Cache
 
 Labelled with `store`: `memory`, `files` or `redis`.

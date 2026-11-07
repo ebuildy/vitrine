@@ -78,6 +78,8 @@ function createMetrics(buckets: number[]): Metrics {
 	const registry = new Registry();
 	collectDefaultMetrics({ register: registry });
 	const cacheStats: Metrics['cacheStats'] = {};
+	// The version the Container image sets, as start.ts prints it, and dev from source.
+	new Gauge({ name: 'vitrine_build_info', help: 'The version of Vitrine that runs, always 1.', labelNames: ['version'], registers: [registry] }).set({ version: process.env.VITRINE_VERSION ?? 'dev' }, 1);
 	const scraped = (name: string, help: string, pick: (stats: CacheStats) => number | undefined) =>
 		new Gauge({
 			name,

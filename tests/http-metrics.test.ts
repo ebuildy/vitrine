@@ -115,6 +115,18 @@ describe('/metrics', () => {
 		expect(sample(text, 'vitrine_warmup_pages_with_problems_total')).toBe(0);
 	});
 
+	test('names the version that runs, dev from source', async () => {
+		const { vitrine } = await start();
+
+		expect(sample((await scrape(vitrine)).text, 'vitrine_build_info{version="dev"}')).toBe(1);
+	});
+
+	test('names the version of VITRINE_VERSION', async () => {
+		const { vitrine } = await start({}, { VITRINE_VERSION: '1.2.3' });
+
+		expect(sample((await scrape(vitrine)).text, 'vitrine_build_info{version="1.2.3"}')).toBe(1);
+	});
+
 	test('is open without METRICS_TOKEN', async () => {
 		const { vitrine } = await start();
 
