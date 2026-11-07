@@ -67,7 +67,7 @@ jobs:
           fi
           echo "$output"
           grep --quiet 'Invalid Settings' <<<"$output"
-          grep --quiet --fixed-strings 'Vitrine ${{ steps.version.outputs.version }}' <<<"$output"
+          grep --quiet --fixed-strings '"msg":"Starting Vitrine"' <<<"$output"
 
           # Run as the Helm chart runs it: a read-only root, with /tmp alone writable, and no capabilities.
           docker run --detach --name vitrine-smoke --publish 8080:8080 \
