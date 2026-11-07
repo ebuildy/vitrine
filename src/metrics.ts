@@ -209,19 +209,63 @@ function outcomeOf(status: number) {
 	return `${Math.floor(status / 100)}xx`;
 }
 
-/** `fetch` for a call to a Source, counted and timed until the Source answers. A call that throws counts as `error`. */
+/**
+ * `fetch` for a call to a Source, counted and timed until the Source has answered in full: for a 2xx answer, until its body is read to
+ * the end, which is the slow part of a large page. Any other answer is counted at its headers, as its body is rarely read.
+ * A call that throws, or whose body fails, counts as `error`.
+ */
 export async function sourceFetch({ type, name }: MeteredSource, input: string | URL, init?: RequestInit): Promise<Response> {
 	const { sourceCalls, sourceDuration } = metrics();
 	const method = (init?.method ?? 'GET').toUpperCase();
 	const started = performance.now();
-	let outcome = 'error';
-	try {
-		const response = await fetch(input, init);
-		outcome = outcomeOf(response.status);
-		return response;
-	} finally {
+	const record = (outcome: string) => {
 		const labels = { source: type, name, method, outcome };
 		sourceCalls.inc(labels);
 		sourceDuration.observe(labels, (performance.now() - started) / 1000);
+	};
+
+	let response: Response;
+	try {
+		response = await fetch(input, init);
+	} catch (error) {
+		record('error');
+		throw error;
 	}
+	const outcome = outcomeOf(response.status);
+	if (!response.ok || !response.body) {
+		record(outcome);
+		return response;
+	}
+	return new Response(untilRead(response.body, (failed) => record(failed ? 'error' : outcome)), response);
+}
+
+/** The same body, telling `done` once, when it has been read to the end, or has failed or been cancelled. */
+function untilRead(body: ReadableStream<Uint8Array>, done: (failed: boolean) => void): ReadableStream<Uint8Array> {
+	const reader = body.getReader();
+	let finished = false;
+	const finish = (failed: boolean) => {
+		if (finished) return;
+		finished = true;
+		done(failed);
+	};
+	return new ReadableStream({
+		async pull(controller) {
+			try {
+				const chunk = await reader.read();
+				if (chunk.done) {
+					finish(false);
+					controller.close();
+				} else {
+					controller.enqueue(chunk.value);
+				}
+			} catch (error) {
+				finish(true);
+				controller.error(error);
+			}
+		},
+		cancel(reason) {
+			finish(true);
+			return reader.cancel(reason);
+		},
+	});
 }

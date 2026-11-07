@@ -58,7 +58,7 @@ Labelled with `source` (the type: `gitlab`, `harbor` or `nexus`), `name` (the na
 | Metric | Type | What it counts |
 | --- | --- | --- |
 | `vitrine_source_http_calls_total` | counter | Calls to a Source. |
-| `vitrine_source_http_call_duration_seconds` | histogram | How long the Source took to answer. |
+| `vitrine_source_http_call_duration_seconds` | histogram | How long the Source took to answer. For a `2xx` answer, it runs until the body is read to the end, which is the slow part of a large page, and a body that fails halfway counts as `error`. Any other answer is timed until its headers. |
 
 ## Rendering and Node
 
