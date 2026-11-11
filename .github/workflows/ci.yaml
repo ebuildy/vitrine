@@ -22,4 +22,21 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run build --if-present
-      - run: npm test
+      - run: npm run test:coverage
+      - name: Summarize coverage
+        if: ${{ !cancelled() && hashFiles('coverage/coverage-summary.json') != '' }}
+        run: |
+          node --input-type=module -e "
+          import { readFileSync } from 'node:fs';
+          const { total } = JSON.parse(readFileSync('coverage/coverage-summary.json', 'utf8'));
+          const rows = ['statements', 'branches', 'functions', 'lines'].map((k) => '| ' + k + ' | ' + total[k].pct + ' % | ' + total[k].covered + ' / ' + total[k].total + ' |');
+          console.log(['## Coverage', '', '| Metric | Share | Covered / total |', '|---|---|---|', ...rows].join('\\n'));
+          " >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 14

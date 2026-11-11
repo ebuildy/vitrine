@@ -18,6 +18,8 @@ A change under `charts/` runs `.github/workflows/chart.yaml`: `helm lint`, kubec
 
 `npm test` and `npm run test:e2e` also write an HTML report, to `vitest-report/` and `playwright-report/` (with traces of failed tests), and never open a browser. `npm run test:report` and `npm run test:e2e:report` serve them, each on a free port.
 
+`npm run test:coverage` runs the same tests with v8 coverage, to `coverage/` (git ignores it); `npm run test:coverage:report` serves it. CI fails under the floor of `test.coverage.thresholds` in `vitest.config.ts`: raise it with the coverage, never lower it.
+
 To see a page with content, run `npm run demo`: it serves fake Sources to `astro dev` in the foreground, with `demo/settings.yaml` instead of `settings.yaml`. Seed data lives in `demo/content.ts`.
 
 ### Several worktrees at once
