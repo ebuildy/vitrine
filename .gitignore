@@ -31,6 +31,7 @@ test-results/
 .test-build/
 playwright-report/
 vitest-report/
+coverage/
 
 # the demo Settings, at the ports of this run
 /demo/.settings-*.yaml

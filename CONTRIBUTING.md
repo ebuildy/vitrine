@@ -9,6 +9,12 @@
 5. Ship the documentation of a change in the same commit, and run `npm run check` and `npm test`. [`AGENTS.md`](AGENTS.md) lists which document each kind of change updates, and what the tests need.
 6. Open a pull request against `main`. `image.yaml` runs the tests, then builds the Container image and smoke tests it, without pushing it.
 
+## Coverage
+
+`ci.yaml` runs `npm run test:coverage` (Vitest with the v8 provider), prints the totals in the job summary and uploads the HTML and `lcov` report as the `coverage` artifact. `vitest.config.ts` sets a floor under `test.coverage.thresholds`: a pull request that drops coverage below it goes red. Raise the floor when coverage grows, never lower it to get a pull request through.
+
+Locally, `npm run test:coverage` writes `coverage/` and `npm run test:coverage:report` serves it. Tests that start Vitrine as a child process do not count, because v8 only sees the process that runs Vitest.
+
 ## Releases
 
 Nobody bumps `package.json`, edits `CHANGELOG.md` or pushes a `v*` tag by hand. [release-please](https://github.com/googleapis/release-please-action) does it, in `.github/workflows/release.yaml`:
