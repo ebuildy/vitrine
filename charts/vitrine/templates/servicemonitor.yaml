@@ -1,0 +1,22 @@
+{{- if .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "vitrine.fullname" . }}
+  labels:
+    {{- include "vitrine.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "vitrine.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: {{ dig "metrics" "path" "/metrics" .Values.settings | quote }}
+      {{- with .Values.metrics.serviceMonitor.bearerTokenSecret }}
+      authorization:
+        type: Bearer
+        credentials:
+          name: {{ .name | quote }}
+          key: {{ .key | quote }}
+      {{- end }}
+{{- end }}

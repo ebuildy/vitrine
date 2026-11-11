@@ -22,6 +22,10 @@ A change under `charts/` runs `.github/workflows/chart.yaml`: `helm lint`, kubec
 
 To see a page with content, run `npm run demo`: it serves fake Sources to `astro dev` in the foreground, with `demo/settings.yaml` instead of `settings.yaml`. Seed data lives in `demo/content.ts`.
 
+### Dependencies
+
+Never add a deprecated package, nor keep one. Before `npm install <package>`, run `npm view <package> deprecated`: any output means the package has a successor or is abandoned, so install what it names instead. The check also applies to a replacement, and to a package whose `npm install` prints a `deprecated` warning. When you touch a dependency, run `npm view` for it, and replace one that turned deprecated in the same pull request.
+
 ### Several worktrees at once
 
 `npm run dev`, `npm run demo` and `npm test` run side by side in several worktrees:

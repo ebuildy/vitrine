@@ -1,0 +1,18 @@
+# A Prometheus Operator ServiceMonitor that reads /metrics with the token of METRICS_TOKEN.
+settings:
+  sources: []
+  routes:
+    - url: /
+      controller: harbor-images
+extraEnvs:
+  - name: METRICS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: vitrine-metrics
+        key: token
+metrics:
+  serviceMonitor:
+    enabled: true
+    bearerTokenSecret:
+      name: vitrine-metrics
+      key: token

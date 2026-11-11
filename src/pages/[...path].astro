@@ -11,6 +11,7 @@ import Navigation from '../controllers/Navigation.astro';
 import Search from '../controllers/Search.astro';
 import Nexus from '../controllers/Nexus.astro';
 import Layout from '../layouts/Layout.astro';
+import { UNMATCHED_ROUTE } from '../metrics.ts';
 import { matchRoute } from '../router.ts';
 import type { ControllerName } from '../router.ts';
 import { getGitlabSource, getSettings } from '../settings.ts';
@@ -40,12 +41,16 @@ const subjectReaders: Partial<Record<ControllerName, (params: Record<string, str
 
 const url = `/${Astro.params.path ?? ''}`;
 const match = matchRoute(getSettings(), url);
-if (!match) return new Response(null, { status: 404 });
+if (!match) {
+	Astro.locals.routeTemplate = UNMATCHED_ROUTE;
+	return new Response(null, { status: 404 });
+}
 
 const Controller = controllers[match.route.controller];
 const { source, group, project } = match.params;
 const subject = await subjectReaders[match.route.controller]?.(match.params);
 if (subject && !subject.error && !subject.data) return new Response(null, { status: 404 });
+Astro.locals.routeTemplate = match.route.url;
 Astro.locals.showsTemplate = Boolean(match.route.compiled) && !subject?.error;
 ---
 
