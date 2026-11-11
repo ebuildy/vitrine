@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.0](https://github.com/ebuildy/vitrine/compare/v0.1.0...v0.2.0) (2026-11-11)
+
+
+### Features
+
+* log JSON lines on stdout, with the level set by LOG_LEVEL ([8cb0d7b](https://github.com/ebuildy/vitrine/commit/8cb0d7b687686c335a4597d8f908a0c5c73368bf))
+* log JSON lines on stdout, with the level set by LOG_LEVEL ([86b67b3](https://github.com/ebuildy/vitrine/commit/86b67b341753ae8a91238c75a8e576935d00bcc6)), closes [#57](https://github.com/ebuildy/vitrine/issues/57)
+
+
+### Bug Fixes
+
+* start with default Settings when the Settings file is missing ([70d16e8](https://github.com/ebuildy/vitrine/commit/70d16e870b414788ed3a57239ddcffe840be9db7))
+* start with default Settings when the Settings file is missing ([a81a331](https://github.com/ebuildy/vitrine/commit/a81a331b4009e34fc312fe6daf4e1d1371dc70b7)), closes [#55](https://github.com/ebuildy/vitrine/issues/55)
+* update smoke test to match JSON log format ([cc0096e](https://github.com/ebuildy/vitrine/commit/cc0096e2d70741e0e31c18ff8373df7eeb0de64c))
+
 ## [0.1.0](https://github.com/ebuildy/vitrine/compare/v0.0.1...v0.1.0) (2026-11-04)
 
 
