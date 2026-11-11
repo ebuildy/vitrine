@@ -147,10 +147,10 @@ describe('/metrics', () => {
 	});
 
 	test('stops startup on a Route at /metrics, as Vitrine serves that URL itself', async () => {
-		const { exitCode, output } = await startupFailure({ sources: [], routes: [{ url: '/metrics', controller: 'search' }] });
+		const { exitCode, problems } = await startupFailure({ sources: [], routes: [{ url: '/metrics', controller: 'search' }] });
 
 		expect(exitCode).toBe(1);
-		expect(output).toContain('Route "/metrics": Vitrine serves this URL itself');
+		expect(problems).toContainEqual(expect.stringContaining('Route "/metrics": Vitrine serves this URL itself'));
 	});
 
 	test('serves a Route at /metrics instead, with metrics.enabled: false', async () => {
@@ -181,7 +181,7 @@ describe('/metrics', () => {
 		const reserved = await startupFailure({ sources: [], routes: [{ url: '/stats', controller: 'search' }], metrics: { path: '/stats' } });
 
 		expect(reserved.exitCode).toBe(1);
-		expect(reserved.output).toContain('Route "/stats": Vitrine serves this URL itself');
+		expect(reserved.problems).toContainEqual(expect.stringContaining('Route "/stats": Vitrine serves this URL itself'));
 	});
 
 	test('serves a Route at /metrics when metrics.path moved', async () => {
@@ -223,9 +223,9 @@ describe('/metrics', () => {
 		const nexus = await startFakeNexus({ repositories });
 		cleanups.push(nexus.stop);
 
-		const { exitCode, output } = await startupFailure(settingsFor(nexus, { type: 'memory' }), { METRICS_BUCKETS: '5,1' });
+		const { exitCode, messages } = await startupFailure(settingsFor(nexus, { type: 'memory' }), { METRICS_BUCKETS: '5,1' });
 
 		expect(exitCode).toBe(1);
-		expect(output).toContain('Invalid METRICS_BUCKETS "5,1"');
+		expect(messages).toContainEqual(expect.objectContaining({ level: 'error', msg: 'Invalid METRICS_BUCKETS', value: '5,1' }));
 	});
 });

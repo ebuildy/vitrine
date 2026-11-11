@@ -1,4 +1,5 @@
 import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from '@prometheus-io/client';
+import { logger } from './logger.mjs';
 
 export const DEFAULT_BUCKETS = [0.1, 0.5, 1, 5, 10, 30];
 
@@ -92,7 +93,7 @@ function createMetrics(buckets: number[]): Metrics {
 					const value = pick(await measure(cacheStats.current));
 					if (value !== undefined) this.set({ store: cacheStats.current.store }, value);
 				} catch (error) {
-					console.error('Cache store could not be measured:', error);
+					logger.error('Cache store could not be measured', { error });
 				}
 			},
 		});
