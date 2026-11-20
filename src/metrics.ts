@@ -210,20 +210,22 @@ function outcomeOf(status: number) {
 	return `${Math.floor(status / 100)}xx`;
 }
 
+/** A call to a Source that has answered in full, with its status, or `error` when it failed without an answer: counted and timed. */
+export function recordSourceCall({ type, name }: MeteredSource, method: string, result: number | 'error', seconds: number) {
+	const labels = { source: type, name, method, outcome: result === 'error' ? result : outcomeOf(result) };
+	metrics().sourceCalls.inc(labels);
+	metrics().sourceDuration.observe(labels, seconds);
+}
+
 /**
  * `fetch` for a call to a Source, counted and timed until the Source has answered in full: for a 2xx answer, until its body is read to
  * the end, which is the slow part of a large page. Any other answer is counted at its headers, as its body is rarely read.
  * A call that throws, or whose body fails, counts as `error`.
  */
-export async function sourceFetch({ type, name }: MeteredSource, input: string | URL, init?: RequestInit): Promise<Response> {
-	const { sourceCalls, sourceDuration } = metrics();
+export async function sourceFetch(source: MeteredSource, input: string | URL, init?: RequestInit): Promise<Response> {
 	const method = (init?.method ?? 'GET').toUpperCase();
 	const started = performance.now();
-	const record = (outcome: string) => {
-		const labels = { source: type, name, method, outcome };
-		sourceCalls.inc(labels);
-		sourceDuration.observe(labels, (performance.now() - started) / 1000);
-	};
+	const record = (result: number | 'error') => recordSourceCall(source, method, result, (performance.now() - started) / 1000);
 
 	let response: Response;
 	try {
@@ -232,12 +234,11 @@ export async function sourceFetch({ type, name }: MeteredSource, input: string |
 		record('error');
 		throw error;
 	}
-	const outcome = outcomeOf(response.status);
 	if (!response.ok || !response.body) {
-		record(outcome);
+		record(response.status);
 		return response;
 	}
-	return new Response(untilRead(response.body, (failed) => record(failed ? 'error' : outcome)), response);
+	return new Response(untilRead(response.body, (failed) => record(failed ? 'error' : response.status)), response);
 }
 
 /** The same body, telling `done` once, when it has been read to the end, or has failed or been cancelled. */
