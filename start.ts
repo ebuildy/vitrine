@@ -1,6 +1,7 @@
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import { checkLogLevel, logger } from './src/logger.mjs';
+import { MetricsError } from './src/metrics.ts';
 import { fixedUrls } from './src/router.ts';
 import { getSettings, loadEnvFile, prepareSettings, SettingsError } from './src/settings.ts';
 import { scheduleWarmUps } from './src/warm-up.ts';
@@ -23,6 +24,8 @@ try {
 } catch (error) {
 	if (error instanceof SettingsError) {
 		for (const problem of error.problems) logger.error('Invalid Settings', { path: error.path, problem });
+	} else if (error instanceof MetricsError) {
+		logger.error('Invalid METRICS_BUCKETS', { value: error.value, problem: error.message });
 	} else {
 		logger.error('Could not start', { error });
 	}

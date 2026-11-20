@@ -25,6 +25,7 @@
   "dependencies": {
     "@astrojs/compiler-rs": "^0.5.2",
     "@astrojs/node": "^11.1.9",
+    "@prometheus-io/client": "^0.16.1",
     "astro": "^7.4.4",
     "gemoji": "^8.1.0",
     "ioredis": "^5.11.1",

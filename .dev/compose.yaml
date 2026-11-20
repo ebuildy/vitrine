@@ -1,0 +1,136 @@
+# Prometheus, Loki and Grafana for the dashboard of Vitrine's metrics and logs: `docker compose -f .dev/compose.yaml up -d`.
+# The first start backfills 7 days of fake metrics into Prometheus and of fake logs into Loki, then Prometheus scrapes a Vitrine running on the host.
+# `docker compose -f .dev/compose.yaml down -v` forgets everything, so the next start backfills anew.
+name: vitrine-observability
+
+services:
+  # Writes 7 days of fake metrics, in OpenMetrics text, and of fake logs, ending now: it plays events through the real src/metrics.ts and
+  # src/logger.mjs of the repository, which need its node_modules (`npm install`). Skipped once Prometheus and Loki hold them.
+  generate:
+    image: docker.io/library/node:24-alpine
+    working_dir: /repo/.dev/backfill
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        if [ -e /prometheus/.backfilled ] && [ -e /out/.loki-backfilled ]; then echo 'already backfilled'; exit 0; fi
+        [ -d /repo/node_modules/@prometheus-io ] || { echo 'run npm install first: the fake metrics are made by the code of src/metrics.ts' >&2; exit 1; }
+        node generate.ts > /out/metrics.om
+    environment:
+      BACKFILL_DAYS: "7"
+      BACKFILL_STEP_SECONDS: "180"
+      BACKFILL_LOGS_FILE: /out/logs.tsv
+    volumes:
+      - ..:/repo:ro
+      - backfill:/out
+      - prometheus-data:/prometheus:ro
+
+  # Turns that file into TSDB blocks inside Prometheus's data directory.
+  backfill:
+    image: docker.io/prom/prometheus:v3.5.0
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        if [ -e /prometheus/.backfilled ]; then echo 'already backfilled'; exit 0; fi
+        promtool tsdb create-blocks-from openmetrics --max-block-duration=24h /out/metrics.om /prometheus && touch /prometheus/.backfilled
+    volumes:
+      - backfill:/out:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      generate:
+        condition: service_completed_successfully
+
+  loki:
+    image: docker.io/grafana/loki:3.7.9
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+
+  # Pushes those logs to Loki, once it is ready, with the timestamps they were written with. Then the two big files are of no use: it removes them.
+  logs:
+    image: docker.io/library/node:24-alpine
+    working_dir: /backfill
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        if [ -e /out/.loki-backfilled ]; then echo 'already backfilled'; exit 0; fi
+        node push-logs.ts && touch /out/.loki-backfilled && rm -f /out/logs.tsv /out/metrics.om
+    environment:
+      LOKI_URL: http://loki:3100
+      BACKFILL_LOGS_FILE: /out/logs.tsv
+    volumes:
+      - ./backfill:/backfill:ro
+      - backfill:/out
+    depends_on:
+      loki:
+        condition: service_started
+      backfill:
+        condition: service_completed_successfully
+
+  prometheus:
+    image: docker.io/prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+    ports:
+      - "127.0.0.1:9090:9090"
+    # Reaches a Vitrine on the host, see prometheus/targets.yml.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/targets.yml:/etc/prometheus/targets.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      backfill:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9090/-/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  grafana:
+    image: docker.io/grafana/grafana:13.3.1
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      # Anonymous Admin: a local tool, bound to 127.0.0.1.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      logs:
+        condition: service_completed_successfully
+
+  # Loads grafana/dashboards/*.json, and again at each `up`: edit the dashboard in the files, as the UI's changes are overwritten.
+  dashboards:
+    image: docker.io/curlimages/curl:8.15.0
+    entrypoint: ["sh", "/provision.sh"]
+    environment:
+      GRAFANA_URL: http://grafana:3000
+    volumes:
+      - ./grafana/provision.sh:/provision.sh:ro
+      - ./grafana/dashboards:/dashboards:ro
+    depends_on:
+      grafana:
+        condition: service_healthy
+
+volumes:
+  backfill:
+  loki-data:
+  prometheus-data:
+  grafana-data:

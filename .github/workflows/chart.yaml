@@ -67,7 +67,7 @@ jobs:
           sha256sum --check --ignore-missing CHECKSUMS
           tar --extract --gzip --file kubeconform-linux-amd64.tar.gz kubeconform
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-      # The default values, then each set of charts/vitrine/ci: a files cache store, Valkey, and Ingress, HTTPRoute and NetworkPolicy.
+      # The default values, then each set of charts/vitrine/ci: a files cache store, Valkey, and Ingress, HTTPRoute and NetworkPolicy, and a ServiceMonitor, which kubeconform skips as it is the Prometheus Operator's CRD.
       - name: Lint, and check every manifest against the Kubernetes and Gateway API schemas
         run: |
           for values in charts/vitrine/values.yaml charts/vitrine/ci/*-values.yaml; do
@@ -75,6 +75,7 @@ jobs:
             helm lint --strict charts/vitrine --values "$values"
             helm template vitrine charts/vitrine --values "$values" \
               | kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
+                  -skip ServiceMonitor \
                   -schema-location default \
                   -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
             echo "::endgroup::"

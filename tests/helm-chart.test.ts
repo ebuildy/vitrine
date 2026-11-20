@@ -214,6 +214,29 @@ describe('the Helm chart', () => {
 		expect(policy.spec.egress).toBeUndefined();
 	});
 
+	test('renders no ServiceMonitor by default', () => {
+		expect(find(render(), 'ServiceMonitor')).toBeUndefined();
+	});
+
+	test('renders a ServiceMonitor that reads /metrics with the bearer token of a Secret', () => {
+		const monitor = find(render({ metrics: { serviceMonitor: { enabled: true, bearerTokenSecret: { name: 'vitrine-metrics', key: 'token' } } } }), 'ServiceMonitor')!;
+
+		expect(monitor.apiVersion).toBe('monitoring.coreos.com/v1');
+		expect(monitor.spec.endpoints).toEqual([{ port: 'http', path: '/metrics', authorization: { type: 'Bearer', credentials: { name: 'vitrine-metrics', key: 'token' } } }]);
+	});
+
+	test('scrapes the metrics at the path of the Settings', () => {
+		const monitor = find(render({ settings: { ...SETTINGS, metrics: { path: '/stats' } }, metrics: { serviceMonitor: { enabled: true } } }), 'ServiceMonitor')!;
+
+		expect(monitor.spec.endpoints[0].path).toBe('/stats');
+	});
+
+	test('renders a ServiceMonitor without a token when no Secret is given', () => {
+		const monitor = find(render({ metrics: { serviceMonitor: { enabled: true } } }), 'ServiceMonitor')!;
+
+		expect(monitor.spec.endpoints).toEqual([{ port: 'http', path: '/metrics' }]);
+	});
+
 	test('deploys Valkey beside Vitrine when enabled', () => {
 		const service = render({ valkey: { enabled: true } }).find((manifest) => manifest.metadata.name === 'vitrine-valkey' && manifest.kind === 'Service');
 

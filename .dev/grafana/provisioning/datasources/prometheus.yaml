@@ -1,0 +1,13 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      # The minimum step of a query: the backfilled metrics are 3 minutes apart, so a rate over less than 4 of them would be empty.
+      timeInterval: 3m

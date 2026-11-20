@@ -1,3 +1,4 @@
+import { sourceFetch } from '../metrics.ts';
 import type { HarborSource } from '../settings.ts';
 
 const PAGE_SIZE = 100;
@@ -79,7 +80,7 @@ export async function listProjects(source: HarborSource, signal: AbortSignal): P
 /** Harbor keeps quotas from some readers, so a refusal only leaves the storage used unknown. */
 async function fetchStorageUsed(source: HarborSource, projectId: number, signal: AbortSignal): Promise<number | undefined> {
 	const path = `/api/v2.0/projects/${projectId}/summary`;
-	const response = await fetch(new URL(path, source.url), { headers: authHeaders(source), signal });
+	const response = await sourceFetch(source, new URL(path, source.url), { headers: authHeaders(source), signal });
 	if (response.status === 401 || response.status === 403) return undefined;
 	if (!response.ok) throw new Error(`Harbor "${source.name}" answered ${response.status} for ${path}`);
 	const summary: HarborProjectSummary = await response.json();
@@ -132,7 +133,7 @@ async function fetchAllPages<T>(source: HarborSource, path: string, query: Recor
 		const url = new URL(path, source.url);
 		url.search = new URLSearchParams({ ...query, page: String(page), page_size: String(PAGE_SIZE) }).toString();
 
-		const response = await fetch(url, { headers: authHeaders(source), signal });
+		const response = await sourceFetch(source, url, { headers: authHeaders(source), signal });
 		if (!response.ok) throw new Error(`Harbor "${source.name}" answered ${response.status} for ${path}`);
 		const batch: T[] = await response.json();
 		items.push(...batch);

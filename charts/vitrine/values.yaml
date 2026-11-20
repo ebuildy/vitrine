@@ -112,6 +112,16 @@ httpRoute:
             type: PathPrefix
             value: /
 
+# -- Vitrine serves Prometheus metrics at /metrics on the Service's port. METRICS_TOKEN, set with extraEnvs, protects them.
+metrics:
+  serviceMonitor:
+    # -- Renders a Prometheus Operator ServiceMonitor, which needs the Operator's CRDs installed.
+    enabled: false
+    # -- The Secret name and key that hold the token, the same Secret that METRICS_TOKEN reads through extraEnvs. Left out, Prometheus sends no token.
+    bearerTokenSecret: {}
+    #   name: vitrine-metrics
+    #   key: token
+
 # -- A NetworkPolicy around Vitrine's pods. ingress and egress are YAML strings, rendered with tpl, each a list of rules.
 networkPolicy:
   enabled: false

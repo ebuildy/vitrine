@@ -2,6 +2,10 @@ declare namespace App {
 	interface Locals {
 		/** Set by a page that renders a Template, for the middleware. */
 		showsTemplate?: boolean;
+		/** Set by a page for the Route it matched, which labels its render time. */
+		routeTemplate?: string;
+		/** Set by the middleware once the request is counted in the metrics. */
+		requestCounted?: boolean;
 	}
 }
 
