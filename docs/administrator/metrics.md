@@ -70,3 +70,39 @@ Labelled with `source` (the type: `gitlab`, `harbor` or `nexus`), `name` (the na
 `route` is the URL of the Route in Settings, such as `/nexus/:source`, never the URL requested. A request that matches no Route has `route="unmatched"`, which no Route URL can be, as they start with `/`. Vitrine's own pages, `/sitemap.xml` and the metrics, count for none. With these, `sum(rate(vitrine_http_requests_total{status_class="5xx"}[5m])) / sum(rate(vitrine_http_requests_total[5m]))` is the ratio of 5xx.
 
 The default Node process metrics of `@prometheus-io/client` are served too, such as `process_cpu_user_seconds_total` and `nodejs_eventloop_lag_seconds`.
+
+## Grafana board
+
+A ready-made [Grafana](https://grafana.com/) board, in `.dev/grafana/dashboards/vitrine.json`, graphs these metrics, and the logs of Vitrine in [Loki](https://grafana.com/oss/loki/). It uses the tabs and rows of Grafana 13 (the v2 schema of its dashboards), so older versions cannot import it. The variables Job, Instance, Route, Source and Cache store filter every panel: Job tells installations of Vitrine apart, and Instance the pods of one. Leave them on All for the whole fleet. Deploys are marked on the graphs, from `vitrine_build_info`.
+
+To try it with 7 days of fake metrics and logs, `docker compose -f .dev/compose.yaml up -d --wait` starts Prometheus, Loki and Grafana, then open <http://localhost:3000/d/vitrine>. [`.dev/README.md`](../../.dev/README.md) explains how it works and how to change the board.
+
+**Overview**: the health of Vitrine at a glance, and which release caused a regression.
+
+![The Overview tab: stats of the time range, traffic, errors, render duration, and the version of each pod](../images/board-overview.png)
+
+**Pages**: traffic, errors and render duration by Route.
+
+![The Pages tab: pages per second, 5xx ratio and render duration by Route, and a table of Routes](../images/board-pages.png)
+
+**Sources**: calls, failures and latency of each Source, and how often the cache spares a call.
+
+![The Sources tab: calls, failure ratio, latency and cache hit ratio of each Source](../images/board-sources.png)
+
+**Cache store**: hit ratio, size and write errors.
+
+![The Cache store tab: hit ratio, reads, entries and write errors](../images/board-cache-store.png)
+
+**Warm-up**: how long warm-ups take, and how many pages with problems they find.
+
+![The Warm-up tab: runs, duration and pages with problems](../images/board-warm-up.png)
+
+**Node**: CPU, memory and event loop by pod, and the restarts of each.
+
+![The Node tab: CPU, memory, event loop lag, restarts and age by pod](../images/board-node.png)
+
+**Logs**: the logs of Vitrine, which are one JSON object per line (see `LOG_LEVEL` in the [README](../../README.md)), and what they tell. The tab needs Loki, with `job`, `instance` and `level` as labels of each stream, as a collector such as Grafana Alloy gives them from the logs of a pod. It counts lines by level and by message, Sources that could not be loaded and why, Templates that failed, Cache store errors, and the duration and failures of warm-ups. At the bottom, the raw lines: filter them with Level and with Search, a case-insensitive regular expression, and click a line for its fields.
+
+![The Logs tab: lines per level, errors by message, failures of Sources and Templates, warm-ups, and the raw JSON logs](../images/board-logs.png)
+
+These screenshots show the fake metrics and logs of `.dev`: a rolling deploy to a bad release (0.5.0) and its hotfix, a flushed Redis, and a GitLab outage.

@@ -1,0 +1,6 @@
+# Where Prometheus scrapes Vitrine. `npm run dev` and `npm run demo` print the port they serve on: 4321 is the first free one.
+# With METRICS_TOKEN set, add `authorization` to the scrape config in prometheus.yml.
+- targets:
+    - host.docker.internal:4321
+  labels:
+    job: vitrine
