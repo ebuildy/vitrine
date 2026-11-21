@@ -1,7 +1,7 @@
 ---
 import { matchRoute } from '../router.ts';
 import { getSettings } from '../settings.ts';
-import { SOURCE_LOOKS } from '../source-looks.ts';
+import { resolveIcon } from '../icons.ts';
 import '../themes/naval.css';
 
 interface Props {
@@ -58,7 +58,7 @@ const SiteNameTag = hasHome ? 'a' : 'span';
 										{/* Decorative, so that a screen reader reads only the label. */}
 										{icon && 'emoji' in icon && <span class="icon" aria-hidden="true">{icon.emoji}</span>}
 										{icon && 'url' in icon && <img class="icon" src={icon.url} alt="" aria-hidden="true" />}
-										{icon && 'embedded' in icon && <img class="icon" src={SOURCE_LOOKS[icon.embedded].icon} alt="" aria-hidden="true" />}
+										{icon && 'embedded' in icon && <img class="icon" src={resolveIcon({ name: icon.embedded })?.url} alt="" aria-hidden="true" />}
 										{label}
 									</a>
 								</li>

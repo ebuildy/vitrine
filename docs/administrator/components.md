@@ -189,7 +189,7 @@ Harbor projects with their creation date and storage used, each linked to its Im
 
 ## `ImageList`
 
-The Images of one Harbor project, with each tag, its size, when it was pushed, and the critical, high, medium and low vulnerabilities of its latest scan.
+The Images of one Harbor project, with each tag, its size, when it was pushed, and the critical, high, medium and low vulnerabilities of its latest scan. The name of each Image has the icon of its technology before it, picked from the last part of the name (`library/nginx` shows nginx, `team/node` shows Node.js), or the Docker icon for a name that matches none.
 
 | Prop | Required | What it does |
 | --- | --- | --- |
@@ -198,7 +198,7 @@ The Images of one Harbor project, with each tag, its size, when it was pushed, a
 
 ## `NexusRepositoryList`
 
-The Published Repositories of a Nexus Source, with their format and type, each linked to its page in Nexus.
+The Published Repositories of a Nexus Source, with their format and type, each linked to its page in Nexus. The name of each Repository has the icon of its format before it, such as maven for `maven2`, npm, Docker, Python for `pypi`, or Go. A format with no logo, like `raw`, shows none.
 
 | Prop | Required | What it does |
 | --- | --- | --- |

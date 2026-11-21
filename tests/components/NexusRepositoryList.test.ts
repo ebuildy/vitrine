@@ -7,9 +7,11 @@ import { writeSettings } from '../support/vitrine.ts';
 
 let nexus: FakeNexus;
 let emptyNexus: FakeNexus;
+let rawNexus: FakeNexus;
 
 beforeAll(async () => {
 	emptyNexus = await startFakeNexus({ repositories: [] });
+	rawNexus = await startFakeNexus({ repositories: [{ name: 'raw-files', format: 'raw', type: 'hosted' }] });
 	nexus = await startFakeNexus({
 		repositories: [
 			{ name: 'maven-releases', format: 'maven2', type: 'hosted' },
@@ -25,6 +27,7 @@ beforeAll(async () => {
 			{ name: 'stale-nexus', type: 'nexus', url: nexus.url, allowedAgeMinutes: 5 },
 			{ name: 'fresh-nexus', type: 'nexus', url: nexus.url },
 			{ name: 'empty-nexus', type: 'nexus', url: emptyNexus.url },
+			{ name: 'raw-nexus', type: 'nexus', url: rawNexus.url },
 		],
 		routes: [],
 	});
@@ -33,6 +36,7 @@ beforeAll(async () => {
 afterAll(async () => {
 	await nexus?.stop();
 	await emptyNexus?.stop();
+	await rawNexus?.stop();
 });
 
 afterEach(() => {
@@ -105,4 +109,32 @@ test('shows an error when the Source is down with nothing cached', async () => {
 	nexus.behave('down');
 
 	expect(await render({ source: 'fresh-nexus' })).toContain('Repositories could not be loaded because fresh-nexus is down.');
+});
+
+/** The icon in the title of each card, by the name of the Repository. */
+function iconsByTitle(html: string) {
+	return Object.fromEntries(
+		[...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/gs)].map(([, title]) => [
+			textOf(title).trim(),
+			/<img[^>]*class="[^"]*tech-icon[^"]*"[^>]*>/.exec(title)?.[0],
+		]),
+	);
+}
+
+test('shows the icon of its format before the title of each Repository, hidden from screen readers', async () => {
+	const icons = iconsByTitle(await render({ source: 'main-nexus' }));
+
+	for (const icon of Object.values(icons)) {
+		expect(icon).toContain('alt=""');
+		expect(icon).toContain('aria-hidden="true"');
+	}
+	expect(new Set(Object.values(icons)).size).toBe(3);
+	expect(Object.keys(icons)).toEqual(['maven-releases', 'npm-proxy', 'docker-all']);
+});
+
+test('shows no icon for a format it has none for, and keeps the title', async () => {
+	const html = await render({ source: 'raw-nexus' });
+
+	expect(iconsByTitle(html)).toEqual({ 'raw-files': undefined });
+	expect(html).not.toContain('<img');
 });

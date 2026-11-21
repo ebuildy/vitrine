@@ -1,6 +1,8 @@
 ---
 import { getNexusSource } from '../settings.ts';
+import { resolveIcon } from '../icons.ts';
 import { listRepositories } from '../sources/nexus.ts';
+import TechIcon from '../partials/TechIcon.astro';
 
 interface Props {
 	source: string;
@@ -20,6 +22,7 @@ const { data: repositories, stale } = await listRepositories(getNexusSource(sour
 			{repositories.slice(0, maxItems).map((repository) => (
 				<li class="card">
 					<h2>
+						<TechIcon icon={resolveIcon({ nexusFormat: repository.format })} />
 						<a href={repository.webUrl}>{repository.name}</a>
 					</h2>
 					<dl>
