@@ -18,6 +18,7 @@ beforeAll(async () => {
 			tagged: ['tagged/api'],
 			nested: ['nested/team/api'],
 			long: ['long/api'],
+			tech: ['tech/nginx', 'tech/api'],
 		},
 		artifacts: {
 			'nested/team/api': [{ size: 1, push_time: '2026-10-01T08:00:00.000Z', tags: [{ name: '1.0', push_time: '2026-10-01T08:00:00.000Z' }] }],
@@ -205,4 +206,20 @@ test('shows an error when the Source is down with nothing cached', async () => {
 
 	expect(html).toContain('Images could not be loaded');
 	expect(html).not.toContain('unreachable/api');
+});
+
+test('shows an icon before the name of each Image: that of its technology, or the Docker one', async () => {
+	const html = await render({ source: 'main-harbor', project: 'tech' });
+
+	const titles = [...html.matchAll(/<h2>(.*?)<\/h2>/gs)].map(([, title]) => ({
+		name: textOf(title).trim(),
+		icon: /<img[^>]*class="[^"]*tech-icon[^"]*"[^>]*>/.exec(title)?.[0] ?? '',
+	}));
+	expect(titles.map(({ name }) => name)).toEqual(['tech/nginx', 'tech/api']);
+	for (const { icon } of titles) {
+		expect(icon).toContain('alt=""');
+		expect(icon).toContain('aria-hidden="true"');
+	}
+	// nginx has an icon of its own, and api falls back to the Docker one.
+	expect(titles[0].icon).not.toBe(titles[1].icon);
 });
