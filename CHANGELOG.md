@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.2.0](https://github.com/ebuildy/vitrine/compare/v0.1.0...v0.2.0) (2026-11-21)
+
+
+### Features
+
+* add Prometheus metrics (cache, warm-up, Sources, rendering) ([7a2c37f](https://github.com/ebuildy/vitrine/commit/7a2c37feb1e4438347ddbab0e2b96485fdd31314))
+* add Prometheus metrics at /metrics ([f8fd0df](https://github.com/ebuildy/vitrine/commit/f8fd0df8e85db642a4cc7c2f7482a31d2a6c3916)), closes [#58](https://github.com/ebuildy/vitrine/issues/58)
+* add vitrine_build_info, labelled with the version ([e35f121](https://github.com/ebuildy/vitrine/commit/e35f12112ce1e7673bcb8814559ee662e04cef06))
+* always refuse a Route at /metrics ([589b6fe](https://github.com/ebuildy/vitrine/commit/589b6feeaaeabf2f14446dfe2aa76ba6782d077b))
+* count pages by Route and status class ([f42df9e](https://github.com/ebuildy/vitrine/commit/f42df9e61f3e7a49eebf5580dd93fd2f723bc269))
+* count reads of a Source through the cache as hits and misses ([d2617e1](https://github.com/ebuildy/vitrine/commit/d2617e16e9d282ac498adf52142623a82bc4d97a))
+* label the metrics of a Source with its name ([c75d798](https://github.com/ebuildy/vitrine/commit/c75d798a5fea9237dd0518646eb438b040e03fd1))
+* let a Route use /metrics when metrics are disabled ([97ca64f](https://github.com/ebuildy/vitrine/commit/97ca64f537903e519eeeadbe9bee655a229f5cfb))
+* log JSON lines on stdout, with the level set by LOG_LEVEL ([8cb0d7b](https://github.com/ebuildy/vitrine/commit/8cb0d7b687686c335a4597d8f908a0c5c73368bf))
+* log JSON lines on stdout, with the level set by LOG_LEVEL ([86b67b3](https://github.com/ebuildy/vitrine/commit/86b67b341753ae8a91238c75a8e576935d00bcc6)), closes [#57](https://github.com/ebuildy/vitrine/issues/57)
+* make the URL of the metrics configurable with metrics.path ([f151cff](https://github.com/ebuildy/vitrine/commit/f151cff6aa716fdb07699c877e5dcf689d26cddf))
+* refuse a Route at /metrics while metrics are enabled ([a07f8d7](https://github.com/ebuildy/vitrine/commit/a07f8d712775cecc3a3530b3e2d670fab433977f))
+* show a technology icon on Nexus Repositories and Harbor Images ([25bca9d](https://github.com/ebuildy/vitrine/commit/25bca9d938bde91fd3d39353a9bdf2a716c41c6a))
+* show a technology icon on Nexus Repositories and Harbor Images ([6b2aa12](https://github.com/ebuildy/vitrine/commit/6b2aa120f08b7d854bc1bda5335759065009f1c2)), closes [#65](https://github.com/ebuildy/vitrine/issues/65)
+
+
+### Bug Fixes
+
+* log the metrics errors through the structured logger ([f380d7c](https://github.com/ebuildy/vitrine/commit/f380d7ce2cf1fa92c848cdcffa0e3c9b1ed4ecab))
+* name the warm-up problems counter with _total ([2b8e58e](https://github.com/ebuildy/vitrine/commit/2b8e58ee2ef03880e9fa7be5fa75d46cf245c10a))
+* start with default Settings when the Settings file is missing ([70d16e8](https://github.com/ebuildy/vitrine/commit/70d16e870b414788ed3a57239ddcffe840be9db7))
+* start with default Settings when the Settings file is missing ([a81a331](https://github.com/ebuildy/vitrine/commit/a81a331b4009e34fc312fe6daf4e1d1371dc70b7)), closes [#55](https://github.com/ebuildy/vitrine/issues/55)
+* time a Source call until its body is read ([fc9cc0e](https://github.com/ebuildy/vitrine/commit/fc9cc0eee65fa15287ca8715bd74ad421005040a))
+* update smoke test to match JSON log format ([cc0096e](https://github.com/ebuildy/vitrine/commit/cc0096e2d70741e0e31c18ff8373df7eeb0de64c))
+
+
+### Performance Improvements
+
+* measure the cache store at most every 30 seconds, and not the size of Redis ([5b8365d](https://github.com/ebuildy/vitrine/commit/5b8365d7119535ab7b665935d268627ea80c7f4d))
+
 ## [0.1.0](https://github.com/ebuildy/vitrine/compare/v0.0.1...v0.1.0) (2026-11-04)
 
 
