@@ -213,7 +213,7 @@ describe.each([
 		expect(scope).toBeDefined();
 		expect(html).toContain(`.mine:where(.${scope})`);
 		expect(html).toContain(`h2:where(.${scope})`);
-		expect(html).toMatch(/<h2[^>]*>platform\/api<\/h2>/);
+		expect(html).toMatch(/<h2[^>]*>(<img[^>]*>)?\s*platform\/api\s*<\/h2>/);
 		expect(html).not.toMatch(new RegExp(`<h2[^>]*${scope}[^>]*>platform/api`));
 	});
 

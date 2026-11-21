@@ -1,7 +1,9 @@
 ---
 import { formatDate, formatSize } from '../format.ts';
+import { resolveIcon } from '../icons.ts';
 import { getHarborSource } from '../settings.ts';
 import { listImages } from '../sources/harbor.ts';
+import TechIcon from '../partials/TechIcon.astro';
 
 interface Props {
 	source: string;
@@ -20,7 +22,10 @@ const { data: images, stale } = await listImages(getHarborSource(source), projec
 		<ul>
 			{images.map((image) => (
 				<li>
-					<h2>{image.name}</h2>
+					<h2>
+						<TechIcon icon={resolveIcon({ imageName: image.name })} />
+						{image.name}
+					</h2>
 					{image.tags.length > 0 ? (
 						<table>
 							<thead>

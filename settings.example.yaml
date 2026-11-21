@@ -86,7 +86,8 @@ branding:
 # The Menu at the top of every page, in this order. A url starts with http://, https:// or /.
 # An icon, before the label, is optional. It is one of:
 #   - an emoji, by its GitHub shortcode, like :rocket: or :books:
-#   - a logo the build carries: gitlab or harbor
+#   - a logo the build carries, by its name: a kind of Source (gitlab, harbor, nexus) or a technology, such as
+#     maven, npm, gradle, java, php, rust, golang, typescript, python, docker or helm. The full list is in src/icons/
 #   - an image at a URL starting with https:// or /
 navigation:
   - label: Images

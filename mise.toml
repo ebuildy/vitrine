@@ -1,2 +1,78 @@
 [tools]
 node = "latest"
+
+[tasks.install]
+description = "Install npm dependencies"
+run = "npm ci"
+
+[tasks.dev]
+description = "Start the dev server (astro dev)"
+run = "npm run dev"
+
+[tasks.demo]
+description = "Serve fake Sources with astro dev and demo/settings.yaml"
+run = "npm run demo"
+
+[tasks.build]
+description = "Build the site"
+run = "npm run build"
+
+[tasks.start]
+description = "Run the built server"
+depends = ["build"]
+run = "npm start"
+
+[tasks.preview]
+description = "Preview the production build"
+run = "npm run preview"
+
+[tasks.warm-up]
+description = "Warm up the cache"
+run = "npm run warm-up"
+
+[tasks.lint]
+description = "Typecheck (astro sync + tsc), as CI does"
+run = "npm run check"
+
+[tasks.services]
+description = "Start the Redis/Valkey of compose.yaml"
+run = "docker compose up -d --wait"
+
+[tasks.test]
+description = "Run unit tests (needs Redis from compose.yaml)"
+depends = ["services"]
+run = "npm test"
+
+[tasks."test:coverage"]
+description = "Run unit tests with v8 coverage"
+depends = ["services"]
+run = "npm run test:coverage"
+
+[tasks."test:e2e"]
+description = "Run Playwright end-to-end tests"
+run = "npm run test:e2e"
+
+[tasks."test:report"]
+description = "Serve the Vitest HTML report"
+run = "npm run test:report"
+
+[tasks."test:coverage:report"]
+description = "Serve the coverage report"
+run = "npm run test:coverage:report"
+
+[tasks."test:e2e:report"]
+description = "Serve the Playwright HTML report"
+run = "npm run test:e2e:report"
+
+[tasks.ci]
+description = "Typecheck, test and build, like CI"
+depends = ["lint", "test:coverage", "build"]
+run = "echo ok"
+
+[tasks."chart:lint"]
+description = "Lint the Helm chart"
+run = "helm lint charts/vitrine"
+
+[tasks.image]
+description = "Build the container image"
+run = "docker build -f Containerfile -t vitrine:dev ."

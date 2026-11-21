@@ -70,6 +70,10 @@ _Avoid_: Logo, identity, white label
 The links at the top of every page, set under `navigation` in Settings, each with an optional icon before its label.
 _Avoid_: Navigation bar, navbar, links
 
+**Technology icon**:
+The small logo of a technology (Maven, npm, Docker, ...) before the title of a card, picked by `resolveIcon` from what the Source reports, such as a Repository's format. The logos are in `src/icons/`, and a Menu item names one under `icon` in Settings.
+_Avoid_: Badge, emblem
+
 **Theme**:
 The look of an installation, set in Settings: a named set of colours and decorations, such as naval, whose colours Settings can override. Every Theme has a light and a dark Colour mode. Components use the colours of the current mode through CSS variables.
 _Avoid_: Palette, skin, Template

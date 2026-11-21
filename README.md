@@ -98,3 +98,5 @@ Open the URL Astro prints. `/`, `/images`, `/images/tools`, `/harbor/main-harbor
 ## License
 
 [MIT](LICENSE)
+
+The technology icons in `src/icons/` come from [Simple Icons](https://simpleicons.org) (CC0 1.0), except `java`, from OpenJDK's Duke (BSD-3-Clause), and the GitLab and Harbor logos, which belong to their projects.

@@ -163,7 +163,7 @@ describe('startup', () => {
 		['a Menu item at a script address', { navigation: [{ label: 'Images', url: 'javascript:alert(1)' }] }, 'navigation.0.url: must start with'],
 		['a Menu item with no label', { navigation: [{ url: '/images' }] }, 'navigation.0.label'],
 		['a Menu icon that is no emoji', { navigation: [{ label: 'Images', url: '/images', icon: ':not-an-emoji:' }] }, 'navigation.0.icon: :not-an-emoji: is not an emoji shortcode'],
-		['a Menu icon the build does not carry', { navigation: [{ label: 'Images', url: '/images', icon: 'nexus' }] }, 'navigation.0.icon: must be an emoji shortcode like :rocket:, one of gitlab, harbor, or a URL'],
+		['a Menu icon the build does not carry', { navigation: [{ label: 'Images', url: '/images', icon: 'cobol' }] }, 'navigation.0.icon: must be an emoji shortcode like :rocket:, a logo the build carries (ansible, cplusplus'],
 		['a Menu icon at a plain-HTTP address', { navigation: [{ label: 'Images', url: '/images', icon: 'http://cdn.acme.test/icon.svg' }] }, 'navigation.0.icon: must be'],
 		['a Menu icon at a page-relative address', { navigation: [{ label: 'Images', url: '/images', icon: 'icon.svg' }] }, 'navigation.0.icon: must be'],
 		['a colour that would end the CSS declaration', { theme: { primary: 'red; color: blue' } }, 'theme.primary: must be a CSS colour'],
